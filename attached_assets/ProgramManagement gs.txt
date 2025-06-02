@@ -1,0 +1,754 @@
+//ProgramManagement.gs
+
+/**
+ * Sets or updates the user's specialized focus for PREP or MAINTENANCE phases.
+ * (Client-callable, session validated)
+ * @param {object} requestData { sessionData: {userId, token}, phaseToSet: "PREP" or "MAINTENANCE", focusProgramId: "PrepStrength", "MaintainRunning", etc. }
+ * @return {object} { success: boolean, message?: string, refreshedToken?: string }
+ */
+
+//This function will be called from the client-side (e.g., Profile page) when the user makes their choice for PREP or MAINTENANCE focus.
+
+function setUserSpecializedPhaseFocus(requestData) {
+  try {
+    const sessionData = requestData.sessionData;
+    const validation = validateClientSessionToken(sessionData.token, sessionData.userId); // from Auth.gs
+    if (!validation.success) {
+      return { success: false, message: validation.message };
+    }
+    const userId = validation.userId;
+    const phaseToSet = requestData.phaseToSet; // "PREP" or "MAINTENANCE"
+    const focusProgramId = requestData.focusProgramId; // e.g., "PrepStrength"
+
+    if (!userId || !phaseToSet || !focusProgramId) {
+      return { success: false, message: "User ID, phase, and focus program ID are required." };
+    }
+
+    // Validate focusProgramId against known specialized program names
+    const validPrepFocus = ["PrepStrength", "PrepRunning", "PrepHyrox"];
+    const validMaintainFocus = ["MaintainStrength", "MaintainRunning", "MaintainHyrox"]; // Allow generic too
+
+    if (phaseToSet === "PREP" && !validPrepFocus.includes(focusProgramId)) {
+        return { success: false, message: "Invalid focus program ID for PREP phase." };
+    }
+    if (phaseToSet === "MAINTENANCE" && !validMaintainFocus.includes(focusProgramId)) {
+        return { success: false, message: "Invalid focus program ID for MAINTENANCE phase." };
+    }
+
+    const userData = getUserData(userId); // from UserManagement.gs
+    if (!userData || !userData.userRow) {
+      return { success: false, message: "User data not found." };
+    }
+
+    // Check if user is actually in the phase they are trying to set focus for (optional, but good)
+    // For now, we allow setting it even if not currently in that phase, for future use.
+    // if (userData.programPhase !== phaseToSet) {
+    //   return { success: false, message: `You are not currently in the ${phaseToSet} phase.` };
+    // }
+
+    const userSpreadsheet = getUserDataSs();
+    const userSheet = getOrCreateSheet(userSpreadsheet, USER_SHEET_NAME);
+    
+    // Assuming SpecializedPhaseFocus is in Column N (index 13 in 0-based array, so cell 14)
+    // Adjust if your column index is different.
+    const focusColumnIndex = 14; // Example: Column N
+    userSheet.getRange(userData.userRow, focusColumnIndex).setValue(focusProgramId);
+
+    Logger.log(`User ${userId} set specialized focus for ${phaseToSet} to ${focusProgramId}`);
+    return { 
+        success: true, 
+        message: `Your focus for the ${phaseToSet.toLowerCase()} phase has been set to ${focusProgramId}.`,
+        refreshedToken: validation.refreshedToken
+    };
+
+  } catch (error) {
+    Logger.log(`Error in setUserSpecializedPhaseFocus: ${error.toString()}`);
+    return { success: false, message: "Server error setting phase focus: " + error.message };
+  }
+}
+
+
+// ProgramManagement.gs
+
+// HYROX_PROGRAMS definition - This should ideally be fetched from a configuration sheet
+// or a more dynamic source, but for now, defining it here as in your provided code.
+// Ensure all fit properties (experienceFit, backgroundFit, timeFit, categoryFit) are present in each program definition.
+const HYROX_PROGRAMS = {
+  "BeginnerProgram": {
+    id: "BeginnerProgram",
+    name: "Complete Beginner 14-Week Program",
+    description: "Perfect for those new to HYROX or structured training. Builds foundational fitness.",
+    totalWeeks: 14, // Assuming this is for the MAIN phase of this program
+    experienceFit: { "Complete Beginner": 1.0, "Fitness Enthusiast": 0.8, "HYROX Novice": 0.4, "Intermediate": 0.2, "Advanced": 0.0, "Elite": 0.0 },
+    backgroundFit: { "General Fitness": 0.9, "Running/Endurance": 0.7, "Strength/CrossFit": 0.7, "Team Sports": 0.8, "No Significant Background": 1.0 },
+    timeFit: { "Very Limited": 0.6, "Limited": 0.7, "Moderate": 0.9, "Substantial": 0.8, "Extensive": 0.6 },
+    categoryFit: { "Standard": 1.0, "Masters 40-49": 0.9, "Masters 50+": 0.8, "Doubles Competitor": 0.7, "Relay Team": 0.5, "Injury Rehabilitation": 0.8, "Off-Season": 0.3 }
+  },
+  "IntermediateProgram": {
+    id: "IntermediateProgram",
+    name: "Intermediate Performance 14-Week Program",
+    description: "For those with some HYROX experience or a good fitness base looking to improve performance.",
+    totalWeeks: 14,
+    experienceFit: { "Complete Beginner": 0.2, "Fitness Enthusiast": 0.5, "HYROX Novice": 1.0, "Intermediate": 1.0, "Advanced": 0.6, "Elite": 0.3 },
+    backgroundFit: { "General Fitness": 0.5, "Running/Endurance": 0.8, "Strength/CrossFit": 0.8, "Team Sports": 0.6, "No Significant Background": 0.2 },
+    timeFit: { "Very Limited": 0.2, "Limited": 0.5, "Moderate": 0.8, "Substantial": 1.0, "Extensive": 0.9 },
+    categoryFit: { "Standard": 1.0, "Masters 40-49": 1.0, "Masters 50+": 0.9, "Doubles Competitor": 0.8, "Relay Team": 0.6, "Injury Rehabilitation": 0.5, "Off-Season": 0.7 }
+  },
+  "AdvancedProgram": {
+    id: "AdvancedProgram",
+    name: "Advanced Competitor 14-Week Program",
+    description: "Designed for experienced HYROX athletes aiming for competitive times and podium finishes.",
+    totalWeeks: 14,
+    experienceFit: { "Complete Beginner": 0.0, "Fitness Enthusiast": 0.1, "HYROX Novice": 0.4, "Intermediate": 0.7, "Advanced": 1.0, "Elite": 1.0 },
+    backgroundFit: { "General Fitness": 0.3, "Running/Endurance": 0.7, "Strength/CrossFit": 1.0, "Team Sports": 0.5, "No Significant Background": 0.1 },
+    timeFit: { "Very Limited": 0.1, "Limited": 0.3, "Moderate": 0.7, "Substantial": 0.9, "Extensive": 1.0 },
+    categoryFit: { "Standard": 1.0, "Masters 40-49": 0.8, "Masters 50+": 0.7, "Doubles Competitor": 1.0, "Relay Team": 0.8, "Injury Rehabilitation": 0.3, "Off-Season": 0.9 }
+  },
+  "MaintenanceProgram": { // Add Maintenance Program definition
+    id: "MaintenanceProgram",
+    name: "General Maintenance Program",
+    description: "A balanced program to maintain fitness levels post-event or during off-season periods.",
+    totalWeeks: 4, // Typically a shorter, repeatable cycle
+    // Fit scores might not be as relevant for a generic maintenance, or could be high for "Off-Season"
+    experienceFit: { "Complete Beginner": 0.5, "Fitness Enthusiast": 0.8, "HYROX Novice": 0.8, "Intermediate": 0.8, "Advanced": 0.8, "Elite": 0.8 },
+    backgroundFit: { "General Fitness": 1.0, "Running/Endurance": 0.8, "Strength/CrossFit": 0.8, "Team Sports": 0.8, "No Significant Background": 0.5 },
+    timeFit: { "Very Limited": 0.7, "Limited": 0.8, "Moderate": 1.0, "Substantial": 0.9, "Extensive": 0.8 },
+    categoryFit: { "Standard": 0.8, "Masters 40-49": 0.8, "Masters 50+": 0.8, "Doubles Competitor": 0.7, "Relay Team": 0.7, "Injury Rehabilitation": 0.6, "Off-Season": 1.0 }
+  },
+  "RunnerProgram": { // Add Maintenance Program definition
+    id: "RunnerProgram",
+    name: "Improve your Running Program",
+    description: "A program to improve your running capacity and speed whilst training for Hyrox.",
+    totalWeeks: 4, // Typically a shorter, repeatable cycle
+    // Fit scores might not be as relevant for a generic maintenance, or could be high for "Off-Season"
+    experienceFit: { "Complete Beginner": 0.3, "Fitness Enthusiast": 0.8, "HYROX Novice": 0.8, "Intermediate": 0.8, "Advanced": 0.3, "Elite": 0.2 },
+    backgroundFit: { "General Fitness": 0.6, "Running/Endurance": 0.3, "Strength/CrossFit": 0.8, "Team Sports": 0.4, "No Significant Background": 0.8 },
+    timeFit: { "Very Limited": 0.7, "Limited": 0.8, "Moderate": 1.0, "Substantial": 0.9, "Extensive": 0.8 },
+    categoryFit: { "Standard": 0.8, "Masters 40-49": 0.8, "Masters 50+": 0.5, "Doubles Competitor": 0.5, "Relay Team": 0.5, "Injury Rehabilitation": 0.3, "Off-Season": 0.4 }
+  },
+    "StrengthProgram": { // Add Maintenance Program definition
+    id: "StrengthProgram",
+    name: "Improve your Strength Program",
+    description: "Are you a strong runner looking to improve your strength and power whilst training for Hyrox.",
+    totalWeeks: 4, // Typically a shorter, repeatable cycle
+    // Fit scores might not be as relevant for a generic maintenance, or could be high for "Off-Season"
+    experienceFit: { "Complete Beginner": 0.3, "Fitness Enthusiast": 0.5, "HYROX Novice": 0.8, "Intermediate": 0.8, "Advanced": 0.5, "Elite": 0.2 },
+    backgroundFit: { "General Fitness": 0.7, "Running/Endurance": 0.9, "Strength/CrossFit": 0.3, "Team Sports": 0.6, "No Significant Background": 0.6 },
+    timeFit: { "Very Limited": 0.7, "Limited": 0.8, "Moderate": 1.0, "Substantial": 0.9, "Extensive": 0.8 },
+    categoryFit: { "Standard": 0.8, "Masters 40-49": 0.6, "Masters 50+": 0.4, "Doubles Competitor": 0.5, "Relay Team": 0.5, "Injury Rehabilitation": 0.5, "Off-Season": 0.5 }
+  },
+  "DoublesProgram": {
+        id: "DoublesProgram",
+        name: "HYROX Doubles/Relay Performance Program",
+        description: "Tailored for the unique demands of HYROX Doubles and Relay competitions.",
+        totalWeeks: 14, // Or adjust as needed
+        experienceFit: { /* ... Define appropriate fit scores ... */ 
+            "Complete Beginner": 0.1, "Fitness Enthusiast": 0.4, "HYROX Novice": 0.8, 
+            "Intermediate": 1.0, "Advanced": 1.0, "Elite": 0.8 
+        },
+        backgroundFit: { /* ... Define ... */ 
+            "General Fitness": 0.7, "Running/Endurance": 0.8, "Strength/CrossFit": 0.8, 
+            "Team Sports": 1.0, "No Significant Background": 0.1
+        },
+        timeFit: { /* ... Define ... */ 
+            "Very Limited": 0.2, "Limited": 0.5, "Moderate": 0.8, 
+            "Substantial": 1.0, "Extensive": 0.9 
+        },
+        categoryFit: { /* ... Define ... */ 
+            "Standard": 0.5, "Masters 40-49": 0.5, "Masters 50+": 0.4, 
+            "Doubles Competitor": 1.0, "Relay Team": 1.0, 
+            "Injury Rehabilitation": 0.2, "Off-Season": 0.6 
+        }
+    }
+  // Add other programs as needed, ensuring all "Fit" objects are defined.
+};
+
+const DEFAULT_PROGRAM_ID = "IntermediateProgram"; // Fallback program
+const MAIN_PROGRAM_TOTAL_WEEKS = 14; // Standard duration for main HYROX programs
+const PREP_CYCLE_WEEKS = 4; // Duration of one prep cycle
+const MAINTENANCE_CYCLE_WEEKS = 4; // Duration of one maintenance cycle
+
+/**
+ * Calculates the initial program state for a user when they register or change programs/event dates.
+ * @param {string} programId The ID of the selected program.
+ * @param {Date|string|null} eventDateObj The user's event date (can be null).
+ * @return {object} { currentWeek, currentDay, programPhase, startDate, virtualStartDate, mainProgramStartDate, eventCompleted }
+ */
+function calculateInitialProgramState(programId, eventDateObj) {
+  const currentDate = new Date();
+  currentDate.setHours(0, 0, 0, 0); // Normalize to start of day
+
+  let eventDate = null;
+  if (eventDateObj) {
+    eventDate = new Date(eventDateObj);
+    if (isNaN(eventDate.getTime())) eventDate = null; // Invalid date string
+    else eventDate.setHours(0,0,0,0);
+  }
+
+  let programPhase = "MAIN"; // Default to MAIN phase
+  let currentWeek = 0;       // 0-indexed
+  let currentDay = 0;        // 0-indexed
+  let startDate = new Date(currentDate); // Actual start date of current phase/program
+  let virtualStartDate = new Date(currentDate); // Date as if starting the selected program from W0D0
+  let mainProgramStartDate = null; // Date when the MAIN phase (14 weeks) should start
+  let eventCompleted = false;
+
+  const selectedProgramDetails = HYROX_PROGRAMS[programId] || HYROX_PROGRAMS[DEFAULT_PROGRAM_ID];
+  const programTotalWeeks = selectedProgramDetails.totalWeeks || MAIN_PROGRAM_TOTAL_WEEKS;
+
+  if (eventDate) {
+    const daysUntilEvent = Math.floor((eventDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (daysUntilEvent < 0) { // Event has passed
+      programPhase = "MAINTENANCE";
+      eventCompleted = true;
+      // currentWeek/Day for maintenance starts at 0,0
+      // virtualStartDate for maintenance can be eventDate or currentDate
+      virtualStartDate = new Date(currentDate); 
+    } else if (daysUntilEvent < (programTotalWeeks * 7)) { // Event is less than program duration away
+      programPhase = "MAIN";
+      const daysIntoProgram = (programTotalWeeks * 7) - daysUntilEvent -1; // -1 because day 0 is the first day
+      currentWeek = Math.floor(daysIntoProgram / 7);
+      currentDay = daysIntoProgram % 7;
+      
+      if (currentWeek < 0) currentWeek = 0; // Safety net
+      if (currentDay < 0) currentDay = 0;   // Safety net
+
+      virtualStartDate = new Date(currentDate);
+      virtualStartDate.setDate(currentDate.getDate() - daysIntoProgram);
+      mainProgramStartDate = new Date(startDate); // Starts main program today
+    } else { // Event is more than program duration away
+      programPhase = "PREP";
+      // currentWeek/Day for PREP starts at 0,0
+      mainProgramStartDate = new Date(eventDate);
+      mainProgramStartDate.setDate(eventDate.getDate() - (programTotalWeeks * 7));
+      virtualStartDate = new Date(currentDate); // Prep starts today
+    }
+  } else { // No event date set
+    programPhase = "MAIN"; // Default to MAIN phase, Week 0, Day 0 (or PREP if you prefer)
+    // If no event date, they start the selected program from W0D0 today.
+    virtualStartDate = new Date(currentDate);
+    mainProgramStartDate = new Date(currentDate); // Assume main program starts now if no event date to guide PREP
+  }
+  
+  Logger.log(`calculateInitialProgramState for Program ${programId}, Event: ${eventDate ? eventDate.toISOString().split('T')[0] : 'None'} -> Phase: ${programPhase}, W${currentWeek}D${currentDay}, VStart: ${virtualStartDate.toISOString().split('T')[0]}`);
+
+  return {
+    currentWeek: currentWeek,
+    currentDay: currentDay,
+    programPhase: programPhase,
+    startDate: startDate,
+    virtualStartDate: virtualStartDate,
+    mainProgramStartDate: mainProgramStartDate,
+    eventCompleted: eventCompleted
+  };
+}
+
+// In ProgramManagement.gs
+function storeProgramSelectionData(userId, programSelection) {
+  try {
+    const userSpreadsheet = getUserDataSpreadsheet(); // Uses the function from Code.gs
+    const selectionSheet = getOrCreateSheet(userSpreadsheet, PROGRAM_SELECTIONS_SHEET_NAME, [
+      "UserID", "SelectionDate", "ProgramID", "ProgramName",
+      "ExperienceLevel", "TrainingBackground", "TimeAvailability",
+      "SpecialCategory", "ModificationsCount", "Reasoning"
+    ]);
+    selectionSheet.appendRow([
+      userId, new Date(),
+      programSelection.recommendedProgram.id, programSelection.recommendedProgram.name,
+      programSelection.experienceLevel, programSelection.trainingBackground,
+      programSelection.timeAvailability, programSelection.specialCategory,
+      programSelection.modifications ? programSelection.modifications.length : 0,
+      programSelection.reasoningExplanation
+    ]);
+    Logger.log(`Program selection data stored for ${userId}`);
+    return true;
+  } catch (e) {
+    Logger.log(`Error storing program selection data for ${userId}: ${e.toString()}`);
+    return false;
+  }
+}
+
+/**
+ * Checks and updates the user's program phase based on dates and progress.
+ * @param {string} userId The user's ID.
+ * @param {object} currentUserData The current user data object.
+ * @return {object} { updated: boolean, newPhase?: string }
+ */
+function checkAndUpdateProgramPhase(userId, currentUserData) {
+  if (!currentUserData || !currentUserData.userRow) {
+    Logger.log(`checkAndUpdateProgramPhase: Invalid currentUserData for ${userId}`);
+    return { updated: false };
+  }
+
+  const userSpreadsheet = getUserDataSpreadsheet();
+  const userSheet = getOrCreateSheet(userSpreadsheet, USER_SHEET_NAME);
+  const userRow = currentUserData.userRow;
+
+  const currentDate = new Date();
+  currentDate.setHours(0, 0, 0, 0);
+
+  const currentPhase = currentUserData.programPhase;
+  const eventDate = currentUserData.eventDate; // This is already a Date object or null
+  const mainProgramStartDate = currentUserData.mainProgramStartDate; // Date object or null
+  const eventCompleted = currentUserData.eventCompleted;
+  
+  const selectedProgramDetails = HYROX_PROGRAMS[currentUserData.programName] || HYROX_PROGRAMS[DEFAULT_PROGRAM_ID];
+  const programTotalWeeks = selectedProgramDetails.totalWeeks || MAIN_PROGRAM_TOTAL_WEEKS;
+
+  let newPhase = currentPhase;
+  let needsUpdate = false;
+  let resetProgress = false; // Flag to reset week/day to 0,0 for new phase
+
+  // Transition from PREP to MAIN
+  if (currentPhase === "PREP" && mainProgramStartDate && currentDate >= mainProgramStartDate) {
+    newPhase = "MAIN";
+    resetProgress = true;
+    needsUpdate = true;
+    Logger.log(`Phase Update: ${userId} PREP -> MAIN (mainProgramStartDate reached)`);
+  }
+  // Transition from MAIN to MAINTENANCE (after event or if program duration completed without event)
+  else if (currentPhase === "MAIN") {
+    if (eventDate && currentDate > eventDate && !eventCompleted) {
+      newPhase = "MAINTENANCE";
+      resetProgress = true;
+      needsUpdate = true;
+      userSheet.getRange(userRow, 13).setValue(true); // Mark event as completed (Col M)
+      Logger.log(`Phase Update: ${userId} MAIN -> MAINTENANCE (eventDate passed)`);
+    } else if (currentUserData.currentWeek >= programTotalWeeks) {
+      // If they complete all weeks of the main program (e.g., 14 weeks)
+      newPhase = "MAINTENANCE";
+      resetProgress = true;
+      needsUpdate = true;
+      // If event date hasn't passed but program is done, they still move to maintenance
+      if (eventDate && currentDate <= eventDate && !eventCompleted) { 
+          Logger.log(`Phase Update: ${userId} MAIN -> MAINTENANCE (program duration completed before event)`);
+      } else {
+          userSheet.getRange(userRow, 13).setValue(true); // Mark event as completed if implied
+          Logger.log(`Phase Update: ${userId} MAIN -> MAINTENANCE (program duration completed)`);
+      }
+    }
+  }
+
+  if (needsUpdate) {
+    userSheet.getRange(userRow, 10).setValue(newPhase); // ProgramPhase in Col J
+    if (resetProgress) {
+      userSheet.getRange(userRow, 2).setValue(0); // CurrentWeek to 0 (Col B)
+      userSheet.getRange(userRow, 3).setValue(0); // CurrentDay to 0 (Col C)
+      userSheet.getRange(userRow, 5).setValue(currentDate); // Update StartDate of new phase (Col E)
+      userSheet.getRange(userRow, 11).setValue(currentDate); // Update VirtualStartDate of new phase (Col K)
+    }
+    Logger.log(`User ${userId} phase updated to ${newPhase}. Progress reset: ${resetProgress}`);
+    return { updated: true, newPhase: newPhase };
+  }
+
+  return { updated: false };
+}
+
+// In ProgramManagement.gs
+
+function getAssessmentFormFields() {
+  // Logger.log("getAssessmentFormFields called on server"); // Add log for server-side check
+  try {
+    return {
+      experience: [
+        { name: "hyroxEventsCompleted", label: "How many HYROX events have you completed?", type: "number", min: 0, default: 0, required: true },
+        { name: "bestFinishTime", label: "Best HYROX finish time? (HH:MM:SS)", type: "text", placeholder: "01:30:00", required: false, description: "Leave blank if none." },
+        { name: "generalFitnessYears", label: "Years of consistent training?", type: "number", min: 0, default: 1, required: true }
+      ],
+      background: [
+        { name: "primaryTrainingBackground", label: "Primary training background?", type: "select", options: ["General Fitness", "Running/Endurance", "Strength/CrossFit", "Team Sports", "No Significant Background"], default: "General Fitness", required: true }
+      ],
+      availability: [
+        { name: "weeklyTrainingDays", label: "Days per week you can train?", type: "number", min: 1, max: 7, default: 4, required: true },
+        { name: "avgSessionLength", label: "Average session length (hours)?", type: "number", step: 0.5, min: 0.5, max: 4, default: 1, required: true },
+        { name: "equipmentAccess", label: "Equipment access?", type: "select", options: ["Full (HYROX specific)", "Limited (Good Gym)", "Minimal (Bodyweight/Running)"], default: "Limited", required: true }
+      ],
+      fitness_tests: [ // Changed key for clarity, avoid just "fitness"
+        { name: "kilometerRunTime", label: "1km run time (minutes)?", type: "number", min: 0, placeholder: "e.g., 4 mins for 1km", required: false, description:"Optional, but helps tailor." },
+        { name: "squatMaxReps", label: "Max bodyweight squats in 1 min?", type: "number", min: 0, placeholder: "e.g., 30", required: false },
+        // Add more test fields here if needed (pushups, wallballs etc.)
+      ],
+      personal_details: [ // Changed key
+        { name: "age", label: "Age?", type: "number", min: 16, max: 99, default: 30, required: true },
+        { name: "competitionFormat", label: "Competition format?", type: "select", options: ["Standard", "Doubles", "Relay"], default: "Standard", required: true },
+        { name: "injuryHistory", label: "Any significant injury history?", type: "checkbox", default: false }, // Label for checkbox is in buildAssessmentFormUI
+        { name: "injuryRecent", label: "Any injuries in past 6 months?", type: "checkbox", default: false } // Label for checkbox
+      ],
+      goals_event: [ // Changed key
+        { name: "goals", label: "Primary goals (select all that apply)", type: "multiselect", options: ["Complete first HYROX", "Improve HYROX time", "Qualify for championships", "Podium in age group", "Overall fitness improvement"], default: ["Complete first HYROX"], required: true },
+        { name: "eventLocation", label: "Target Event Location (Optional)", type: "text", placeholder: "e.g., London, Manchester", required: false },
+        { name: "eventDate", label: "Target Event Date (Optional)", type: "date", required: false }
+      ]
+    };
+  } catch (e) {
+    Logger.log("Error in getAssessmentFormFields: " + e.toString());
+    return {}; // Return empty object or throw error to client
+  }
+}
+// --- Program Selection Algorithm (from your codegs140525.txt, integrated) ---
+
+/**
+ * Main program selection function based on user assessment data.
+ * @param {object} assessmentData Combined user data and assessment results.
+ * @return {object} { recommendedProgram, modifications, reasoningExplanation, ... }
+ */
+function selectHyroxProgram(assessmentData) {
+  try {
+    const experienceLevel = assessExperienceLevel(assessmentData);
+    const trainingBackground = assessTrainingBackground(assessmentData);
+    const timeAvailability = assessTimeAvailability(assessmentData);
+    const specialCategory = checkSpecialCategories(assessmentData);
+    const fitnessProfile = assessFitnessProfile(assessmentData); // You'll need to implement this based on detailed questions
+    const goals = assessmentData.goals || ["Complete first HYROX"];
+
+    let recommendedProgram = weightedProgramSelection(
+      experienceLevel, trainingBackground, timeAvailability, specialCategory, fitnessProfile, goals
+    );
+
+    if (!recommendedProgram) {
+      Logger.log(`No program recommended for user ${assessmentData.username}. Defaulting.`);
+      recommendedProgram = HYROX_PROGRAMS[DEFAULT_PROGRAM_ID]; // Fallback
+    }
+    
+    // In ProgramManagement.gs - inside selectHyroxProgram, before weightedSelection
+if (assessmentData.competitionFormat === "Doubles" || assessmentData.competitionFormat === "Relay") {
+    // Optionally, if experience is sufficient, directly recommend DoublesProgram
+    // Or, ensure DoublesProgram has very high categoryFit scores for these.
+    // For now, rely on weighted selection with well-defined fit scores for DoublesProgram.
+    Logger.log("User indicated Doubles/Relay format, DoublesProgram will be considered strongly.");
+}
+    const programModifications = recommendModifications(recommendedProgram, assessmentData);
+    const reasoning = generateExplanation(experienceLevel, trainingBackground, timeAvailability, specialCategory, fitnessProfile, goals, recommendedProgram);
+
+    return {
+      recommendedProgram: recommendedProgram,
+      modifications: programModifications,
+      reasoningExplanation: reasoning,
+      experienceLevel: experienceLevel,
+      trainingBackground: trainingBackground,
+      timeAvailability: timeAvailability,
+      specialCategory: specialCategory,
+      fitnessProfile: fitnessProfile
+    };
+  } catch (e) {
+    Logger.log("Error in selectHyroxProgram: " + e.toString() + " Stack: " + e.stack);
+    return { // Return a default/error structure
+        recommendedProgram: HYROX_PROGRAMS[DEFAULT_PROGRAM_ID],
+        modifications: [],
+        reasoningExplanation: "An error occurred during program selection. A default program has been assigned.",
+        experienceLevel: "Unknown",
+        trainingBackground: "Unknown",
+        timeAvailability: "Unknown",
+        specialCategory: "Unknown",
+        fitnessProfile: {}
+    };
+  }
+}
+
+// --- Assessment Helper Functions (from your codegs140525.txt) ---
+// These need to be robust and handle various inputs from assessmentData
+
+function assessExperienceLevel(userData) {
+  let finishTimeSeconds = 0;
+  if (userData.bestFinishTime) {
+    if (typeof userData.bestFinishTime === 'string' && userData.bestFinishTime.includes(':')) {
+      const timeParts = userData.bestFinishTime.split(':').map(Number);
+      finishTimeSeconds = (timeParts[0] || 0) * 3600 + (timeParts[1] || 0) * 60 + (timeParts[2] || 0);
+    } else if (typeof userData.bestFinishTime === 'number') {
+      finishTimeSeconds = userData.bestFinishTime;
+    }
+  }
+  const eventsCompleted = parseInt(userData.hyroxEventsCompleted) || 0;
+  const fitnessYears = parseInt(userData.generalFitnessYears) || 0;
+
+  if (eventsCompleted === 0) return fitnessYears > 1 ? "Fitness Enthusiast" : "Complete Beginner"; // Adjusted threshold
+  if (eventsCompleted <= 2) return finishTimeSeconds > 0 && finishTimeSeconds <= 5400 ? "Intermediate" : "HYROX Novice";
+  if (eventsCompleted <= 5) return finishTimeSeconds > 0 && finishTimeSeconds <= 4200 ? "Advanced" : "Intermediate";
+  return finishTimeSeconds > 0 && finishTimeSeconds <= 3900 ? "Elite" : "Advanced";
+}
+
+function assessTrainingBackground(userData) {
+  let strengthScore = calculateStrengthScore(userData);
+  let enduranceScore = calculateEnduranceScore(userData);
+  let differenceThreshold = 2; // Adjusted
+
+  if (userData.primaryTrainingBackground && userData.primaryTrainingBackground !== "No Significant Background") {
+    return userData.primaryTrainingBackground;
+  }
+  if (strengthScore === 0 && enduranceScore === 0) return "No Significant Background";
+  if (Math.abs(strengthScore - enduranceScore) < differenceThreshold) return "General Fitness";
+  return strengthScore > enduranceScore ? "Strength/CrossFit" : "Running/Endurance";
+}
+
+function calculateStrengthScore(userData) {
+  let score = 0;
+  const squatMaxReps = parseInt(userData.squatMaxReps) || 0;
+  // Add more metrics as needed from your assessment form
+  if (squatMaxReps) score += Math.min(5, squatMaxReps / 10); // Scaled
+  return score;
+}
+
+function calculateEnduranceScore(userData) {
+  let score = 0;
+  const kmRunTime = parseFloat(userData.kilometerRunTime) || 0; // Assume seconds
+  // Add more metrics
+  if (kmRunTime > 0) score += Math.min(5, (5 / kmRunTime) * 2.5); // Scaled, 300s (5min) is a baseline
+  return score;
+}
+
+function assessTimeAvailability(userData) {
+  const weeklyDays = parseInt(userData.weeklyTrainingDays) || 0;
+  const sessionLength = parseFloat(userData.avgSessionLength) || 0;
+  const weeklyHours = weeklyDays * sessionLength;
+  if (weeklyHours < 3) return "Very Limited";
+  if (weeklyHours < 5) return "Limited";
+  if (weeklyHours < 8) return "Moderate";
+  if (weeklyHours < 12) return "Substantial";
+  return "Extensive";
+}
+
+function checkSpecialCategories(userData) {
+  const age = parseInt(userData.age) || 30;
+  if (userData.competitionFormat === "Doubles") return "Doubles Competitor";
+  if (userData.competitionFormat === "Relay") return "Relay Team";
+  if (age >= 50) return "Masters 50+";
+  if (age >= 40) return "Masters 40-49";
+  // injuryHistory and injuryRecent are booleans (true/false)
+  if (userData.injuryHistory === true && userData.injuryRecent === true) return "Injury Rehabilitation";
+  if (userData.trainingPhase === "Off-Season") return "Off-Season";
+  return "Standard";
+}
+
+function assessFitnessProfile(userData) {
+  // This needs more detailed implementation based on the specific questions asked.
+  // For now, returning placeholder values.
+  return {
+    runningCapacity: evaluateMetric(userData.kilometerRunTime, 5, true), // Lower is better
+    strengthFoundation: evaluateMetric(userData.squatMaxReps, 30, false), // Higher is better
+    movementQuality: parseInt(userData.movementQualityScore) || 5, // Assume direct score
+    workCapacity: parseInt(userData.workCapacityScore) || 5,     // Assume direct score
+    stationEfficiency: parseInt(userData.stationEfficiencyScore) || 5 // Assume direct score
+  };
+}
+
+function evaluateMetric(value, baseline, lowerIsBetter, scale = 10) {
+    const numValue = parseFloat(value);
+    if (isNaN(numValue) || numValue === 0) return scale / 2; // Default to average if no data
+    if (lowerIsBetter) {
+        return Math.min(scale, Math.max(0, (baseline / numValue) * (scale / 2) ));
+    } else {
+        return Math.min(scale, Math.max(0, (numValue / baseline) * (scale / 2) ));
+    }
+}
+
+
+function calculateFitnessProfileFit(program, fitnessProfile) {
+  // Placeholder - This needs to be defined based on how program characteristics match fitness profile aspects.
+  // Example: A strength-focused program scores higher if fitnessProfile.strengthFoundation is high.
+  // For now, returning a neutral score.
+  let score = 0;
+  let count = 0;
+  // Hypothetical program properties: program.focusStrength, program.focusRunning
+  // This is highly dependent on how you structure your HYROX_PROGRAMS details.
+  // if (program.focusStrength && fitnessProfile.strengthFoundation) { score += fitnessProfile.strengthFoundation; count++; }
+  // if (program.focusRunning && fitnessProfile.runningCapacity) { score += fitnessProfile.runningCapacity; count++; }
+  // return count > 0 ? (score / count) / 10 : 0.5; // Average normalized score, or 0.5 default
+  return 0.8; // Default example value
+}
+
+function weightedProgramSelection(experienceLevel, trainingBackground, timeAvailability, specialCategory, fitnessProfile, goals) {
+  let programScores = {};
+  let bestProgramId = null;
+  let highestScore = -Infinity; // Start with negative infinity
+
+  const programsToEvaluate = Object.values(HYROX_PROGRAMS);
+  if (programsToEvaluate.length === 0) {
+    Logger.log("CRITICAL: No programs defined in HYROX_PROGRAMS.");
+    return HYROX_PROGRAMS[DEFAULT_PROGRAM_ID]; // Return default if empty
+  }
+
+  programsToEvaluate.forEach(program => {
+    if (program.id === "MaintenanceProgram") return; // Exclude maintenance from initial selection
+
+    const expFitScore = (program.experienceFit && program.experienceFit[experienceLevel] !== undefined) ? program.experienceFit[experienceLevel] : 0;
+    const bgFitScore = (program.backgroundFit && program.backgroundFit[trainingBackground] !== undefined) ? program.backgroundFit[trainingBackground] : 0;
+    const timeFitScore = (program.timeFit && program.timeFit[timeAvailability] !== undefined) ? program.timeFit[timeAvailability] : 0;
+    const catFitScore = (program.categoryFit && program.categoryFit[specialCategory] !== undefined) ? program.categoryFit[specialCategory] : 0;
+    const profileFitScore = calculateFitnessProfileFit(program, fitnessProfile);
+
+    // Weights can be adjusted
+    const currentScore =
+      (expFitScore * 0.35) +
+      (bgFitScore * 0.25) +
+      (timeFitScore * 0.20) +
+      (catFitScore * 0.10) +
+      (profileFitScore * 0.10);
+    
+    programScores[program.id] = currentScore;
+    // Logger.log(`Program: ${program.name}, Score: ${currentScore.toFixed(2)} (Exp:${expFitScore}, Bg:${bgFitScore}, Time:${timeFitScore}, Cat:${catFitScore}, Prof:${profileFitScore.toFixed(2)})`);
+
+    if (currentScore > highestScore) {
+      highestScore = currentScore;
+      bestProgramId = program.id;
+    }
+  });
+  
+  if (!bestProgramId) { // Fallback if all scores are 0 or negative
+      bestProgramId = DEFAULT_PROGRAM_ID;
+      Logger.log("Warning: All program scores were <= 0 or no valid programs. Defaulting to: " + HYROX_PROGRAMS[bestProgramId].name);
+  }
+  
+  return HYROX_PROGRAMS[bestProgramId];
+}
+
+function recommendModifications(program, userData) {
+  let modifications = [];
+  // Example modifications - expand this based on program specifics and user data
+  if ((userData.recoveryCapacity || "Moderate") === "Low") {
+    modifications.push({ type: "Volume", action: "Reduce overall volume by 10-15%", reason: "Low recovery capacity." });
+  }
+  if (parseInt(userData.age) > 50 && program.intensity === "High") { // Assuming programs have an intensity field
+    modifications.push({ type: "Intensity", action: "Add an extra rest day or active recovery.", reason: "Age consideration for high intensity." });
+  }
+  return modifications;
+}
+
+function generateExplanation(experienceLevel, trainingBackground, timeAvailability, specialCategory, fitnessProfile, goals, recommendedProgram) {
+  if (!recommendedProgram || !recommendedProgram.name) {
+    return "Could not determine a suitable program. Please review your assessment or contact support.";
+  }
+  return `Based on your experience as a ${experienceLevel}, background in ${trainingBackground}, ` +
+         `${timeAvailability.toLowerCase()} time, and category as ${specialCategory.toLowerCase()}, ` +
+         `the "${recommendedProgram.name}" is recommended. This program aligns with your fitness profile ` +
+         `(Running: ${fitnessProfile.runningCapacity.toFixed(1)}/10, Strength: ${fitnessProfile.strengthFoundation.toFixed(1)}/10) ` +
+         `and your goals: ${goals.join(", ")}.`;
+}
+
+/**
+ * Processes raw assessment data from the client form into a structured object.
+ * @param {object} rawAssessmentData The data from the assessment form.
+ * @return {object} Standardized assessment data object.
+ */
+function processAssessmentData(rawAssessmentData) {
+  if (!rawAssessmentData) rawAssessmentData = {};
+  return {
+    hyroxEventsCompleted: parseInt(rawAssessmentData.hyroxEventsCompleted) || 0,
+    bestFinishTime: rawAssessmentData.bestFinishTime || "",
+    generalFitnessYears: parseInt(rawAssessmentData.generalFitnessYears) || 0,
+    primaryTrainingBackground: rawAssessmentData.primaryTrainingBackground || "General Fitness",
+    weeklyTrainingDays: parseInt(rawAssessmentData.weeklyTrainingDays) || 3,
+    avgSessionLength: parseFloat(rawAssessmentData.avgSessionLength) || 1.0,
+    competitionFormat: rawAssessmentData.competitionFormat || "Standard",
+    age: parseInt(rawAssessmentData.age) || 30,
+    // Ensure boolean conversion for checkboxes
+    injuryHistory: rawAssessmentData.injuryHistory === true || String(rawAssessmentData.injuryHistory).toLowerCase() === 'true',
+    injuryRecent: rawAssessmentData.injuryRecent === true || String(rawAssessmentData.injuryRecent).toLowerCase() === 'true',
+    trainingPhase: rawAssessmentData.trainingPhase || "In-Season", // Example default
+    kilometerRunTime: parseFloat(rawAssessmentData.kilometerRunTime) || 0,
+    squatMaxReps: parseInt(rawAssessmentData.squatMaxReps) || 0,
+    // Add other assessment fields here, ensure parsing and defaults
+    recoveryCapacity: rawAssessmentData.recoveryCapacity || "Moderate",
+    equipmentAccess: rawAssessmentData.equipmentAccess || "Full",
+    goals: Array.isArray(rawAssessmentData.goals) ? rawAssessmentData.goals : (rawAssessmentData.goals ? [rawAssessmentData.goals] : ["Complete first HYROX"])
+  };
+}
+
+
+// --- Public functions callable from client-side ---
+
+/**
+ * Gets the list of available training programs.
+ * Filters out "MaintenanceProgram" from general selection.
+ * @return {Array<object>} Array of program objects {id, name, description}.
+ */
+function getAvailableTrainingPrograms() {
+  try {
+    const programs = Object.values(HYROX_PROGRAMS)
+      .filter(p => p.id !== "MaintenanceProgram") // Exclude maintenance from general selection
+      .map(p => ({
+        id: p.id,
+        name: p.name,
+        description: p.description || "A comprehensive HYROX training program."
+      }));
+    // Logger.log("getAvailableTrainingPrograms: Returning " + programs.length + " programs.");
+    return programs;
+  } catch (e) {
+    Logger.log("Error in getAvailableTrainingPrograms: " + e.toString());
+    return []; // Return empty array on error
+  }
+}
+
+/**
+ * Client-callable function to submit assessment data and get program recommendation.
+ * @param {object} assessmentData Raw data from client's assessment form.
+ * @return {object} { success: boolean, programSelection?: object, message?: string }
+ */
+function submitAssessmentAndGetRecommendation(assessmentData) {
+  try {
+    Logger.log("submitAssessmentAndGetRecommendation: Received data: " + JSON.stringify(assessmentData));
+    const processedData = processAssessmentData(assessmentData);
+    const programSelectionResult = selectHyroxProgram(processedData);
+    
+    Logger.log("submitAssessmentAndGetRecommendation: Selection result: " + JSON.stringify(programSelectionResult));
+    return { success: true, programSelection: programSelectionResult };
+  } catch (error) {
+    Logger.log("Error in submitAssessmentAndGetRecommendation: " + error.toString() + " Stack: " + error.stack);
+    return { success: false, message: "Error processing assessment: " + error.message };
+  }
+}
+
+// In ProgramManagement.gs
+
+/**
+ * Stores the user's processed assessment data into the UserAssessments sheet.
+ * @param {string} userId The UserID.
+ * @param {object} processedAssessmentData The structured assessment data object.
+ */
+function storeUserAssessmentData(userId, processedAssessmentData) {
+  try {
+    if (!userId || !processedAssessmentData) {
+      Logger.log("storeUserAssessmentData: Missing userId or assessment data.");
+      return false; // Indicate failure
+    }
+
+    const userSpreadsheet = getUserDataSpreadsheet(); // From Code.gs
+    const assessmentSheet = getOrCreateSheet(userSpreadsheet, USER_ASSESSMENTS_SHEET_NAME, [
+      "UserID", "AssessmentDate", "HyroxEventsCompleted", "BestFinishTime",
+      "GeneralFitnessYears", "PrimaryTrainingBackground", "WeeklyTrainingDays",
+      "AvgSessionLength", "KilometerRunTime", "SquatMaxReps", 
+      // Add headers for any other assessment fields you collect and want to store
+      "Age", "CompetitionFormat", "InjuryHistory", "InjuryRecent",
+      "EquipmentAccess", "RecoveryCapacity", "Goals" 
+    ]);
+
+    // Prepare the row data based on the headers and processedAssessmentData
+    // Ensure the order matches your headers array.
+    const goalsString = Array.isArray(processedAssessmentData.goals) ? processedAssessmentData.goals.join(', ') : String(processedAssessmentData.goals || "");
+
+    assessmentSheet.appendRow([
+      userId,
+      new Date(), // AssessmentDate
+      processedAssessmentData.hyroxEventsCompleted || 0,
+      processedAssessmentData.bestFinishTime || "",
+      processedAssessmentData.generalFitnessYears || 0,
+      processedAssessmentData.primaryTrainingBackground || "",
+      processedAssessmentData.weeklyTrainingDays || 0,
+      processedAssessmentData.avgSessionLength || 0,
+      processedAssessmentData.kilometerRunTime || 0,
+      processedAssessmentData.squatMaxReps || 0,
+      processedAssessmentData.age || 0,
+      processedAssessmentData.competitionFormat || "",
+      processedAssessmentData.injuryHistory === true, // Store as TRUE/FALSE
+      processedAssessmentData.injuryRecent === true,  // Store as TRUE/FALSE
+      processedAssessmentData.equipmentAccess || "",
+      processedAssessmentData.recoveryCapacity || "", // Assuming this key exists in processedAssessmentData
+      goalsString
+    ]);
+    Logger.log(`Assessment data stored for UserID: ${userId}`);
+    return true; // Indicate success
+  } catch (error) {
+    Logger.log(`Error in storeUserAssessmentData for ${userId}: ${error.toString()}\nStack: ${error.stack}`);
+    return false; // Indicate failure
+  }
+}

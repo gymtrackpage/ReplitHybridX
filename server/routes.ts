@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { seedHyroxPrograms } from "./seedData";
+import { selectHyroxProgram, HYROX_PROGRAMS } from "./programSelection";
 import Stripe from "stripe";
 import { insertProgramSchema, insertWorkoutSchema, insertAssessmentSchema, insertWeightEntrySchema } from "@shared/schema";
 
@@ -373,6 +374,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching workout completions:", error);
       res.status(500).json({ message: "Failed to fetch workout completions" });
+    }
+  });
+
+  // Assessment endpoint with program selection algorithm
+  app.post('/api/assessment', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const assessmentData = req.body;
+      
+      // Use your program selection algorithm
+      const programRecommendation = selectHyroxProgram(assessmentData);
+      
+      // Store the assessment data
+      const validatedData = insertAssessmentSchema.parse({
+        userId: userId,
+        fitnessLevel: programRecommendation.experienceLevel,
+        goals: assessmentData.goals || ["Complete first HYROX"],
+        experience: assessmentData.primaryTrainingBackground || "General Fitness",
+        timeAvailability: parseInt(assessmentData.weeklyTrainingDays) || 4,
+        equipmentAccess: assessmentData.equipmentAccess || ["Full gym access"]
+      });
+      
+      const assessment = await storage.createAssessment(validatedData);
+
+      // Update user's fitness level
+      await storage.updateUserAssessment(userId, programRecommendation.experienceLevel);
+      
+      // Find the recommended program in our database
+      const programs = await storage.getPrograms();
+      const matchingProgram = programs.find(p => 
+        p.name.toLowerCase().includes(programRecommendation.recommendedProgram.name.toLowerCase().split(' ')[0])
+      );
+      
+      if (matchingProgram) {
+        await storage.updateUserProgram(userId, matchingProgram.id);
+      }
+
+      res.json({
+        assessment,
+        programRecommendation: {
+          program: matchingProgram || programs[0],
+          reasoning: programRecommendation.reasoningExplanation,
+          modifications: programRecommendation.modifications,
+          experienceLevel: programRecommendation.experienceLevel,
+          trainingBackground: programRecommendation.trainingBackground,
+          timeAvailability: programRecommendation.timeAvailability,
+          specialCategory: programRecommendation.specialCategory
+        }
+      });
+    } catch (error) {
+      console.error("Error creating assessment:", error);
+      res.status(500).json({ message: "Failed to create assessment" });
+    }
+  });
+
+  // Get available programs for selection
+  app.get('/api/available-programs', async (req, res) => {
+    try {
+      const availablePrograms = Object.values(HYROX_PROGRAMS)
+        .filter(p => p.id !== "MaintenanceProgram")
+        .map(p => ({
+          id: p.id,
+          name: p.name,
+          description: p.description
+        }));
+      
+      res.json(availablePrograms);
+    } catch (error) {
+      console.error("Error fetching available programs:", error);
+      res.status(500).json({ message: "Failed to fetch available programs" });
     }
   });
 
