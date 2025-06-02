@@ -4,6 +4,8 @@ import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { seedHyroxPrograms } from "./seedData";
 import { selectHyroxProgram, HYROX_PROGRAMS } from "./programSelection";
+import { loadProgramsFromCSV, calculateProgramSchedule } from "./programLoader";
+import { determineUserProgramPhase, transitionUserToPhase, checkForPhaseTransition } from "./programPhaseManager";
 import Stripe from "stripe";
 import { insertProgramSchema, insertWorkoutSchema, insertAssessmentSchema, insertWeightEntrySchema } from "@shared/schema";
 
@@ -444,6 +446,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching available programs:", error);
       res.status(500).json({ message: "Failed to fetch available programs" });
+    }
+  });
+
+  // Load complete workout programs from CSV data
+  app.post('/api/load-programs', async (req, res) => {
+    try {
+      const programs = await loadProgramsFromCSV();
+      res.json({ message: "Complete workout programs loaded successfully", count: programs.length });
+    } catch (error) {
+      console.error("Error loading programs:", error);
+      res.status(500).json({ message: "Failed to load programs" });
+    }
+  });
+
+  // Calculate program schedule based on event date
+  app.post('/api/calculate-schedule', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { programId, eventDate } = req.body;
+      
+      const schedule = await calculateProgramSchedule(userId, programId, eventDate ? new Date(eventDate) : null);
+      res.json(schedule);
+    } catch (error) {
+      console.error("Error calculating schedule:", error);
+      res.status(500).json({ message: "Failed to calculate schedule" });
     }
   });
 
