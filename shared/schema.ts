@@ -86,8 +86,9 @@ export const userProgress = pgTable("user_progress", {
   currentDay: integer("current_day").default(1),
   completedWorkouts: integer("completed_workouts").default(0),
   totalWorkouts: integer("total_workouts").default(0),
-  startDate: date("start_date").defaultNow(),
+  startDate: varchar("start_date"),
   lastWorkoutDate: date("last_workout_date"),
+  eventDate: varchar("event_date"), // Store as string for compatibility
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

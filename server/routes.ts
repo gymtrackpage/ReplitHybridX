@@ -281,9 +281,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const assessment = await storage.createAssessment(assessmentData);
       
       // Update user with recommended program
-      const recommendedProgram = await storage.getPrograms().then(programs => 
-        programs.find(p => p.name === programRecommendation.recommendedProgram.name)
-      );
+      const programs = await storage.getPrograms();
+      console.log("Available programs:", programs.map(p => p.name));
+      console.log("Recommended program name:", programRecommendation.recommendedProgram.name);
+      
+      // Map recommendation to actual program names
+      const programNameMapping: { [key: string]: string } = {
+        "Complete Beginner 14-Week Program": "Beginner Program",
+        "Intermediate HYROX 14-Week Program": "Intermediate Program", 
+        "Advanced HYROX 14-Week Program": "Advanced Program",
+        "Strength-Focused 14-Week Program": "Strength Program",
+        "Running-Focused 14-Week Program": "Runner Program",
+        "HYROX Doubles 14-Week Program": "Doubles Program"
+      };
+      
+      const actualProgramName = programNameMapping[programRecommendation.recommendedProgram.name] || 
+                               programRecommendation.recommendedProgram.name;
+      
+      const recommendedProgram = programs.find(p => p.name === actualProgramName);
       
       if (recommendedProgram) {
         await storage.updateUserProgram(userId, recommendedProgram.id);
@@ -300,12 +315,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             programId: recommendedProgram.id,
             currentWeek: 1,
             currentDay: 1,
-            startDate: new Date(),
-            eventDate: eventDate,
+            startDate: new Date().toISOString(),
+            eventDate: eventDate?.toISOString() || null,
             completedWorkouts: 0,
             totalWorkouts: recommendedProgram.duration ? recommendedProgram.duration * (recommendedProgram.frequency || 4) : 56
           });
         }
+        
+        console.log(`Successfully assigned ${actualProgramName} to user ${userId}`);
+      } else {
+        console.error(`Program not found: ${actualProgramName}. Available programs:`, programs.map(p => p.name));
       }
       
       // Update user's fitness level based on program recommendation
