@@ -19,6 +19,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
 
+  // Initialize programs and workouts if not already loaded
+  try {
+    const existingPrograms = await storage.getPrograms();
+    if (existingPrograms.length === 0) {
+      console.log("Loading HYROX programs and workouts...");
+      await seedHyroxPrograms();
+      await loadProgramsFromCSV();
+    }
+  } catch (error) {
+    console.error("Error initializing programs:", error);
+  }
+
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
@@ -233,6 +245,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Create user progress entry for the program
         const eventDate = req.body.eventDate ? new Date(req.body.eventDate) : null;
         await calculateProgramSchedule(userId, recommendedProgram.id, eventDate);
+        
+        // Create initial user progress tracking
+        const existingProgress = await storage.getUserProgress(userId);
+        if (!existingProgress) {
+          await storage.createUserProgress({
+            userId,
+            programId: recommendedProgram.id,
+            currentWeek: 1,
+            currentDay: 1,
+            startDate: new Date(),
+            eventDate: eventDate,
+            completedWorkouts: 0,
+            totalWorkouts: recommendedProgram.duration ? recommendedProgram.duration * (recommendedProgram.frequency || 4) : 56
+          });
+        }
       }
       
       // Update user's fitness level based on program recommendation
