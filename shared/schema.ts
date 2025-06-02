@@ -42,11 +42,14 @@ export const users = pgTable("users", {
   assessmentCompleted: boolean("assessment_completed").default(false),
   streak: integer("streak").default(0),
   totalWorkouts: integer("total_workouts").default(0),
+  hyroxEventDate: timestamp("hyrox_event_date"),
+  hyroxEventLocation: varchar("hyrox_event_location"),
+  targetTime: varchar("target_time"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Training programs table
+// Hyrox training programs table
 export const programs = pgTable("programs", {
   id: serial("id").primaryKey(),
   name: varchar("name").notNull(),
@@ -54,7 +57,8 @@ export const programs = pgTable("programs", {
   duration: integer("duration"), // weeks
   difficulty: varchar("difficulty"), // beginner, intermediate, advanced
   frequency: integer("frequency"), // workouts per week
-  category: varchar("category"), // strength, cardio, functional, etc.
+  category: varchar("category").default("hyrox"), // hyrox, strength, conditioning
+  targetEventWeeks: integer("target_event_weeks"), // weeks until event
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

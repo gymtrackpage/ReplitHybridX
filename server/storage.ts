@@ -31,6 +31,7 @@ export interface IStorage {
   updateUserStripeInfo(userId: string, customerId: string, subscriptionId: string): Promise<User>;
   updateUserProgram(userId: string, programId: number): Promise<User>;
   updateUserAssessment(userId: string, fitnessLevel: string): Promise<User>;
+  updateUserProfile(userId: string, profileData: Partial<UpsertUser>): Promise<User>;
 
   // Program operations
   getPrograms(): Promise<Program[]>;
@@ -124,6 +125,18 @@ export class DatabaseStorage implements IStorage {
       .set({
         fitnessLevel,
         assessmentCompleted: true,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    return user;
+  }
+
+  async updateUserProfile(userId: string, profileData: Partial<UpsertUser>): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({
+        ...profileData,
         updatedAt: new Date(),
       })
       .where(eq(users.id, userId))
