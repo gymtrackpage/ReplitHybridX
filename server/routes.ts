@@ -43,6 +43,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // User profile with assessment data
+  app.get('/api/profile', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const assessment = await storage.getUserAssessment(userId);
+      const progress = await storage.getUserProgress(userId);
+      const completions = await storage.getWorkoutCompletions(userId);
+      
+      res.json({
+        user,
+        assessment,
+        progress,
+        completions,
+        totalCompletions: completions.length
+      });
+    } catch (error) {
+      console.error("Error fetching user profile:", error);
+      res.status(500).json({ message: "Failed to fetch user profile" });
+    }
+  });
+
   // Dashboard data
   app.get('/api/dashboard', isAuthenticated, async (req: any, res) => {
     try {
@@ -266,6 +288,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const fitnessLevel = programRecommendation.experienceLevel;
       await storage.updateUserAssessment(userId, fitnessLevel);
 
+      // Update user profile with assessment data
+      await storage.updateUserProfile(userId, {
+        assessmentCompleted: true,
+        hyroxEventDate: req.body.eventDate ? new Date(req.body.eventDate) : null,
+        hyroxEventLocation: req.body.eventLocation || null,
+        targetTime: req.body.bestFinishTime || null,
+        fitnessLevel: fitnessLevel,
+        updatedAt: new Date()
+      });
+
       res.json({
         ...assessment,
         programRecommendation,
@@ -274,6 +306,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error saving assessment:", error);
       res.status(500).json({ message: "Failed to save assessment" });
+    }
+  });
+
+  // Workout completion
+  app.post('/api/complete-workout', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { workoutId, duration, notes, exerciseData } = req.body;
+
+      // Create workout completion record
+      const completion = await storage.createWorkoutCompletion({
+        userId,
+        workoutId,
+        duration,
+        notes,
+        exerciseData: JSON.stringify(exerciseData)
+      });
+
+      // Update user progress
+      const progress = await storage.getUserProgress(userId);
+      if (progress) {
+        await storage.updateUserProgress(userId, {
+          completedWorkouts: progress.completedWorkouts + 1
+        });
+      }
+
+      // Update user's total workout count and streak
+      const user = await storage.getUser(userId);
+      if (user) {
+        await storage.updateUserProfile(userId, {
+          totalWorkouts: user.totalWorkouts + 1,
+          streak: user.streak + 1
+        });
+      }
+
+      res.json(completion);
+    } catch (error) {
+      console.error("Error completing workout:", error);
+      res.status(500).json({ message: "Failed to complete workout" });
     }
   });
 
