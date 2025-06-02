@@ -8,7 +8,7 @@ import Landing from "@/pages/landing";
 import Dashboard from "@/pages/dashboard";
 import Admin from "@/pages/admin";
 import Subscribe from "@/pages/subscribe";
-import Assessment from "@/pages/assessment";
+import EnhancedAssessment from "@/pages/enhanced-assessment";
 import Calendar from "@/pages/calendar";
 import Profile from "@/pages/profile";
 import NotFound from "@/pages/not-found";
@@ -36,7 +36,7 @@ function Router() {
           <Route path="/profile" component={Profile} />
           <Route path="/admin" component={Admin} />
           <Route path="/subscribe" component={Subscribe} />
-          <Route path="/assessment" component={Assessment} />
+          <Route path="/assessment" component={EnhancedAssessment} />
         </>
       )}
       <Route component={NotFound} />

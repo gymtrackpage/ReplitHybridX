@@ -43,61 +43,152 @@ interface AssessmentData {
 
 const questions = [
   {
-    id: 'fitnessLevel',
-    title: "What's your current fitness level?",
+    id: 'hyroxEventsCompleted',
+    title: "How many HYROX events have you completed?",
+    type: 'number',
+    required: true,
+    min: 0,
+    description: "Enter 0 if you haven't completed any events yet"
+  },
+  {
+    id: 'bestFinishTime',
+    title: "Best HYROX finish time (HH:MM:SS)?",
+    type: 'text',
+    required: false,
+    placeholder: '01:30:00',
+    description: 'Leave blank if you haven\'t completed an event'
+  },
+  {
+    id: 'generalFitnessYears',
+    title: "Years of consistent training?",
+    type: 'number',
+    required: true,
+    min: 0,
+    description: "How many years have you been training regularly?"
+  },
+  {
+    id: 'primaryTrainingBackground',
+    title: "Primary training background?",
     type: 'radio',
+    required: true,
     options: [
-      { value: 'beginner', label: 'Beginner', description: 'Little to no regular exercise' },
-      { value: 'intermediate', label: 'Intermediate', description: 'Regular exercise 2-3 times per week' },
-      { value: 'advanced', label: 'Advanced', description: 'Consistent training 4+ times per week' },
+      { value: 'General Fitness', label: 'General Fitness' },
+      { value: 'Running/Endurance', label: 'Running/Endurance' },
+      { value: 'Strength/CrossFit', label: 'Strength/CrossFit' },
+      { value: 'Team Sports', label: 'Team Sports' },
+      { value: 'No Significant Background', label: 'No Significant Background' },
     ],
   },
   {
-    id: 'goals',
-    title: "What are your primary fitness goals?",
-    type: 'checkbox',
-    options: [
-      { value: 'strength', label: 'Build Strength' },
-      { value: 'muscle', label: 'Gain Muscle Mass' },
-      { value: 'weight_loss', label: 'Lose Weight' },
-      { value: 'endurance', label: 'Improve Endurance' },
-      { value: 'flexibility', label: 'Increase Flexibility' },
-      { value: 'athletic', label: 'Athletic Performance' },
-    ],
+    id: 'weeklyTrainingDays',
+    title: "Days per week you can train?",
+    type: 'number',
+    required: true,
+    min: 1,
+    max: 7,
+    description: "How many days per week can you commit to training?"
   },
   {
-    id: 'experience',
-    title: "How much weight training experience do you have?",
-    type: 'radio',
-    options: [
-      { value: 'none', label: 'No Experience', description: 'Never lifted weights before' },
-      { value: 'some', label: 'Some Experience', description: '6 months - 2 years' },
-      { value: 'experienced', label: 'Experienced', description: '2+ years of consistent training' },
-    ],
-  },
-  {
-    id: 'timeAvailability',
-    title: "How much time can you dedicate per workout?",
-    type: 'radio',
-    options: [
-      { value: '30', label: '30 minutes', description: 'Quick, efficient workouts' },
-      { value: '45', label: '45 minutes', description: 'Standard workout duration' },
-      { value: '60', label: '60 minutes', description: 'Comprehensive training sessions' },
-      { value: '90', label: '90+ minutes', description: 'Extended training sessions' },
-    ],
+    id: 'avgSessionLength',
+    title: "Average session length (hours)?",
+    type: 'number',
+    required: true,
+    min: 0.5,
+    max: 4,
+    step: 0.5,
+    description: "How long is each training session on average?"
   },
   {
     id: 'equipmentAccess',
-    title: "What equipment do you have access to?",
-    type: 'checkbox',
+    title: "Equipment access?",
+    type: 'radio',
+    required: true,
     options: [
-      { value: 'bodyweight', label: 'Bodyweight Only' },
-      { value: 'dumbbells', label: 'Dumbbells' },
-      { value: 'barbells', label: 'Barbells' },
-      { value: 'resistance_bands', label: 'Resistance Bands' },
-      { value: 'gym', label: 'Full Gym Access' },
-      { value: 'home_gym', label: 'Home Gym Setup' },
+      { value: 'Full (HYROX specific)', label: 'Full (HYROX specific)', description: 'Access to SkiErg, sleds, wall balls, etc.' },
+      { value: 'Limited (Good Gym)', label: 'Limited (Good Gym)', description: 'Standard gym with most equipment' },
+      { value: 'Minimal (Bodyweight/Running)', label: 'Minimal (Bodyweight/Running)', description: 'Limited equipment, mostly bodyweight' },
     ],
+  },
+  {
+    id: 'kilometerRunTime',
+    title: "1km run time (minutes)?",
+    type: 'number',
+    required: false,
+    min: 0,
+    step: 0.1,
+    placeholder: '4.5',
+    description: 'Optional fitness test - enter time in minutes (e.g. 4.5 for 4:30)'
+  },
+  {
+    id: 'squatMaxReps',
+    title: "Max bodyweight squats in 1 minute?",
+    type: 'number',
+    required: false,
+    min: 0,
+    placeholder: '30',
+    description: 'Optional fitness test - how many squats can you do in 1 minute?'
+  },
+  {
+    id: 'age',
+    title: "Age?",
+    type: 'number',
+    required: true,
+    min: 16,
+    max: 99,
+    description: "Your current age"
+  },
+  {
+    id: 'competitionFormat',
+    title: "Competition format?",
+    type: 'radio',
+    required: true,
+    options: [
+      { value: 'Standard', label: 'Standard', description: 'Individual HYROX competition' },
+      { value: 'Doubles', label: 'Doubles', description: 'Two-person team competition' },
+      { value: 'Relay', label: 'Relay', description: 'Four-person relay team' },
+    ],
+  },
+  {
+    id: 'injuryHistory',
+    title: "Any significant injury history?",
+    type: 'checkbox',
+    required: false,
+    description: "Check if you have any significant injury history"
+  },
+  {
+    id: 'injuryRecent',
+    title: "Any injuries in past 6 months?",
+    type: 'checkbox',
+    required: false,
+    description: "Check if you've had any injuries in the past 6 months"
+  },
+  {
+    id: 'goals',
+    title: "Primary goals (select all that apply)",
+    type: 'checkbox',
+    required: true,
+    options: [
+      { value: 'Complete first HYROX', label: 'Complete first HYROX' },
+      { value: 'Improve HYROX time', label: 'Improve HYROX time' },
+      { value: 'Qualify for championships', label: 'Qualify for championships' },
+      { value: 'Podium in age group', label: 'Podium in age group' },
+      { value: 'Overall fitness improvement', label: 'Overall fitness improvement' },
+    ],
+  },
+  {
+    id: 'eventLocation',
+    title: "Target Event Location (Optional)",
+    type: 'text',
+    required: false,
+    placeholder: 'e.g., London, Manchester',
+    description: 'Where is your target HYROX event?'
+  },
+  {
+    id: 'eventDate',
+    title: "Target Event Date (Optional)",
+    type: 'date',
+    required: false,
+    description: 'When is your target HYROX event?'
   },
 ];
 
@@ -107,7 +198,16 @@ export default function Assessment() {
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<Partial<AssessmentData>>({
     goals: [],
-    equipmentAccess: [],
+    hyroxEventsCompleted: 0,
+    generalFitnessYears: 1,
+    weeklyTrainingDays: 4,
+    avgSessionLength: 1,
+    age: 30,
+    competitionFormat: 'Standard',
+    primaryTrainingBackground: 'General Fitness',
+    equipmentAccess: 'Limited (Good Gym)',
+    injuryHistory: false,
+    injuryRecent: false,
   });
 
   const assessmentMutation = useMutation({
