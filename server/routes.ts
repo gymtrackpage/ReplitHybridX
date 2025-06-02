@@ -6,7 +6,7 @@ import { selectHyroxProgram, HYROX_PROGRAMS } from "./programSelection";
 import { loadProgramsFromCSV, calculateProgramSchedule } from "./programLoader";
 import { determineUserProgramPhase, transitionUserToPhase, checkForPhaseTransition } from "./programPhaseManager";
 import { seedHyroxPrograms } from "./seedData";
-import { loadBeginnerProgramFromCSV } from "./csvWorkoutLoader";
+import { loadAllHyroxPrograms } from "./comprehensiveCSVLoader";
 import Stripe from "stripe";
 import { insertProgramSchema, insertWorkoutSchema, insertAssessmentSchema, insertWeightEntrySchema } from "@shared/schema";
 
@@ -23,15 +23,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Initialize programs endpoint
   app.post('/api/init-programs', isAuthenticated, async (req: any, res) => {
     try {
-      console.log("Loading HYROX programs and workouts...");
-      await seedHyroxPrograms();
-      await loadBeginnerProgramFromCSV();
+      console.log("Loading all HYROX programs and workouts...");
+      await loadAllHyroxPrograms();
       const programs = await storage.getPrograms();
-      const workouts = await storage.getWorkoutsByProgram(programs[0]?.id || 1);
+      let totalWorkouts = 0;
+      for (const program of programs) {
+        const workouts = await storage.getWorkoutsByProgram(program.id);
+        totalWorkouts += workouts.length;
+      }
       res.json({ 
-        message: "Programs and workouts initialized", 
+        message: "All HYROX programs and workouts initialized", 
         programCount: programs.length,
-        workoutCount: workouts.length 
+        workoutCount: totalWorkouts,
+        programs: programs.map(p => ({ id: p.id, name: p.name, category: p.category }))
       });
     } catch (error) {
       console.error("Error initializing programs:", error);
@@ -43,10 +47,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   try {
     const existingPrograms = await storage.getPrograms();
     if (existingPrograms.length === 0) {
-      console.log("Loading HYROX programs and detailed workouts...");
-      await seedHyroxPrograms();
-      await loadBeginnerProgramFromCSV();
-      console.log("Programs and workouts initialized successfully");
+      console.log("Loading all HYROX programs and detailed workouts...");
+      await loadAllHyroxPrograms();
+      console.log("All programs and workouts initialized successfully");
     }
   } catch (error) {
     console.error("Error initializing programs:", error);
