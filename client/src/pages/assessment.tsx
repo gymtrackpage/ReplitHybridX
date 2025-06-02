@@ -12,11 +12,33 @@ import { Checkbox } from "@/components/ui/checkbox";
 import Navigation from "@/components/Navigation";
 
 interface AssessmentData {
-  fitnessLevel: string;
+  // Experience Level Assessment
+  hyroxEventsCompleted: number;
+  bestFinishTime: string;
+  generalFitnessYears: number;
+  
+  // Training Background
+  primaryTrainingBackground: string;
+  
+  // Time Availability
+  weeklyTrainingDays: number;
+  avgSessionLength: number;
+  equipmentAccess: string;
+  
+  // Fitness Tests
+  kilometerRunTime: number;
+  squatMaxReps: number;
+  
+  // Personal Details
+  age: number;
+  competitionFormat: string;
+  injuryHistory: boolean;
+  injuryRecent: boolean;
+  
+  // Goals and Event
   goals: string[];
-  experience: string;
-  timeAvailability: number;
-  equipmentAccess: string[];
+  eventLocation: string;
+  eventDate: string;
 }
 
 const questions = [
