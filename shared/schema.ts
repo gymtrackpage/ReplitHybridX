@@ -108,11 +108,12 @@ export const workoutCompletions = pgTable("workout_completions", {
 export const assessments = pgTable("assessments", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull(),
-  fitnessLevel: varchar("fitness_level").notNull(),
-  goals: jsonb("goals").notNull(),
+  fitnessLevel: varchar("fitness_level"),
+  goals: jsonb("goals"),
   experience: varchar("experience"),
   timeAvailability: integer("time_availability"), // minutes per workout
   equipmentAccess: jsonb("equipment_access"),
+  data: jsonb("data"), // Store complete HYROX assessment data
   completedAt: timestamp("completed_at").defaultNow(),
 });
 

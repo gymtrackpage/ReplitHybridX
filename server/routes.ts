@@ -2,10 +2,10 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
-import { seedHyroxPrograms } from "./seedData";
 import { selectHyroxProgram, HYROX_PROGRAMS } from "./programSelection";
 import { loadProgramsFromCSV, calculateProgramSchedule } from "./programLoader";
 import { determineUserProgramPhase, transitionUserToPhase, checkForPhaseTransition } from "./programPhaseManager";
+import { seedHyroxPrograms } from "./seedData";
 import Stripe from "stripe";
 import { insertProgramSchema, insertWorkoutSchema, insertAssessmentSchema, insertWeightEntrySchema } from "@shared/schema";
 
@@ -210,17 +210,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/assessment', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      
+      // Use your program selection algorithm
+      const programRecommendation = selectHyroxProgram(req.body);
+      
       const assessmentData = insertAssessmentSchema.parse({
         ...req.body,
         userId,
+        data: JSON.stringify(req.body), // Store full assessment data
       });
 
       const assessment = await storage.createAssessment(assessmentData);
       
-      // Update user's fitness level
-      await storage.updateUserAssessment(userId, req.body.fitnessLevel);
+      // Update user with recommended program
+      const recommendedProgram = await storage.getPrograms().then(programs => 
+        programs.find(p => p.name === programRecommendation.recommendedProgram.name)
+      );
+      
+      if (recommendedProgram) {
+        await storage.updateUserProgram(userId, recommendedProgram.id);
+        
+        // Create user progress entry for the program
+        const eventDate = req.body.eventDate ? new Date(req.body.eventDate) : null;
+        await calculateProgramSchedule(userId, recommendedProgram.id, eventDate);
+      }
+      
+      // Update user's fitness level based on program recommendation
+      const fitnessLevel = programRecommendation.experienceLevel;
+      await storage.updateUserAssessment(userId, fitnessLevel);
 
-      res.json(assessment);
+      res.json({
+        ...assessment,
+        programRecommendation,
+        recommendedProgram
+      });
     } catch (error) {
       console.error("Error saving assessment:", error);
       res.status(500).json({ message: "Failed to save assessment" });
