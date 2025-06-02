@@ -6,7 +6,8 @@ import { isUnauthorizedError } from "@/lib/authUtils";
 import Navigation from "@/components/Navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Dumbbell, Calendar, User } from "lucide-react";
+import { Dumbbell, Calendar, User, ClipboardList } from "lucide-react";
+import { Link } from "wouter";
 
 export default function Dashboard() {
   const { user, isLoading: authLoading, isAuthenticated } = useAuth();
@@ -83,19 +84,29 @@ export default function Dashboard() {
       
       {/* Navigation Tabs */}
       <div className="bg-white px-4 py-3 border-b border-gray-200">
-        <div className="flex space-x-1">
+        <div className="flex space-x-1 overflow-x-auto">
           <Button variant="ghost" className="flex items-center space-x-2 bg-gray-100 text-gray-900 rounded-lg px-4 py-2">
             <Dumbbell className="h-4 w-4" />
             <span className="font-medium">Today's Workout</span>
           </Button>
-          <Button variant="ghost" className="flex items-center space-x-2 text-gray-600 px-4 py-2">
-            <Calendar className="h-4 w-4" />
-            <span>Calendar</span>
-          </Button>
-          <Button variant="ghost" className="flex items-center space-x-2 text-gray-600 px-4 py-2">
-            <User className="h-4 w-4" />
-            <span>My Profile</span>
-          </Button>
+          <Link href="/calendar">
+            <Button variant="ghost" className="flex items-center space-x-2 text-gray-600 px-4 py-2">
+              <Calendar className="h-4 w-4" />
+              <span>Calendar</span>
+            </Button>
+          </Link>
+          <Link href="/profile">
+            <Button variant="ghost" className="flex items-center space-x-2 text-gray-600 px-4 py-2">
+              <User className="h-4 w-4" />
+              <span>My Profile</span>
+            </Button>
+          </Link>
+          <Link href="/assessment">
+            <Button variant="ghost" className="flex items-center space-x-2 text-gray-600 px-4 py-2">
+              <ClipboardList className="h-4 w-4" />
+              <span>Assessment</span>
+            </Button>
+          </Link>
         </div>
       </div>
 
