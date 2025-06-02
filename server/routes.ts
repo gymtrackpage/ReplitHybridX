@@ -46,7 +46,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Initialize programs and workouts if not already loaded
   try {
     const existingPrograms = await storage.getPrograms();
-    if (existingPrograms.length === 0) {
+    if (existingPrograms.length === 0 || !existingPrograms.some(p => p.name === "Beginner Program")) {
       console.log("Loading all HYROX programs and detailed workouts...");
       await loadAllHyroxPrograms();
       console.log("All programs and workouts initialized successfully");
@@ -290,6 +290,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "Complete Beginner 14-Week Program": "Beginner Program",
         "Intermediate HYROX 14-Week Program": "Intermediate Program", 
         "Advanced HYROX 14-Week Program": "Advanced Program",
+        "Advanced Competitor 14-Week Program": "Advanced Program",
         "Strength-Focused 14-Week Program": "Strength Program",
         "Running-Focused 14-Week Program": "Runner Program",
         "HYROX Doubles 14-Week Program": "Doubles Program"
