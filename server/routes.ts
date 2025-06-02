@@ -6,6 +6,7 @@ import { selectHyroxProgram, HYROX_PROGRAMS } from "./programSelection";
 import { loadProgramsFromCSV, calculateProgramSchedule } from "./programLoader";
 import { determineUserProgramPhase, transitionUserToPhase, checkForPhaseTransition } from "./programPhaseManager";
 import { seedHyroxPrograms } from "./seedData";
+import { loadBeginnerProgramFromCSV } from "./csvWorkoutLoader";
 import Stripe from "stripe";
 import { insertProgramSchema, insertWorkoutSchema, insertAssessmentSchema, insertWeightEntrySchema } from "@shared/schema";
 
@@ -24,9 +25,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log("Loading HYROX programs and workouts...");
       await seedHyroxPrograms();
-      await loadProgramsFromCSV();
+      await loadBeginnerProgramFromCSV();
       const programs = await storage.getPrograms();
-      res.json({ message: "Programs initialized", count: programs.length });
+      const workouts = await storage.getWorkoutsByProgram(programs[0]?.id || 1);
+      res.json({ 
+        message: "Programs and workouts initialized", 
+        programCount: programs.length,
+        workoutCount: workouts.length 
+      });
     } catch (error) {
       console.error("Error initializing programs:", error);
       res.status(500).json({ message: "Failed to initialize programs" });
@@ -37,9 +43,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   try {
     const existingPrograms = await storage.getPrograms();
     if (existingPrograms.length === 0) {
-      console.log("Loading HYROX programs and workouts...");
+      console.log("Loading HYROX programs and detailed workouts...");
       await seedHyroxPrograms();
-      await loadProgramsFromCSV();
+      await loadBeginnerProgramFromCSV();
+      console.log("Programs and workouts initialized successfully");
     }
   } catch (error) {
     console.error("Error initializing programs:", error);
