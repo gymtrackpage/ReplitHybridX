@@ -75,28 +75,7 @@ export default function Dashboard() {
 
   const { progress, todaysWorkout, weeklyCompletions } = dashboardData;
 
-  const quickActions = [
-    {
-      icon: Weight,
-      label: "Log Weight",
-      action: () => toast({ title: "Weight logging coming soon!" }),
-    },
-    {
-      icon: Utensils,
-      label: "Nutrition Guide",
-      action: () => toast({ title: "Nutrition guide coming soon!" }),
-    },
-    {
-      icon: MessageCircle,
-      label: "Contact Trainer",
-      action: () => toast({ title: "Trainer messaging coming soon!" }),
-    },
-    {
-      icon: Search,
-      label: "Browse Programs",
-      action: () => window.location.href = "/programs",
-    },
-  ];
+  // Quick actions removed as they're not needed in the mobile-first design
 
   return (
     <div className="min-h-screen bg-gray-100">
