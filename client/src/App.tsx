@@ -9,6 +9,8 @@ import Dashboard from "@/pages/dashboard";
 import Admin from "@/pages/admin";
 import Subscribe from "@/pages/subscribe";
 import Assessment from "@/pages/assessment";
+import Calendar from "@/pages/calendar";
+import Profile from "@/pages/profile";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -29,6 +31,9 @@ function Router() {
       ) : (
         <>
           <Route path="/" component={Dashboard} />
+          <Route path="/dashboard" component={Dashboard} />
+          <Route path="/calendar" component={Calendar} />
+          <Route path="/profile" component={Profile} />
           <Route path="/admin" component={Admin} />
           <Route path="/subscribe" component={Subscribe} />
           <Route path="/assessment" component={Assessment} />

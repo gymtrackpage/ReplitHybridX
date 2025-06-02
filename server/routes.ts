@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
+import { seedHyroxPrograms } from "./seedData";
 import Stripe from "stripe";
 import { insertProgramSchema, insertWorkoutSchema, insertAssessmentSchema, insertWeightEntrySchema } from "@shared/schema";
 
@@ -311,6 +312,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Stripe error:", error);
       res.status(400).json({ error: { message: error.message } });
+    }
+  });
+
+  // Profile routes
+  app.put('/api/profile', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const profileData = req.body;
+      
+      // Convert date string to Date object if provided
+      if (profileData.hyroxEventDate) {
+        profileData.hyroxEventDate = new Date(profileData.hyroxEventDate);
+      }
+      
+      const user = await storage.updateUserProfile(userId, profileData);
+      res.json(user);
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      res.status(500).json({ message: "Failed to update profile" });
+    }
+  });
+
+  app.put('/api/change-program', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { programId } = req.body;
+      
+      const user = await storage.updateUserProgram(userId, programId);
+      res.json(user);
+    } catch (error) {
+      console.error("Error changing program:", error);
+      res.status(500).json({ message: "Failed to change program" });
+    }
+  });
+
+  // Calendar routes
+  app.get('/api/workouts', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.currentProgramId) {
+        return res.json([]);
+      }
+      
+      const workouts = await storage.getWorkoutsByProgram(user.currentProgramId);
+      res.json(workouts);
+    } catch (error) {
+      console.error("Error fetching workouts:", error);
+      res.status(500).json({ message: "Failed to fetch workouts" });
+    }
+  });
+
+  app.get('/api/workout-completions', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const completions = await storage.getWorkoutCompletions(userId);
+      res.json(completions);
+    } catch (error) {
+      console.error("Error fetching workout completions:", error);
+      res.status(500).json({ message: "Failed to fetch workout completions" });
+    }
+  });
+
+  // Seed Hyrox programs (dev only)
+  app.post('/api/seed-programs', async (req, res) => {
+    try {
+      const programs = await seedHyroxPrograms();
+      res.json({ message: "Hyrox programs seeded successfully", count: programs.length });
+    } catch (error) {
+      console.error("Error seeding programs:", error);
+      res.status(500).json({ message: "Failed to seed programs" });
     }
   });
 
