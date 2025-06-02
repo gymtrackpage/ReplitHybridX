@@ -19,6 +19,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
 
+  // Initialize programs endpoint
+  app.post('/api/init-programs', isAuthenticated, async (req: any, res) => {
+    try {
+      console.log("Loading HYROX programs and workouts...");
+      await seedHyroxPrograms();
+      await loadProgramsFromCSV();
+      const programs = await storage.getPrograms();
+      res.json({ message: "Programs initialized", count: programs.length });
+    } catch (error) {
+      console.error("Error initializing programs:", error);
+      res.status(500).json({ message: "Failed to initialize programs" });
+    }
+  });
+
   // Initialize programs and workouts if not already loaded
   try {
     const existingPrograms = await storage.getPrograms();
