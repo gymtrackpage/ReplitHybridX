@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Dumbbell, Bell, User } from "lucide-react";
+import { Dumbbell, Bell, User as UserIcon } from "lucide-react";
 import type { User } from "@shared/schema";
 
 interface NavigationProps {
@@ -74,7 +74,7 @@ export default function Navigation({ user }: NavigationProps) {
                 />
               ) : (
                 <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                  <User className="h-4 w-4 text-primary" />
+                  <UserIcon className="h-4 w-4 text-primary" />
                 </div>
               )}
               <span className="text-sm font-medium text-foreground">

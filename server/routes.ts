@@ -9,9 +9,7 @@ if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
 }
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: "2023-10-16",
-});
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
@@ -172,9 +170,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const progress = await storage.getUserProgress(userId);
       if (progress) {
         await storage.updateUserProgress(userId, {
-          completedWorkouts: progress.completedWorkouts + 1,
+          completedWorkouts: (progress.completedWorkouts || 0) + 1,
           lastWorkoutDate: new Date().toISOString().split('T')[0] as any,
-          currentDay: progress.currentDay + 1,
+          currentDay: (progress.currentDay || 0) + 1,
         });
       }
 
@@ -193,7 +191,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const progress = await storage.getUserProgress(userId);
       if (progress) {
         await storage.updateUserProgress(userId, {
-          currentDay: progress.currentDay + 1,
+          currentDay: (progress.currentDay || 0) + 1,
         });
       }
 
@@ -271,9 +269,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (user.stripeSubscriptionId) {
         const subscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
+        const invoice = subscription.latest_invoice;
+        const clientSecret = typeof invoice === 'object' && invoice?.payment_intent 
+          ? (typeof invoice.payment_intent === 'object' ? invoice.payment_intent.client_secret : null)
+          : null;
         return res.json({
           subscriptionId: subscription.id,
-          clientSecret: subscription.latest_invoice?.payment_intent?.client_secret,
+          clientSecret,
         });
       }
 
@@ -297,9 +299,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await storage.updateUserStripeInfo(userId, customer.id, subscription.id);
 
+      const invoice = subscription.latest_invoice;
+      const clientSecret = typeof invoice === 'object' && invoice?.payment_intent 
+        ? (typeof invoice.payment_intent === 'object' ? invoice.payment_intent.client_secret : null)
+        : null;
+
       res.json({
         subscriptionId: subscription.id,
-        clientSecret: subscription.latest_invoice?.payment_intent?.client_secret,
+        clientSecret,
       });
     } catch (error: any) {
       console.error("Stripe error:", error);
