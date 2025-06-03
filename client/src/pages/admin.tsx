@@ -32,7 +32,8 @@ import {
   ChevronRight,
   Clock,
   Target,
-  Activity
+  Activity,
+  Upload
 } from "lucide-react";
 
 interface Program {
@@ -78,6 +79,7 @@ export default function AdminPanel() {
   const [selectedProgram, setSelectedProgram] = useState<Program | null>(null);
   const [selectedWorkout, setSelectedWorkout] = useState<Workout | null>(null);
   const [expandedPrograms, setExpandedPrograms] = useState<Set<number>>(new Set());
+  const [isUploadProgramOpen, setIsUploadProgramOpen] = useState(false);
 
   // Redirect if not authenticated or not admin
   useEffect(() => {
@@ -342,23 +344,33 @@ export default function AdminPanel() {
           <TabsContent value="programs" className="space-y-4">
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold text-gray-900">Training Programs</h2>
-              <Dialog open={isCreateProgramOpen} onOpenChange={setIsCreateProgramOpen}>
-                <DialogTrigger asChild>
-                  <Button className="flex items-center gap-2">
-                    <Plus className="h-4 w-4" />
-                    Add Program
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>Create New Program</DialogTitle>
-                  </DialogHeader>
-                  <ProgramForm
-                    onSubmit={(data) => createProgramMutation.mutate(data)}
-                    isLoading={createProgramMutation.isPending}
-                  />
-                </DialogContent>
-              </Dialog>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline"
+                  onClick={() => setIsUploadProgramOpen(true)}
+                  className="flex items-center gap-2"
+                >
+                  <Upload className="h-4 w-4" />
+                  Upload CSV/XLSX
+                </Button>
+                <Dialog open={isCreateProgramOpen} onOpenChange={setIsCreateProgramOpen}>
+                  <DialogTrigger asChild>
+                    <Button className="flex items-center gap-2">
+                      <Plus className="h-4 w-4" />
+                      Add Program
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Create New Program</DialogTitle>
+                    </DialogHeader>
+                    <ProgramForm
+                      onSubmit={(data) => createProgramMutation.mutate(data)}
+                      isLoading={createProgramMutation.isPending}
+                    />
+                  </DialogContent>
+                </Dialog>
+              </div>
             </div>
 
             {programsLoading ? (
@@ -650,6 +662,23 @@ export default function AdminPanel() {
                 isLoading={updateWorkoutMutation.isPending}
               />
             )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Upload Program Dialog */}
+        <Dialog open={isUploadProgramOpen} onOpenChange={setIsUploadProgramOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Upload Program from CSV/XLSX</DialogTitle>
+            </DialogHeader>
+            <ProgramUploadForm
+              onSubmit={(data) => {
+                // Handle file upload
+                console.log('Upload data:', data);
+                setIsUploadProgramOpen(false);
+              }}
+              isLoading={false}
+            />
           </DialogContent>
         </Dialog>
       </main>
