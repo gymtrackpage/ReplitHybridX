@@ -31,6 +31,7 @@ export default function Programs() {
   const [selectedProgram, setSelectedProgram] = useState<Program | null>(null);
   const [isChangeProgramOpen, setIsChangeProgramOpen] = useState(false);
   const [eventDate, setEventDate] = useState("");
+  const [startOption, setStartOption] = useState<"beginning" | "eventDate">("beginning");
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -104,7 +105,7 @@ export default function Programs() {
     
     changeProgramMutation.mutate({
       programId: selectedProgram.id,
-      eventDate: eventDate || undefined
+      eventDate: startOption === "eventDate" && eventDate ? eventDate : undefined
     });
   };
 
@@ -221,17 +222,55 @@ export default function Programs() {
               </div>
 
               <div>
-                <Label htmlFor="eventDate">Event Date (Optional)</Label>
-                <Input
-                  id="eventDate"
-                  type="date"
-                  value={eventDate}
-                  onChange={(e) => setEventDate(e.target.value)}
-                  className="mt-1"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  If you have an event date, the program will be scheduled to finish before your event
-                </p>
+                <Label className="text-base font-medium">Program Start Options</Label>
+                <div className="mt-3 space-y-3">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      id="startBeginning"
+                      name="startOption"
+                      value="beginning"
+                      checked={startOption === "beginning"}
+                      onChange={(e) => setStartOption(e.target.value as "beginning" | "eventDate")}
+                      className="h-4 w-4 text-yellow-600 focus:ring-yellow-500 border-gray-300"
+                    />
+                    <label htmlFor="startBeginning" className="text-sm text-gray-700">
+                      Start from the beginning today
+                    </label>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      id="scheduleToEvent"
+                      name="startOption"
+                      value="eventDate"
+                      checked={startOption === "eventDate"}
+                      onChange={(e) => setStartOption(e.target.value as "beginning" | "eventDate")}
+                      className="h-4 w-4 text-yellow-600 focus:ring-yellow-500 border-gray-300"
+                    />
+                    <label htmlFor="scheduleToEvent" className="text-sm text-gray-700">
+                      Schedule to finish before an event
+                    </label>
+                  </div>
+                </div>
+                
+                {startOption === "eventDate" && (
+                  <div className="mt-4">
+                    <Label htmlFor="eventDate">Event Date</Label>
+                    <Input
+                      id="eventDate"
+                      type="date"
+                      value={eventDate}
+                      onChange={(e) => setEventDate(e.target.value)}
+                      className="mt-1"
+                      required={startOption === "eventDate"}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      The program will be scheduled to finish before your event date
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-2 pt-2">
