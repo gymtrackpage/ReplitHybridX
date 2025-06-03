@@ -9,7 +9,7 @@ import Header from "@/components/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Dumbbell, Calendar, User, ClipboardList, Share, SkipForward, CheckCircle } from "lucide-react";
+import { Dumbbell, Calendar, User, ClipboardList, Share, SkipForward, CheckCircle, Clock } from "lucide-react";
 import { Link } from "wouter";
 
 export default function Dashboard() {
