@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import BottomNav from "@/components/BottomNav";
+import Header from "@/components/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -138,26 +139,7 @@ export default function Dashboard() {
   if (!user || !dashboardData) {
     return (
       <div className="min-h-screen bg-background">
-        {/* Header */}
-        <div className="bg-white border-b border-gray-200 sticky top-0 z-50">
-          <div className="px-4 py-3">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg flex items-center justify-center">
-                  <Dumbbell className="h-4 w-4 text-white" />
-                </div>
-                <div className="flex flex-col">
-                  <div className="text-lg font-semibold text-gray-900">Hybrid X</div>
-                  <div className="text-sm text-gray-600">Welcome</div>
-                </div>
-              </div>
-              
-              <Button variant="ghost" size="sm" onClick={() => window.location.href = "/api/logout"}>
-                <User className="h-5 w-5 text-gray-600" />
-              </Button>
-            </div>
-          </div>
-        </div>
+        <Header title="Welcome" />
         
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center">
@@ -183,30 +165,23 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* Header with Logo */}
+      <Header title="Dashboard" />
+      
+      {/* User Welcome Section */}
       <div className="bg-white px-4 py-3 border-b border-gray-200">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="bg-gradient-to-r from-orange-500 to-red-600 rounded-lg p-2">
-              <Dumbbell className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-lg font-bold text-gray-900">Hybrid X</h1>
-              <p className="text-xs text-gray-500">Training Platform</p>
-            </div>
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">Welcome back, {user?.firstName || 'User'}!</h2>
+            <p className="text-sm text-gray-500">Ready for today's training?</p>
           </div>
           <div className="flex items-center space-x-2">
             {user?.profileImageUrl && (
               <img 
                 src={user.profileImageUrl} 
                 alt="Profile" 
-                className="w-8 h-8 rounded-full object-cover"
+                className="w-10 h-10 rounded-full object-cover"
               />
             )}
-            <div className="text-right">
-              <p className="text-sm font-medium text-gray-900">{user?.firstName || 'User'}</p>
-              <p className="text-xs text-gray-500">Athlete</p>
-            </div>
           </div>
         </div>
       </div>

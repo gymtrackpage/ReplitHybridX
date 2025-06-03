@@ -13,6 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Scale, TrendingDown, TrendingUp, Plus, Target, Dumbbell } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
+import Header from "@/components/Header";
 import { WeightEntry } from "@shared/schema";
 import { format } from "date-fns";
 
