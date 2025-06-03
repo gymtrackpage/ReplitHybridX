@@ -669,6 +669,122 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // CSV/XLSX upload endpoint for programs
+  app.post('/api/admin/upload-program', isAuthenticated, requireAdmin, upload.single('file'), async (req, res) => {
+    try {
+      const { name, description, difficulty, duration, frequency, category } = req.body;
+      const file = req.file;
+
+      if (!file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      // Parse the file based on type
+      let workbook;
+      try {
+        if (file.mimetype === 'text/csv' || file.originalname?.endsWith('.csv')) {
+          const csvData = file.buffer.toString('utf8');
+          workbook = XLSX.read(csvData, { type: 'string' });
+        } else if (file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || file.originalname?.endsWith('.xlsx')) {
+          workbook = XLSX.read(file.buffer, { type: 'buffer' });
+        } else {
+          return res.status(400).json({ message: "Unsupported file type. Please upload CSV or XLSX files." });
+        }
+      } catch (parseError) {
+        console.error("File parsing error:", parseError);
+        return res.status(400).json({ message: "Invalid file format. Please check your CSV/XLSX file." });
+      }
+
+      // Get the first worksheet
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+      if (!jsonData || jsonData.length === 0) {
+        return res.status(400).json({ message: "File is empty or has no valid data" });
+      }
+
+      // Create the program first
+      const program = await storage.createProgram({
+        name,
+        description,
+        difficulty,
+        duration: parseInt(duration),
+        frequency: parseInt(frequency),
+        category
+      });
+
+      // Process workout data
+      const workouts = [];
+      for (const row of jsonData) {
+        const workout = row as any;
+        
+        // Validate required fields
+        if (!workout.week || !workout.day || !workout.name) {
+          console.warn("Skipping row with missing required fields:", workout);
+          continue;
+        }
+
+        // Parse exercises - handle both JSON string and plain text
+        let exercises = [];
+        if (workout.exercises) {
+          try {
+            if (typeof workout.exercises === 'string') {
+              // Try to parse as JSON first
+              try {
+                exercises = JSON.parse(workout.exercises);
+              } catch {
+                // If not JSON, treat as simple text description
+                exercises = [{
+                  name: workout.exercises,
+                  type: "general",
+                  description: workout.exercises
+                }];
+              }
+            } else if (Array.isArray(workout.exercises)) {
+              exercises = workout.exercises;
+            }
+          } catch (error) {
+            console.warn("Error parsing exercises for workout:", workout.name, error);
+            exercises = [{
+              name: workout.exercises || "Workout",
+              type: "general",
+              description: workout.exercises || ""
+            }];
+          }
+        }
+
+        const workoutData = {
+          programId: program.id,
+          name: workout.name,
+          description: workout.description || "",
+          week: parseInt(workout.week) || 1,
+          day: parseInt(workout.day) || 1,
+          duration: parseInt(workout.duration) || 60,
+          exercises: exercises
+        };
+
+        try {
+          const createdWorkout = await storage.createWorkout(workoutData);
+          workouts.push(createdWorkout);
+        } catch (workoutError) {
+          console.error("Error creating workout:", workoutData.name, workoutError);
+        }
+      }
+
+      res.json({ 
+        message: "Program uploaded successfully", 
+        program, 
+        workoutsCreated: workouts.length,
+        totalRows: jsonData.length
+      });
+
+    } catch (error) {
+      console.error("Upload error:", error);
+      res.status(500).json({ message: "Failed to upload program: " + (error as Error).message });
+    }
+  });
+
   // Seed Hyrox programs (dev only)
   app.post('/api/seed-programs', async (req, res) => {
     try {
