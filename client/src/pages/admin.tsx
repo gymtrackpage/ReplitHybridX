@@ -81,6 +81,39 @@ export default function AdminPanel() {
   const [expandedPrograms, setExpandedPrograms] = useState<Set<number>>(new Set());
   const [isUploadProgramOpen, setIsUploadProgramOpen] = useState(false);
 
+  // Upload program mutation
+  const uploadProgramMutation = useMutation({
+    mutationFn: async (formData: FormData) => {
+      const response = await fetch('/api/admin/upload-program', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(error || 'Upload failed');
+      }
+      
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Program Uploaded",
+        description: "Program and workouts have been created successfully.",
+      });
+      setIsUploadProgramOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/programs"] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Upload Failed",
+        description: error.message || "Failed to upload program. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Redirect if not authenticated or not admin
   useEffect(() => {
     if (!authLoading && (!isAuthenticated || !user?.isAdmin)) {
@@ -673,11 +706,17 @@ export default function AdminPanel() {
             </DialogHeader>
             <ProgramUploadForm
               onSubmit={(data) => {
-                // Handle file upload
-                console.log('Upload data:', data);
-                setIsUploadProgramOpen(false);
+                const formData = new FormData();
+                formData.append('name', data.name);
+                formData.append('description', data.description);
+                formData.append('difficulty', data.difficulty);
+                formData.append('duration', data.duration.toString());
+                formData.append('frequency', data.frequency.toString());
+                formData.append('category', data.category);
+                formData.append('file', data.file);
+                uploadProgramMutation.mutate(formData);
               }}
-              isLoading={false}
+              isLoading={uploadProgramMutation.isPending}
             />
           </DialogContent>
         </Dialog>
