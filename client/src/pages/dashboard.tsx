@@ -1,17 +1,21 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { isUnauthorizedError } from "@/lib/authUtils";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import Navigation from "@/components/Navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Dumbbell, Calendar, User, ClipboardList } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Dumbbell, Calendar, User, ClipboardList, Share, SkipForward, CheckCircle } from "lucide-react";
 import { Link } from "wouter";
 
 export default function Dashboard() {
   const { user, isLoading: authLoading, isAuthenticated } = useAuth();
   const { toast } = useToast();
+  const [workoutNotes, setWorkoutNotes] = useState("");
+  const [selectedRating, setSelectedRating] = useState<number | null>(null);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -33,6 +37,82 @@ export default function Dashboard() {
     enabled: isAuthenticated,
     retry: false,
   });
+
+  // Workout completion mutation
+  const completeWorkoutMutation = useMutation({
+    mutationFn: async (workoutData: { workoutId: number; rating?: number; notes?: string; skipped?: boolean }) => {
+      const response = await apiRequest("POST", "/api/workout-completions", workoutData);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      setWorkoutNotes("");
+      setSelectedRating(null);
+      toast({
+        title: "Workout Completed!",
+        description: "Great job! Your progress has been updated.",
+      });
+    },
+    onError: (error: any) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Error",
+        description: error.message || "Failed to complete workout.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Button handlers
+  const handleCompleteWorkout = () => {
+    if (!dashboardData?.todaysWorkout?.id) return;
+    
+    completeWorkoutMutation.mutate({
+      workoutId: dashboardData.todaysWorkout.id,
+      rating: selectedRating || undefined,
+      notes: workoutNotes.trim() || undefined,
+      skipped: false
+    });
+  };
+
+  const handleSkipWorkout = () => {
+    if (!dashboardData?.todaysWorkout?.id) return;
+    
+    completeWorkoutMutation.mutate({
+      workoutId: dashboardData.todaysWorkout.id,
+      skipped: true
+    });
+  };
+
+  const handleShareWorkout = () => {
+    if (!dashboardData?.todaysWorkout) return;
+    
+    const shareData = {
+      title: `HYROX Training - ${dashboardData.todaysWorkout.name}`,
+      text: `Just completed: ${dashboardData.todaysWorkout.name}\n${dashboardData.todaysWorkout.description}`,
+      url: window.location.href
+    };
+
+    if (navigator.share) {
+      navigator.share(shareData);
+    } else {
+      navigator.clipboard.writeText(`${shareData.text}\n${shareData.url}`);
+      toast({
+        title: "Copied to clipboard",
+        description: "Workout details copied to clipboard",
+      });
+    }
+  };
 
   useEffect(() => {
     if (error && isUnauthorizedError(error)) {
@@ -134,22 +214,62 @@ export default function Dashboard() {
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">How did this workout feel?</h3>
                   
                   <div className="grid grid-cols-3 gap-2 mb-4">
-                    <Button className="bg-yellow-400 hover:bg-yellow-500 text-black rounded-lg py-3 font-medium">
+                    <Button 
+                      onClick={() => setSelectedRating(5)}
+                      className={`rounded-lg py-3 font-medium ${
+                        selectedRating === 5 
+                          ? "bg-yellow-400 hover:bg-yellow-500 text-black" 
+                          : "border-gray-300 text-gray-700"
+                      }`}
+                      variant={selectedRating === 5 ? "default" : "outline"}
+                    >
                       😊 Great
                     </Button>
-                    <Button variant="outline" className="border-gray-300 text-gray-700 rounded-lg py-3">
+                    <Button 
+                      onClick={() => setSelectedRating(4)}
+                      className={`rounded-lg py-3 ${
+                        selectedRating === 4 
+                          ? "bg-yellow-400 hover:bg-yellow-500 text-black" 
+                          : "border-gray-300 text-gray-700"
+                      }`}
+                      variant={selectedRating === 4 ? "default" : "outline"}
+                    >
                       😐 Good
                     </Button>
-                    <Button variant="outline" className="border-gray-300 text-gray-700 rounded-lg py-3">
+                    <Button 
+                      onClick={() => setSelectedRating(3)}
+                      className={`rounded-lg py-3 ${
+                        selectedRating === 3 
+                          ? "bg-yellow-400 hover:bg-yellow-500 text-black" 
+                          : "border-gray-300 text-gray-700"
+                      }`}
+                      variant={selectedRating === 3 ? "default" : "outline"}
+                    >
                       😕 Average
                     </Button>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 mb-6">
-                    <Button variant="outline" className="border-gray-300 text-gray-700 rounded-lg py-3">
+                    <Button 
+                      onClick={() => setSelectedRating(2)}
+                      className={`rounded-lg py-3 ${
+                        selectedRating === 2 
+                          ? "bg-yellow-400 hover:bg-yellow-500 text-black" 
+                          : "border-gray-300 text-gray-700"
+                      }`}
+                      variant={selectedRating === 2 ? "default" : "outline"}
+                    >
                       😣 Difficult
                     </Button>
-                    <Button variant="outline" className="border-gray-300 text-gray-700 rounded-lg py-3">
+                    <Button 
+                      onClick={() => setSelectedRating(1)}
+                      className={`rounded-lg py-3 ${
+                        selectedRating === 1 
+                          ? "bg-yellow-400 hover:bg-yellow-500 text-black" 
+                          : "border-gray-300 text-gray-700"
+                      }`}
+                      variant={selectedRating === 1 ? "default" : "outline"}
+                    >
                       😫 Very Hard
                     </Button>
                   </div>
@@ -157,8 +277,10 @@ export default function Dashboard() {
 
                 {/* Notes textarea */}
                 <div className="mb-6">
-                  <textarea 
-                    className="w-full p-4 border border-gray-200 rounded-lg text-gray-500 placeholder-gray-400 resize-none"
+                  <Textarea 
+                    value={workoutNotes}
+                    onChange={(e) => setWorkoutNotes(e.target.value)}
+                    className="w-full p-4 border border-gray-200 rounded-lg resize-none"
                     rows={4}
                     placeholder="Add any notes, PBs, or how you felt..."
                   />
@@ -166,16 +288,31 @@ export default function Dashboard() {
 
                 {/* Action buttons */}
                 <div className="space-y-3">
-                  <Button className="w-full bg-yellow-400 hover:bg-yellow-500 text-black font-semibold py-4 rounded-lg text-lg">
-                    ✓ Mark Complete
+                  <Button 
+                    onClick={handleCompleteWorkout}
+                    disabled={completeWorkoutMutation.isPending}
+                    className="w-full bg-yellow-400 hover:bg-yellow-500 text-black font-semibold py-4 rounded-lg text-lg flex items-center justify-center gap-2"
+                  >
+                    <CheckCircle className="h-5 w-5" />
+                    {completeWorkoutMutation.isPending ? "Completing..." : "Mark Complete"}
                   </Button>
                   
                   <div className="flex space-x-3">
-                    <Button variant="outline" className="flex-1 border-gray-300 text-gray-700 py-3 rounded-lg">
-                      ⏭️ Skip Workout
+                    <Button 
+                      onClick={handleSkipWorkout}
+                      disabled={completeWorkoutMutation.isPending}
+                      variant="outline" 
+                      className="flex-1 border-gray-300 text-gray-700 py-3 rounded-lg flex items-center justify-center gap-2"
+                    >
+                      <SkipForward className="h-4 w-4" />
+                      Skip Workout
                     </Button>
-                    <Button className="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-lg">
-                      📤 Share
+                    <Button 
+                      onClick={handleShareWorkout}
+                      className="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-lg flex items-center justify-center gap-2"
+                    >
+                      <Share className="h-4 w-4" />
+                      Share
                     </Button>
                   </div>
                 </div>
