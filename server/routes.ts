@@ -648,6 +648,189 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Stripe payment integration
+  app.post("/api/create-payment-intent", isAuthenticated, async (req: any, res) => {
+    try {
+      const { amount, currency = "usd" } = req.body;
+      const userId = req.user.claims.sub;
+      
+      const Stripe = require('stripe');
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(amount * 100), // Convert to cents
+        currency,
+        metadata: { userId }
+      });
+
+      res.json({ clientSecret: paymentIntent.client_secret });
+    } catch (error: any) {
+      console.error("Payment intent creation error:", error);
+      res.status(500).json({ message: "Error creating payment intent: " + error.message });
+    }
+  });
+
+  app.post("/api/create-subscription", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const Stripe = require('stripe');
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+      let customerId = user.stripeCustomerId;
+      
+      // Create customer if doesn't exist
+      if (!customerId) {
+        const customer = await stripe.customers.create({
+          email: user.email,
+          name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+          metadata: { userId }
+        });
+        customerId = customer.id;
+        await storage.updateUserStripeInfo(userId, customerId, "");
+      }
+
+      // Check for existing subscription
+      if (user.stripeSubscriptionId) {
+        const subscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
+        if (subscription.status === 'active') {
+          return res.json({
+            subscriptionId: subscription.id,
+            status: subscription.status,
+            clientSecret: subscription.latest_invoice?.payment_intent?.client_secret
+          });
+        }
+      }
+
+      // Create new subscription with default monthly price
+      const subscription = await stripe.subscriptions.create({
+        customer: customerId,
+        items: [{
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: 'Hybrid X Training Program',
+              description: 'Access to all HYROX training programs and features'
+            },
+            unit_amount: 2999, // $29.99/month
+            recurring: {
+              interval: 'month'
+            }
+          }
+        }],
+        payment_behavior: 'default_incomplete',
+        expand: ['latest_invoice.payment_intent'],
+      });
+
+      await storage.updateUserStripeInfo(userId, customerId, subscription.id);
+
+      res.json({
+        subscriptionId: subscription.id,
+        clientSecret: subscription.latest_invoice?.payment_intent?.client_secret
+      });
+    } catch (error: any) {
+      console.error("Subscription creation error:", error);
+      res.status(500).json({ message: "Error creating subscription: " + error.message });
+    }
+  });
+
+  // Phase transition management
+  app.post("/api/check-phase-transition", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { checkForPhaseTransition, transitionUserToPhase } = await import('./programPhaseManager');
+      
+      const transitionCheck = await checkForPhaseTransition(userId);
+      
+      if (transitionCheck.shouldTransition && transitionCheck.newPhase) {
+        await transitionUserToPhase(userId, transitionCheck.newPhase);
+        res.json({ 
+          transitioned: true, 
+          newPhase: transitionCheck.newPhase 
+        });
+      } else {
+        res.json({ transitioned: false });
+      }
+    } catch (error: any) {
+      console.error("Phase transition error:", error);
+      res.status(500).json({ message: "Error checking phase transition" });
+    }
+  });
+
+  // Admin management routes
+  app.get("/api/admin/users", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.isAdmin) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const users = await storage.getAllUsers();
+      res.json(users);
+    } catch (error: any) {
+      console.error("Admin users fetch error:", error);
+      res.status(500).json({ message: "Error fetching users" });
+    }
+  });
+
+  app.patch("/api/admin/users/:targetUserId", isAuthenticated, async (req: any, res) => {
+    try {
+      const adminUserId = req.user.claims.sub;
+      const adminUser = await storage.getUser(adminUserId);
+      
+      if (!adminUser?.isAdmin) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const { targetUserId } = req.params;
+      const { isAdmin } = req.body;
+
+      const updatedUser = await storage.updateUserAdmin(targetUserId, isAdmin);
+      res.json(updatedUser);
+    } catch (error: any) {
+      console.error("Admin user update error:", error);
+      res.status(500).json({ message: "Error updating user" });
+    }
+  });
+
+  // Weight tracking system
+  app.get("/api/weight-entries", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const entries = await storage.getUserWeightEntries(userId);
+      res.json(entries);
+    } catch (error: any) {
+      console.error("Weight entries fetch error:", error);
+      res.status(500).json({ message: "Error fetching weight entries" });
+    }
+  });
+
+  app.post("/api/weight-entries", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { weight, date, notes } = req.body;
+
+      const entry = await storage.createWeightEntry({
+        userId,
+        weight,
+        date: date ? new Date(date) : new Date(),
+        notes
+      });
+
+      res.json(entry);
+    } catch (error: any) {
+      console.error("Weight entry creation error:", error);
+      res.status(500).json({ message: "Error creating weight entry" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

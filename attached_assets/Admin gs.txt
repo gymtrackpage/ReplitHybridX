@@ -1,0 +1,456 @@
+// Admin.gs
+
+const ADMIN_EMAILS = ['training@hybridx.club', 'jdlee9900@gmail.com']; // Add authorized admin emails
+
+/**
+ * Verifies if the current Apps Script user is an authorized admin.
+ * This is for protecting the Apps Script functions themselves if called directly.
+ * If your Admin Panel is a separate Firebase-hosted app, it would use Firebase Auth.
+ */
+function isAdminUser() {
+  try {
+    const currentUserEmail = Session.getActiveUser().getEmail();
+    return ADMIN_EMAILS.includes(currentUserEmail.toLowerCase());
+  } catch (e) {
+    // If no active user (e.g. script run by trigger or not as web app by user)
+    Logger.log("isAdminUser check failed, no active user session: " + e.toString());
+    return false; // Default to not admin if session is problematic
+  }
+}
+
+/**
+ * Wrapper for admin functions to ensure only admins can call them.
+ */
+function executeAsAdmin(callback, args = []) {
+  if (!isAdminUser()) {
+    Logger.log(`Admin Action Denied: User ${Session.getActiveUser().getEmail()} is not an authorized admin for Apps Script functions.`);
+    return { success: false, message: "Access Denied: You are not authorized for this server operation." };
+  }
+  try {
+    return callback.apply(null, args);
+  } catch (error) {
+    Logger.log(`Admin Action Error in ${callback.name}: ${error.toString()} Stack: ${error.stack}`);
+    return { success: false, message: `Server error in ${callback.name}: ${error.message}` };
+  }
+}
+
+
+// --- Firestore Instance (from your code.gs) ---
+// Ensure getFirestoreInstance() and convertFirestoreFieldsToSimpleObject() are available
+// (e.g., by copying them here or ensuring they are in a shared library/file if this is separate)
+function getFirestoreInstance() {
+  const scriptProperties = PropertiesService.getScriptProperties();
+  const projectId = scriptProperties.getProperty('FIREBASE_PROJECT_ID');
+  // IMPORTANT: Ensure FIREBASE_PRIVATE_KEY is the full JSON key content or properly formatted
+  const privateKeyJson = scriptProperties.getProperty('FIREBASE_PRIVATE_KEY'); // This should be the JSON string of the key
+  const clientEmail = scriptProperties.getProperty('FIREBASE_CLIENT_EMAIL');
+
+  if (!privateKeyJson || !clientEmail || !projectId) {
+    const missing = [];
+    if (!privateKeyJson) missing.push('FIREBASE_PRIVATE_KEY (JSON content)');
+    if (!clientEmail) missing.push('FIREBASE_CLIENT_EMAIL');
+    if (!projectId) missing.push('FIREBASE_PROJECT_ID');
+    Logger.log("Firebase credentials missing in Script Properties: " + missing.join(', '));
+    throw new Error("Firebase Admin SDK not configured. Check Script Properties. Private key should be the JSON string.");
+  }
+  try {
+    // The Grahame Earley library expects the private key string directly (without -----BEGIN... lines if it's just the key part)
+    // However, it's more common for the library to take the full JSON key file content.
+    // Let's assume the library can handle the JSON service account key string.
+    return FirestoreApp.getFirestore(clientEmail, JSON.parse(privateKeyJson), projectId);
+    // If FirestoreApp.getFirestore expects only the private key string (not the full JSON):
+    // const keyObject = JSON.parse(privateKeyJson);
+    // return FirestoreApp.getFirestore(clientEmail, keyObject.private_key, projectId);
+  } catch (e) {
+    Logger.log("Error initializing Firestore with FirestoreApp.getFirestore: " + e.toString() + ". Ensure FIREBASE_PRIVATE_KEY contains the valid JSON service account key content.");
+    throw e;
+  }
+}
+
+function convertFirestoreFieldsToSimpleObject(fields) {
+  if (!fields) return null;
+  const result = {};
+  Object.keys(fields).forEach(key => {
+    const field = fields[key];
+    if (field.stringValue !== undefined) result[key] = field.stringValue;
+    else if (field.booleanValue !== undefined) result[key] = field.booleanValue;
+    else if (field.integerValue !== undefined) result[key] = parseInt(field.integerValue);
+    else if (field.doubleValue !== undefined) result[key] = parseFloat(field.doubleValue);
+    else if (field.timestampValue !== undefined) result[key] = new Date(field.timestampValue);
+    else if (field.arrayValue && field.arrayValue.values) {
+        result[key] = field.arrayValue.values.map(v => convertFirestoreFieldsToSimpleObject({singleValue: v}).singleValue); // Recursive for array elements
+    } else if (field.mapValue && field.mapValue.fields) {
+        result[key] = convertFirestoreFieldsToSimpleObject(field.mapValue.fields); // Recursive for map fields
+    }
+    else if (field.nullValue !== undefined) result[key] = null;
+    else result[key] = field; // Fallback for other types or if already simple
+  });
+  return result;
+}
+function convertDatesToISO(dataObject) {
+    if (!dataObject || typeof dataObject !== 'object') return dataObject;
+    const newObj = Array.isArray(dataObject) ? [] : {};
+    for (const key in dataObject) {
+        if (Object.prototype.hasOwnProperty.call(dataObject, key)) { // Ensure it's an own property
+            if (dataObject[key] instanceof Date) {
+                newObj[key] = dataObject[key].toISOString();
+            } else if (typeof dataObject[key] === 'object' && dataObject[key] !== null) { // Check for null
+                newObj[key] = convertDatesToISO(dataObject[key]); // Recurse
+            } else {
+                newObj[key] = dataObject[key];
+            }
+        }
+    }
+    return newObj;
+}
+
+
+// --- User Management (Firebase based) ---
+function adminGetAllUsersFirebase_() {
+  const firestore = getFirestoreInstance();
+  try {
+    const usersSnapshot = firestore.getDocuments('users'); // Get all documents from 'users'
+    const users = [];
+    if (usersSnapshot && usersSnapshot.length > 0) {
+      usersSnapshot.forEach(doc => {
+        if (doc.fields) {
+          const userData = convertFirestoreFieldsToSimpleObject(doc.fields);
+          users.push({
+            userId: doc.id || (doc.name ? doc.name.split('/').pop() : null), // Get document ID
+            email: userData.email || 'N/A',
+            name: userData.name || 'N/A',
+          });
+        }
+      });
+    }
+    return { success: true, users: users };
+  } catch (e) {
+    Logger.log("Error in adminGetAllUsersFirebase_: " + e.toString());
+    return { success: false, message: "Failed to fetch users from Firebase: " + e.message };
+  }
+}
+function adminGetAllUsersFirebase() { return executeAsAdmin(adminGetAllUsersFirebase_); }
+
+function adminGetUserDetailsFirebase_(userId) {
+  if (!userId) return { success: false, message: "UserID is required." };
+  const firestore = getFirestoreInstance();
+  try {
+    const userDoc = firestore.getDocument(`users/${userId}`);
+    if (!userDoc || !userDoc.fields) {
+      return { success: false, message: "User profile not found in Firebase." };
+    }
+    const userDetails = convertDatesToISO(convertFirestoreFieldsToSimpleObject(userDoc.fields));
+    // You might want to fetch related data like recent workout logs or subscription status here as well
+    // For example, to get last 5 workout logs:
+    // const logsSnapshot = firestore.query('workoutLogs').where('userId', '==', userId).orderBy('date', 'desc').limit(5).get();
+    // userDetails.recentLogs = logsSnapshot.map(logDoc => convertFirestoreFieldsToSimpleObject(logDoc.fields));
+    return { success: true, userDetails: userDetails };
+  } catch (e) {
+    Logger.log(`Error in adminGetUserDetailsFirebase_ for ${userId}: ${e.toString()}`);
+    return { success: false, message: "Failed to fetch user details: " + e.message };
+  }
+}
+function adminGetUserDetailsFirebase(userId) { return executeAsAdmin(adminGetUserDetailsFirebase_, [userId]); }
+
+function adminRegisterClientFirebase_(clientData) {
+  const { email, password, name, programId } = clientData;
+  if (!email || !password || !name || !programId) {
+    return { success: false, message: "Email, password, name, and program ID are required." };
+  }
+  // In a full Firebase app, admin would use Firebase Admin SDK to create user.
+  // Apps Script cannot directly create Firebase Auth users.
+  // This function will only create the Firestore user profile document.
+  // The admin would need to instruct the user to sign up via Firebase Auth,
+  // or use a Firebase Cloud Function callable by an admin to create the Auth user.
+
+  // For now, let's assume this function is for creating the Firestore record
+  // and the admin will handle Auth user creation separately or via a dedicated tool.
+  const firestore = getFirestoreInstance();
+  const userId = email; // Using email as UserID for simplicity here, but Firebase Auth UID is better.
+                       // If you have a Cloud Function to create Auth user, it would return the UID.
+
+  try {
+    // Check if user already exists in Firestore (by email as ID, or query by email field if ID is UID)
+    const existingUserDoc = firestore.getDocument(`users/${userId}`);
+    if (existingUserDoc && existingUserDoc.fields) {
+        return { success: false, message: "A user profile with this email already exists in Firestore." };
+    }
+
+    const newUserProfile = {
+      userId: userId, // This should ideally be the Firebase Auth UID
+      email: email,
+      name: name,
+      programName: programId,
+      programPhase: "PREP", // Default starting phase
+      currentWeek: 0,
+      currentDay: 0,
+      displayWeek: 0,
+      programStartDate: new Date(), // Firestore will convert to Timestamp
+      mainProgramStartDate: null,
+      eventDate: null,
+      eventLocation: "",
+      SpecializedPhaseFocus: "PrepHyrox", // Default
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      // DO NOT STORE PLAIN TEXT PASSWORDS
+    };
+    firestore.createDocument(`users/${userId}`, newUserProfile);
+    Logger.log(`Admin created Firestore profile for: ${email} with program ${programId}`);
+    return { success: true, message: `Firestore profile for ${email} created. Auth user needs separate creation.` };
+  } catch (e) {
+    Logger.log(`Error in adminRegisterClientFirebase_: ${e.toString()}`);
+    return { success: false, message: "Failed to create Firestore profile: " + e.message };
+  }
+}
+function adminRegisterClientFirebase(clientData) { return executeAsAdmin(adminRegisterClientFirebase_, [clientData]); }
+
+
+function adminChangeUserProgramFirebase_(userId, newProgramId, scheduleOption) {
+  const firestore = getFirestoreInstance();
+  // This would call a more complex function, potentially a direct port of your
+  // changeUserProgramSecure from code.gs, but adapted for direct Firestore writes.
+  // For brevity, here's a simplified update:
+  try {
+    const userProfileRef = `users/${userId}`;
+    const userDoc = firestore.getDocument(userProfileRef);
+    if (!userDoc || !userDoc.fields) return { success: false, message: "User not found." };
+
+    const programMetaRef = `programMetadata/${newProgramId}`;
+    const programMetaDoc = firestore.getDocument(programMetaRef);
+    if (!programMetaDoc || !programMetaDoc.fields) return { success: false, message: "Program metadata not found." };
+    const programMeta = convertFirestoreFieldsToSimpleObject(programMetaDoc.fields);
+
+
+    const updateData = {
+      programName: newProgramId,
+      programPhase: "MAIN", // Default to MAIN, adjust based on scheduleOption and program type
+      currentWeek: 0,
+      currentDay: 0,
+      displayWeek: 0,
+      updatedAt: new Date(),
+      mainProgramCompleted: false,
+      awaitingNextProgramChoice: false,
+      // Add logic for scheduleOption ('start-fresh' vs 'keep-date') to set programStartDate, mainProgramStartDate
+    };
+    // Example: if 'start-fresh'
+    updateData.programStartDate = new Date();
+    updateData.mainProgramStartDate = new Date(); // If it's a main program
+
+    firestore.updateDocument(userProfileRef, updateData);
+    return { success: true, message: `User ${userId} program changed to ${newProgramId}.` };
+  } catch (e) {
+    Logger.log(`Error in adminChangeUserProgramFirebase_ for ${userId}: ${e.toString()}`);
+    return { success: false, message: "Failed to change user program: " + e.message };
+  }
+}
+function adminChangeUserProgramFirebase(userId, newProgramId, scheduleOption) { return executeAsAdmin(adminChangeUserProgramFirebase_, [userId, newProgramId, scheduleOption]); }
+
+function adminSetUserProgressFirebase_(userId, targetWeek, targetDay) {
+  const firestore = getFirestoreInstance();
+  try {
+    const userProfileRef = `users/${userId}`;
+     const updateData = {
+      currentWeek: parseInt(targetWeek),
+      currentDay: parseInt(targetDay),
+      displayWeek: parseInt(targetWeek), // Or more complex logic for displayWeek
+      updatedAt: new Date()
+    };
+    firestore.updateDocument(userProfileRef, updateData);
+    // TODO: Add logic to check and update programPhase if end of phase is reached.
+    return { success: true, message: `User ${userId} progress set to W${targetWeek}D${targetDay}.` };
+  } catch (e) {
+    Logger.log(`Error in adminSetUserProgressFirebase_ for ${userId}: ${e.toString()}`);
+    return { success: false, message: "Failed to set user progress: " + e.message };
+  }
+}
+function adminSetUserProgressFirebase(userId, targetWeek, targetDay) { return executeAsAdmin(adminSetUserProgressFirebase_, [userId, targetWeek, targetDay]); }
+
+
+// --- Program Metadata Management ---
+function adminGetProgramMetadataList_() {
+  const firestore = getFirestoreInstance();
+  try {
+    const programsSnapshot = firestore.getDocuments('programMetadata');
+    const programs = [];
+    if (programsSnapshot && programsSnapshot.length > 0) {
+      programsSnapshot.forEach(doc => {
+        if (doc.fields) {
+          const data = convertFirestoreFieldsToSimpleObject(doc.fields);
+          programs.push({
+            id: doc.id || (doc.name ? doc.name.split('/').pop() : null),
+            ...data
+          });
+        }
+      });
+    }
+    // Sort by displayOrder, then by name
+    programs.sort((a,b) => (a.displayOrder || 999) - (b.displayOrder || 999) || a.name.localeCompare(b.name));
+    return { success: true, programs: programs };
+  } catch (e) {
+    Logger.log("Error in adminGetProgramMetadataList_: " + e.toString());
+    return { success: false, message: "Failed to fetch program metadata: " + e.message };
+  }
+}
+function adminGetProgramMetadataList() { return executeAsAdmin(adminGetProgramMetadataList_); }
+
+function adminSaveProgramMetadata_(metadata, isNew) {
+  const firestore = getFirestoreInstance();
+  const programId = metadata.id; // This is the document ID
+  if (!programId) return { success: false, message: "Program ID is required." };
+
+  // Data to save (excluding the 'id' if it's just for client-side tracking)
+  const dataToSave = { ...metadata };
+  delete dataToSave.id; // Don't save 'id' as a field if it's the document ID
+
+  dataToSave.updatedAt = new Date();
+  if (isNew) {
+    dataToSave.createdAt = new Date();
+  }
+
+  try {
+    if (isNew) {
+      // Check if ID already exists to prevent accidental overwrite if user types existing ID for new
+      const existingDoc = firestore.getDocument(`programMetadata/${programId}`);
+      if (existingDoc && existingDoc.fields) {
+        return { success: false, message: `Program ID "${programId}" already exists. Choose a different ID for new programs.` };
+      }
+      firestore.createDocument(`programMetadata/${programId}`, dataToSave);
+    } else {
+      firestore.updateDocument(`programMetadata/${programId}`, dataToSave);
+    }
+    return { success: true, message: `Program metadata for "${metadata.name}" (${programId}) saved successfully.` };
+  } catch (e) {
+    Logger.log(`Error saving program metadata for ${programId}: ${e.toString()}`);
+    return { success: false, message: "Failed to save program metadata: " + e.message };
+  }
+}
+function adminSaveProgramMetadata(metadata, isNew) { return executeAsAdmin(adminSaveProgramMetadata_, [metadata, isNew]); }
+
+function adminDeleteProgramMetadata_(programId) {
+  const firestore = getFirestoreInstance();
+  if (!programId) return { success: false, message: "Program ID is required for deletion." };
+  try {
+    firestore.deleteDocument(`programMetadata/${programId}`);
+    // Note: This does NOT delete the actual workout content in `programs/{programId}/weeks/days`
+    // That would require a more complex recursive delete, often done with a Cloud Function.
+    return { success: true, message: `Program metadata for ID "${programId}" deleted. Workout content remains.` };
+  } catch (e) {
+    Logger.log(`Error deleting program metadata ${programId}: ${e.toString()}`);
+    return { success: false, message: "Failed to delete program metadata: " + e.message };
+  }
+}
+function adminDeleteProgramMetadata(programId) { return executeAsAdmin(adminDeleteProgramMetadata_, [programId]); }
+
+
+// --- Program Content Upload (CSV) ---
+function adminUploadProgramContentCsv_(programId, csvData) {
+  if (!programId) return { success: false, message: "Program ID is required to upload content." };
+  if (!csvData) return { success: false, message: "No CSV data provided." };
+
+  const firestore = getFirestoreInstance();
+  let workoutsAdded = 0;
+  let errorsEncountered = 0;
+  let errorMessages = [];
+
+  try {
+    const lines = csvData.split(/\r\n|\n|\r/); // Handle different line endings
+    if (lines.length <= 1) return { success: false, message: "CSV has no data rows." };
+
+    const header = lines[0].split(',').map(h => h.trim().toLowerCase());
+    // Expected headers: weekNum, dayNum, title, workoutText, phase (optional)
+    const weekNumIndex = header.indexOf('weeknum');
+    const dayNumIndex = header.indexOf('daynum');
+    const titleIndex = header.indexOf('title');
+    const workoutTextIndex = header.indexOf('workouttext');
+    const phaseIndex = header.indexOf('phase'); // Optional
+
+    if (weekNumIndex === -1 || dayNumIndex === -1 || titleIndex === -1 || workoutTextIndex === -1) {
+      return { success: false, message: "CSV missing required headers: weekNum, dayNum, title, workoutText. Found: " + header.join(',') };
+    }
+
+    // Firestore batch write for efficiency (FirestoreApp library might not support batch writes directly in Apps Script)
+    // If not, we do individual writes. Grahame's library usually does individual.
+    // For this example, individual writes:
+    for (let i = 1; i < lines.length; i++) {
+      if (lines[i].trim() === '') continue; // Skip empty lines
+      const values = lines[i].split(','); // Simple CSV split, might need more robust parsing for complex CSVs
+
+      const weekNum = parseInt(values[weekNumIndex]);
+      const dayNum = parseInt(values[dayNumIndex]);
+      const title = values[titleIndex] ? values[titleIndex].trim() : `Week ${weekNum+1}, Day ${dayNum+1}`;
+      const workoutText = values[workoutTextIndex] ? values[workoutTextIndex].trim().replace(/\\n/g, '\n') : "No workout text provided."; // Allow \n for newlines
+      const phase = phaseIndex !== -1 && values[phaseIndex] ? values[phaseIndex].trim().toUpperCase() : "MAIN"; // Default to MAIN if not provided
+
+      if (isNaN(weekNum) || isNaN(dayNum)) {
+        Logger.log(`Skipping row ${i+1}: Invalid week/day number.`);
+        errorsEncountered++;
+        errorMessages.push(`Row ${i+1}: Invalid week/day number.`);
+        continue;
+      }
+
+      // Document path: programs/{programId}/weeks/{weekId}/days/{dayId}
+      // Or a flatter structure if preferred: programs/{programId}/content/{weekNum_dayNum_phase}
+      // Let's use the nested structure for better organization.
+      const weekDocId = `week${weekNum}`;
+      const dayDocId = `day${dayNum}`;
+      const workoutDocPath = `programs/${programId}/weeks/${weekDocId}/days/${dayDocId}`;
+      // If phase is important for distinguishing workouts (e.g. PREP W0D0 vs MAIN W0D0 for same programId)
+      // you might include phase in the path or as a field.
+      // For now, assuming phase is a field within the day's document.
+
+      const workoutData = {
+        title: title,
+        workoutText: workoutText,
+        weekNum: weekNum, // Store for reference
+        dayNum: dayNum,   // Store for reference
+        phase: phase,     // Store phase
+        programId: programId, // Store parent program ID
+        updatedAt: new Date()
+      };
+
+      try {
+        // Ensure parent week document exists (Firestore doesn't auto-create parent docs for subcollections via set/update on child)
+        // This is a simplification. In a real scenario, you might want to create the week document if it doesn't exist,
+        // or structure data differently if weeks don't have their own fields.
+        // For Grahame's library, setting a document in a subcollection path usually works.
+        firestore.setDocument(workoutDocPath, workoutData); // setDocument creates or overwrites
+        workoutsAdded++;
+      } catch (e) {
+        Logger.log(`Error writing workout for W${weekNum}D${dayNum} of ${programId}: ${e.toString()}`);
+        errorsEncountered++;
+        errorMessages.push(`Row ${i+1} (W${weekNum}D${dayNum}): ${e.message}`);
+      }
+    }
+
+    let finalMessage = `${workoutsAdded} workouts processed for program "${programId}".`;
+    if (errorsEncountered > 0) {
+      finalMessage += ` ${errorsEncountered} errors encountered.`;
+    }
+    return { success: workoutsAdded > 0, message: finalMessage, details: errorMessages.join('\n') };
+
+  } catch (e) {
+    Logger.log(`Error in adminUploadProgramContentCsv_ for ${programId}: ${e.toString()}`);
+    return { success: false, message: "Failed to process CSV: " + e.message, details: e.stack };
+  }
+}
+function adminUploadProgramContentCsv(programId, csvData) { return executeAsAdmin(adminUploadProgramContentCsv_, [programId, csvData]); }
+
+
+// --- Diagnostics ---
+function adminTestFirestoreConnection_() {
+  try {
+    const firestore = getFirestoreInstance();
+    // Try a simple read operation, e.g., get a non-existent document to test connectivity & auth
+    firestore.getDocument('testConnectivity/doc1'); // This will likely log "not found" but won't throw if auth is okay
+    return { success: true, message: "Firestore instance obtained. Basic connection seems OK. Check logs for details." };
+  } catch (e) {
+    Logger.log("adminTestFirestoreConnection_ Error: " + e.toString());
+    return { success: false, message: "Failed to connect to Firestore: " + e.message, details: e.stack };
+  }
+}
+function adminTestFirestoreConnection() { return executeAsAdmin(adminTestFirestoreConnection_); }
+
+// Ensure any functions from the main code.gs that are needed by Admin.gs (like getFirestoreInstance,
+// convertFirestoreFieldsToSimpleObject, etc.) are either duplicated here, moved to a shared library,
+// or this Admin.gs is part of the same project as the main code.gs.
+// For this example, I've included getFirestoreInstance and convertFirestoreFieldsToSimpleObject.

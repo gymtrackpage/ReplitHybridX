@@ -1,0 +1,514 @@
+<script>
+  let currentUser = null; // { token, userId, name, email, etc. }
+  let currentWorkoutData = null; // To store loaded workout details
+
+  // --- INITIALIZATION ---
+  window.addEventListener('DOMContentLoaded', () => {
+    loadTheme();
+    checkSession();
+    handleUrlParams(); // For password reset link
+    
+    // Populate calendar month/year selectors
+    const monthSelect = document.getElementById('cal-month');
+    const currentMonth = new Date().getMonth();
+    const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    months.forEach((month, index) => {
+        const option = document.createElement('option');
+        option.value = index + 1;
+        option.textContent = month;
+        if (index === currentMonth) option.selected = true;
+        monthSelect.appendChild(option);
+    });
+    document.getElementById('cal-year').value = new Date().getFullYear();
+
+  });
+
+  function handleUrlParams() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const view = urlParams.get('view');
+    const token = urlParams.get('token');
+
+    if (view === 'resetPassword' && token) {
+      showView('reset-password-view');
+      document.getElementById('reset-token-field').value = token;
+    }
+  }
+
+  // --- THEME MANAGEMENT ---
+  function toggleTheme() {
+    document.body.classList.toggle('dark-theme');
+    localStorage.setItem('theme', document.body.classList.contains('dark-theme') ? 'dark' : 'light');
+  }
+
+  function loadTheme() {
+    const theme = localStorage.getItem('theme');
+    if (theme === 'dark') {
+      document.body.classList.add('dark-theme');
+    }
+  }
+
+  // --- VIEW MANAGEMENT ---
+function showView(viewId) {
+  console.log('Attempting to show view:', viewId); // Log attempt
+  document.querySelectorAll('.view').forEach(view => view.style.display = 'none');
+  const targetView = document.getElementById(viewId);
+
+  if (targetView) { // Check if the element exists
+    targetView.style.display = 'block';
+    console.log('Successfully displayed view:', viewId);
+  } else {
+    console.error('Error in showView: Element with ID "' + viewId + '" not found.'); // Log error
+    // Optionally, display an error to the user or fallback to a default view
+    // alert('Error: Could not display the requested page section.');
+    // return; // Stop further execution if view not found
+  }
+
+  document.querySelectorAll('.message').forEach(el => el.innerHTML = '');
+
+  // Load data for specific views if user is logged in
+  if (currentUser) {
+    if (viewId === 'workout-view') loadCurrentWorkout();
+    if (viewId === 'calendar-view') loadCalendarData();
+    if (viewId === 'profile-view') loadProfileData();
+    if (viewId === 'dashboard-view') loadDashboardData();
+  }
+}
+
+  // --- MESSAGE DISPLAY ---
+function displayMessage(elementId, message, type = 'info') {
+  const el = document.getElementById(elementId);
+  if (el) { // Check if element exists
+    el.innerHTML = message;
+    el.className = 'message ' + type; // 'success', 'error', 'info'
+  } else {
+    console.error('Error in displayMessage: Element with ID "' + elementId + '" not found.');
+    // Fallback or alternative way to show message if primary element is missing
+    // alert(type.toUpperCase() + ": " + message);
+  }
+}
+
+  // --- AUTHENTICATION ---
+  function checkSession() {
+    const token = localStorage.getItem('sessionToken');
+    const userId = localStorage.getItem('userId');
+    if (token && userId) {
+      google.script.run
+        .withSuccessHandler(response => {
+          if (response && response.isValid) {
+            currentUser = { token: token, userId: userId, email: response.userEmail /*, potentially more */ };
+            // If token was refreshed on server: localStorage.setItem('sessionToken', response.refreshedToken);
+            document.getElementById('main-nav').style.display = 'block';
+            // Fetch user name for display if not already stored
+            google.script.run.withSuccessHandler(profileResp => {
+                if (profileResp.status === "success") {
+                    currentUser.name = profileResp.profile.name;
+                    document.getElementById('user-name-display').textContent = currentUser.name;
+                     showView('dashboard-view'); // Or last visited view
+                } else {
+                     showView('login-view'); // Fallback if profile fails
+                }
+            }).getUserProfile(currentUser.userId, currentUser.token);
+          } else {
+            logoutCleanup();
+            showView('login-view');
+          }
+        })
+        .withFailureHandler(err => {
+          console.error("Session check error:", err);
+          logoutCleanup();
+          showView('login-view');
+        })
+        .validateSessionToken(token, userId);
+    } else {
+      showView('login-view');
+    }
+  }
+
+  function handleLogin() {
+    const email = document.getElementById('login-email').value;
+    const password = document.getElementById('login-password').value;
+    if (!email || !password) {
+        displayMessage('login-message', 'Email and password are required.', 'error');
+        return;
+    }
+    google.script.run
+      .withSuccessHandler(response => {
+        if (response.status === 'success') {
+          localStorage.setItem('sessionToken', response.token);
+          localStorage.setItem('userId', response.userId);
+          localStorage.setItem('userName', response.name); // Store name
+          currentUser = { token: response.token, userId: response.userId, name: response.name, email: email };
+          document.getElementById('main-nav').style.display = 'block';
+          document.getElementById('user-name-display').textContent = response.name;
+          showView('dashboard-view');
+          displayMessage('login-message', response.message, 'success');
+        } else {
+          displayMessage('login-message', response.message, 'error');
+        }
+      })
+      .withFailureHandler(err => displayMessage('login-message', 'Login failed: ' + err, 'error'))
+      .loginUser(email, password);
+  }
+
+  function handleRegister() {
+    const name = document.getElementById('register-name').value;
+    const email = document.getElementById('register-email').value;
+    const password = document.getElementById('register-password').value;
+     if (!name || !email || !password) {
+        displayMessage('register-message', 'All fields are required.', 'error');
+        return;
+    }
+    if (password.length < 8) {
+        displayMessage('register-message', 'Password must be at least 8 characters.', 'error');
+        return;
+    }
+  google.script.run
+    .withSuccessHandler(response => {
+      console.log('Register response:', response); // Log the raw response
+      if (response.status === 'success') {
+        displayMessage('register-message', response.message + " Please login.", 'success');
+        console.log('Registration success, scheduling showView("login-view")');
+        setTimeout(() => {
+          console.log('Timeout triggered, calling showView("login-view")');
+          showView('login-view');
+        }, 2000);
+      } else {
+        displayMessage('register-message', response.message, 'error');
+      }
+    })
+    .withFailureHandler(err => {
+      console.error('Register failure:', err); // Log failure
+      displayMessage('register-message', 'Registration failed: ' + err, 'error');
+    })
+    .registerUser(name, email, password);
+}
+  
+  function handleRequestPasswordReset() {
+    const email = document.getElementById('reset-email').value;
+    if (!email) {
+        displayMessage('forgot-password-message', 'Email is required.', 'error');
+        return;
+    }
+    google.script.run
+      .withSuccessHandler(response => {
+        displayMessage('forgot-password-message', response.message, response.status);
+      })
+      .withFailureHandler(err => displayMessage('forgot-password-message', 'Error: ' + err, 'error'))
+      .requestPasswordReset(email);
+  }
+
+  function handleResetPassword() {
+    const token = document.getElementById('reset-token-field').value;
+    const newPassword = document.getElementById('new-password').value;
+    const confirmPassword = document.getElementById('confirm-new-password').value;
+
+    if (!newPassword || !confirmPassword) {
+        displayMessage('reset-password-message', 'Both password fields are required.', 'error');
+        return;
+    }
+    if (newPassword !== confirmPassword) {
+        displayMessage('reset-password-message', 'Passwords do not match.', 'error');
+        return;
+    }
+    if (newPassword.length < 8) {
+        displayMessage('reset-password-message', 'Password must be at least 8 characters.', 'error');
+        return;
+    }
+
+    google.script.run
+      .withSuccessHandler(response => {
+        displayMessage('reset-password-message', response.message, response.status);
+        if (response.status === 'success') {
+          setTimeout(() => {
+            window.location.search = ""; // Clear URL params
+            showView('login-view');
+          }, 3000);
+        }
+      })
+      .withFailureHandler(err => displayMessage('reset-password-message', 'Error: ' + err, 'error'))
+      .resetPasswordWithToken(token, newPassword);
+  }
+
+
+  function logout() {
+    if (currentUser && currentUser.userId && currentUser.token) {
+        google.script.run
+            .withSuccessHandler(response => { // Server logout complete
+                logoutCleanup();
+            })
+            .withFailureHandler(err => { // Still logout client side
+                console.error("Server logout failed:", err);
+                logoutCleanup();
+            })
+            .logoutUser(currentUser.userId, currentUser.token);
+    } else {
+        logoutCleanup(); // If no current user, just clean up client
+    }
+  }
+  
+  function logoutCleanup() {
+    localStorage.removeItem('sessionToken');
+    localStorage.removeItem('userId');
+    localStorage.removeItem('userName');
+    currentUser = null;
+    document.getElementById('main-nav').style.display = 'none';
+    showView('login-view');
+  }
+
+
+  // --- DASHBOARD ---
+  function loadDashboardData() {
+    if (!currentUser) return;
+    document.getElementById('user-name-display').textContent = currentUser.name || 'User';
+    // TODO: Fetch and display overview data like next workout summary, event countdown etc.
+    // For now, just ensure name is displayed.
+  }
+
+  // --- WORKOUT MODULE ---
+  function loadCurrentWorkout() {
+    if (!currentUser) return;
+    document.getElementById('current-workout-content').innerHTML = 'Loading workout...';
+    document.getElementById('workout-actions').style.display = 'none';
+
+    google.script.run
+      .withSuccessHandler(response => {
+        if (response.status === 'success' && response.workout) {
+          currentWorkoutData = response.workout;
+          let content = `<h3>${response.workout.title || 'Workout'}</h3>`;
+          content += `<p><strong>Program:</strong> ${response.workout.programId}, <strong>Phase:</strong> ${response.workout.phase}, <strong>Week:</strong> ${response.workout.week}, <strong>Day:</strong> ${response.workout.day}</p>`;
+          
+          if (typeof response.workout.details === 'object') {
+            if(response.workout.details.type === 'run') {
+                content += `<p><strong>Type:</strong> Run</p>`;
+                content += `<p><strong>Duration:</strong> ${response.workout.details.duration}</p>`;
+                content += `<p><strong>Intensity:</strong> ${response.workout.details.intensity}</p>`;
+            } else if (response.workout.details.exercises) {
+                content += `<h4>Exercises:</h4><ul>`;
+                response.workout.details.exercises.forEach(ex => {
+                    content += `<li>${ex.name}: ${ex.sets} sets of ${ex.reps} ${ex.notes ? '('+ex.notes+')' : ''}</li>`;
+                });
+                content += `</ul>`;
+            } else { // Fallback for other object structures
+                content += `<pre>${JSON.stringify(response.workout.details, null, 2)}</pre>`;
+            }
+          } else {
+            content += `<p>${response.workout.details}</p>`; // If details is just a string
+          }
+          if(response.workout.notesForUser) content += `<p><strong>Coach Notes:</strong> ${response.workout.notesForUser}</p>`;
+
+          document.getElementById('current-workout-content').innerHTML = content;
+          document.getElementById('workout-actions').style.display = 'block';
+        } else if (response.status === 'info') {
+          document.getElementById('current-workout-content').innerHTML = `<p>${response.message}</p>`;
+          currentWorkoutData = null;
+        } else {
+          displayMessage('workout-message', response.message || 'Failed to load workout.', 'error');
+          currentWorkoutData = null;
+        }
+      })
+      .withFailureHandler(err => displayMessage('workout-message', 'Error loading workout: ' + err, 'error'))
+      .getCurrentWorkout(currentUser.userId, currentUser.token);
+  }
+
+  function handleCompleteWorkout() {
+    if (!currentUser || !currentWorkoutData) return;
+    const rating = document.getElementById('workout-rating').value;
+    const notes = document.getElementById('workout-notes').value;
+
+    google.script.run
+      .withSuccessHandler(response => {
+        displayMessage('workout-message', response.message, response.status);
+        if (response.status === 'success') {
+          loadCurrentWorkout(); // Refresh to show next workout
+          document.getElementById('workout-rating').value = '3';
+          document.getElementById('workout-notes').value = '';
+        }
+      })
+      .withFailureHandler(err => displayMessage('workout-message', 'Error: ' + err, 'error'))
+      .completeWorkout(currentUser.userId, currentUser.token, currentWorkoutData.workoutId, rating, notes);
+  }
+
+  function handleSkipWorkout() {
+    if (!currentUser || !currentWorkoutData) return;
+    if (!confirm("Are you sure you want to skip this workout?")) return;
+
+    google.script.run
+      .withSuccessHandler(response => {
+        displayMessage('workout-message', response.message, response.status);
+        if (response.status === 'success') {
+          loadCurrentWorkout(); // Refresh to show next workout
+        }
+      })
+      .withFailureHandler(err => displayMessage('workout-message', 'Error: ' + err, 'error'))
+      .skipWorkout(currentUser.userId, currentUser.token, currentWorkoutData.workoutId);
+  }
+
+  function handleShareWorkout() {
+    if (!currentWorkoutData) {
+        alert("No workout loaded to share.");
+        return;
+    }
+    // Placeholder: In a real app, this would generate an image (e.g. using html2canvas)
+    // or prepare data for a server-side image generation.
+    alert(`Sharing Workout (Placeholder):\nTitle: ${currentWorkoutData.title}\nThis would ideally generate a branded image.`);
+    console.log("Shareable data:", currentWorkoutData);
+  }
+
+  // --- CALENDAR MODULE ---
+  function loadCalendarData() {
+    if (!currentUser) return;
+    const month = document.getElementById('cal-month').value;
+    const year = document.getElementById('cal-year').value;
+    document.getElementById('calendar-grid').innerHTML = 'Loading calendar...';
+
+    google.script.run
+      .withSuccessHandler(response => {
+        if (response.status === 'success') {
+          renderCalendar(parseInt(year), parseInt(month), response.history);
+        } else {
+          displayMessage('calendar-message', response.message, 'error');
+        }
+      })
+      .withFailureHandler(err => displayMessage('calendar-message', 'Error loading calendar: ' + err, 'error'))
+      .getWorkoutHistory(currentUser.userId, currentUser.token, year, month);
+  }
+
+  function renderCalendar(year, month, historyData) {
+    const grid = document.getElementById('calendar-grid');
+    grid.innerHTML = ''; // Clear previous
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const firstDayOfMonth = new Date(year, month - 1, 1).getDay(); // 0=Sun, 1=Mon..
+
+    // Add day labels
+    const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    dayLabels.forEach(label => {
+        const labelDiv = document.createElement('div');
+        labelDiv.classList.add('calendar-day-label');
+        labelDiv.textContent = label;
+        grid.appendChild(labelDiv);
+    });
+
+
+    // Add empty cells for days before the 1st of the month
+    for (let i = 0; i < firstDayOfMonth; i++) {
+      grid.appendChild(document.createElement('div'));
+    }
+
+    // Add day cells
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dayCell = document.createElement('div');
+      dayCell.classList.add('calendar-day');
+      dayCell.innerHTML = `<div class="day-number">${day}</div>`;
+      const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+      const workoutLogEntry = historyData.find(entry => entry.dateCompleted === dateStr);
+      if (workoutLogEntry) {
+        dayCell.classList.add('has-workout');
+        if (workoutLogEntry.status === 'Completed') dayCell.classList.add('completed');
+        if (workoutLogEntry.status === 'Skipped') dayCell.classList.add('skipped');
+        // Ideally fetch workout title for display
+        dayCell.innerHTML += `<div class="workout-title-calendar">${workoutLogEntry.status} (W${workoutLogEntry.week}D${workoutLogEntry.day})</div>`;
+        dayCell.title = `Workout: ${workoutLogEntry.workoutIdPlanned}\nStatus: ${workoutLogEntry.status}\nNotes: ${workoutLogEntry.notes || ''}`;
+        dayCell.onclick = () => alert(`Workout on ${dateStr}:\nID: ${workoutLogEntry.workoutIdPlanned}\nStatus: ${workoutLogEntry.status}\nRating: ${workoutLogEntry.rating || 'N/A'}\nNotes: ${workoutLogEntry.notes || 'None'}`);
+      }
+      // Highlight current day (very basic)
+      const today = new Date();
+      if (day === today.getDate() && month === (today.getMonth() + 1) && year === today.getFullYear()) {
+          dayCell.classList.add('current');
+      }
+      grid.appendChild(dayCell);
+    }
+  }
+
+  // --- PROFILE MODULE ---
+  let availablePrograms = [];
+  function loadProfileData() {
+    if (!currentUser) return;
+
+    // First get available programs
+    google.script.run
+      .withSuccessHandler(progResponse => {
+        if (progResponse.status === 'success') {
+          availablePrograms = progResponse.programs;
+          const programSelect = document.getElementById('profile-program');
+          programSelect.innerHTML = '<option value="">-- Select Program --</option>';
+          availablePrograms.forEach(prog => {
+            const option = document.createElement('option');
+            option.value = prog.id;
+            option.textContent = prog.name;
+            programSelect.appendChild(option);
+          });
+
+          // Then get user's current profile
+          google.script.run
+            .withSuccessHandler(response => {
+              if (response.status === 'success') {
+                const profile = response.profile;
+                document.getElementById('profile-name').value = profile.name || '';
+                document.getElementById('profile-email').value = profile.email || ''; // Should be from currentUser.email
+                document.getElementById('profile-event-date').value = profile.eventDate || '';
+                if (profile.currentProgramId) {
+                  programSelect.value = profile.currentProgramId;
+                }
+                document.getElementById('subscription-status').textContent = profile.subscriptionStatus || 'Unknown';
+              } else {
+                displayMessage('profile-message', response.message, 'error');
+              }
+            })
+            .withFailureHandler(err => displayMessage('profile-message', 'Error loading profile: ' + err, 'error'))
+            .getUserProfile(currentUser.userId, currentUser.token);
+        } else {
+          displayMessage('profile-message', 'Could not load programs: ' + progResponse.message, 'error');
+        }
+      })
+      .withFailureHandler(err => displayMessage('profile-message', 'Error fetching programs list: ' + err, 'error'))
+      .getAvailablePrograms();
+  }
+
+  function handleUpdateProfile() {
+    if (!currentUser) return;
+    const name = document.getElementById('profile-name').value;
+    const eventDate = document.getElementById('profile-event-date').value;
+    const currentProgramId = document.getElementById('profile-program').value;
+
+    const profileData = { name, eventDate, currentProgramId };
+
+    google.script.run
+      .withSuccessHandler(response => {
+        displayMessage('profile-message', response.message, response.status);
+        if(response.status === 'success') {
+            // Update local currentUser if name changed
+            if (currentUser.name !== name) {
+                currentUser.name = name;
+                localStorage.setItem('userName', name);
+                document.getElementById('user-name-display').textContent = name;
+            }
+            // Reload profile data to reflect changes, especially if program state was recalculated
+            loadProfileData();
+        }
+      })
+      .withFailureHandler(err => displayMessage('profile-message', 'Error updating profile: ' + err, 'error'))
+      .updateUserProfile(currentUser.userId, currentUser.token, profileData);
+  }
+
+  // --- PAYMENT (Placeholder) ---
+  function handleManageSubscription() {
+    if (!currentUser) return;
+    // This would ideally call your Stripe integration to create a customer portal session or checkout
+    displayMessage('profile-message', 'Attempting to manage subscription (placeholder)...', 'info');
+    google.script.run
+      .withSuccessHandler(response => {
+        if (response.status === 'success_mock' && response.checkoutUrl) {
+          displayMessage('profile-message', 'Redirecting to mock payment page...', 'success');
+          // In a real app, redirect or open Stripe Checkout
+          // window.location.href = response.checkoutUrl;
+           alert("Mock checkout: " + response.checkoutUrl);
+        } else {
+          displayMessage('profile-message', response.message || 'Could not initiate subscription management.', 'error');
+        }
+      })
+      .withFailureHandler(err => displayMessage('profile-message', 'Error: ' + err, 'error'))
+      .createStripeCheckoutSession(currentUser.userId, currentUser.token, 'YOUR_DEFAULT_PLAN_ID'); // Replace with actual plan ID
+  }
+
+</script>

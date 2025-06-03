@@ -1,0 +1,529 @@
+// Auth.gs
+
+const SESSION_TOKEN_EXPIRATION_DAYS = 30; // For cookie-based tokens
+const PASSWORD_RESET_TOKEN_EXPIRY_HOURS = 24;
+
+/**
+ * Handles user registration.
+ * userData: { username, password, fullname, email, programId (optional), eventLocation (optional), eventDate (optional), assessmentData (optional) }
+ */
+function registerNewUserWithAssessmentAndPayment(userData) {
+  try {
+    Logger.log("Attempting registration for username: " + userData.username + " with PaymentIntent: " + userData.paymentIntentId);
+
+    // --- 1. Validate Input (Basic user data) ---
+    if (!userData.username || !userData.password || !userData.fullname || !userData.email) {
+      return { success: false, message: "Missing required account information." };
+    }
+    // ... (other validations from previous draft: password length, email format) ...
+
+    // --- 2. Verify Payment Intent Server-Side ---
+    if (!userData.paymentIntentId) {
+      Logger.log("Registration attempt without PaymentIntentID for user: " + userData.username);
+      // This might be a free trial path or an error. For paid, this is an error.
+      return { success: false, message: "Payment information is missing. Cannot complete registration." };
+    }
+    const paymentVerification = verifyStripePaymentIntent(userData.paymentIntentId); // From Payment.gs
+    if (!paymentVerification.success) {
+      return { success: false, message: "Payment verification failed: " + paymentVerification.message };
+    }
+    if (paymentVerification.status !== 'succeeded') {
+      // This case should ideally be caught client-side, but double-check server-side.
+      return { success: false, message: `Payment was not successful. Status: ${paymentVerification.status}. Please try payment again.` };
+    }
+    // At this point, payment for the initial amount (e.g., first month) is confirmed.
+    // The customerId and paymentMethodId are from the verified PaymentIntent.
+    const stripeCustomerId = paymentVerification.customerId;
+    const paymentMethodId = paymentVerification.paymentMethodId;
+
+    if (!stripeCustomerId || !paymentMethodId) {
+        Logger.log(`Critical data missing from payment verification for PI ${userData.paymentIntentId}: CustID: ${stripeCustomerId}, PM_ID: ${paymentMethodId}`);
+        return { success: false, message: "Payment verification incomplete. Contact support."};
+    }
+
+
+    // --- 3. Create Stripe Subscription (Recurring Billing) ---
+    const subscriptionResult = createStripeSubscriptionServerSide(stripeCustomerId, STRIPE_PRICE_ID_CONST, paymentMethodId); // From Payment.gs
+    if (!subscriptionResult.success) {
+      // If subscription fails, what to do? User has paid for first month via PI.
+      // Log error. User might need manual setup or refund.
+      Logger.log(`CRITICAL: PaymentIntent ${userData.paymentIntentId} succeeded, but failed to create subscription for customer ${stripeCustomerId}. Error: ${subscriptionResult.message}`);
+      // For now, let's proceed with registration but flag this. User gets access based on PI success.
+      // Ideally, you'd have a robust retry or alerting mechanism.
+      // A simpler approach for now: if PI succeeded, grant access for first period even if subscription setup fails.
+      // The webhook for invoice.payment_succeeded on the PI might also update subscription state.
+    }
+    const stripeSubscriptionId = subscriptionResult.success ? subscriptionResult.subscriptionId : null;
+    const subscriptionStatus = subscriptionResult.success ? subscriptionResult.status : 'payment_succeeded_pi_only'; // Custom status
+    const subscriptionPeriodEnd = subscriptionResult.success ? new Date(subscriptionResult.current_period_end * 1000) : new Date(new Date().getTime() + 30 * 24 * 60 * 60 * 1000); // Approx 1 month access
+
+    // --- 4. Check Username Availability & Hash Password (as before) ---
+    const userSpreadsheet = getUserDataSpreadsheet();
+    const credsSheet = getOrCreateSheet(userSpreadsheet, CREDENTIALS_SHEET_NAME, ["Username", "PasswordHash", "Salt", "UserID", "Email", "StripeCustomerID", "SubscriptionID"]);
+    const existingUser = findRowByValue(credsSheet, 1, userData.username);
+    if (existingUser) return { success: false, message: "Username already exists." };
+    // ... (check existing email too) ...
+
+    const salt = generateSalt();
+    const passwordHash = hashPassword(userData.password, salt);
+    const userId = userData.username;
+
+    // --- 5. Store Credentials (now including Stripe IDs) ---
+    credsSheet.appendRow([
+      userId, // Username is Col A for findRowByValue
+      passwordHash,
+      salt,
+      userId, // UserID is Col D
+      userData.email.toLowerCase().trim(),
+      stripeCustomerId,
+      stripeSubscriptionId || "" // Store if created
+    ]);
+
+    // --- 6. Process Assessment and Program Selection (as before) ---
+    const processedAssessmentData = processAssessmentData(userData.assessmentData || {});
+    const programSelection = selectHyroxProgram({ ...processedAssessmentData, username: userId, age: userData.assessmentData.age, goals: userData.assessmentData.goals });
+    let selectedProgramId = (programSelection.recommendedProgram && programSelection.recommendedProgram.id) ? programSelection.recommendedProgram.id : DEFAULT_PROGRAM_ID;
+    let selectedProgramName = (programSelection.recommendedProgram && programSelection.recommendedProgram.name) ? programSelection.recommendedProgram.name : "Default Program";
+
+    // --- 7. Store User Profile Data (as before) ---
+    const userProfileSheet = getOrCreateSheet(userSpreadsheet, USER_SHEET_NAME /*, headers */);
+    const initialProgramState = calculateInitialProgramState(selectedProgramId, userData.eventDate ? new Date(userData.eventDate) : null);
+    userProfileSheet.appendRow([
+      userId, initialProgramState.currentWeek, initialProgramState.currentDay, userData.fullname,
+      initialProgramState.startDate, "", selectedProgramId, userData.eventLocation || "",
+      userData.eventDate ? new Date(userData.eventDate) : "", initialProgramState.programPhase,
+      initialProgramState.virtualStartDate, initialProgramState.mainProgramStartDate || "", false
+    ]);
+
+    // --- 8. Store Assessment & Selection Details (as before) ---
+    if (userData.assessmentData) storeUserAssessmentData(userId, processedAssessmentData);
+    storeProgramSelectionData(userId, programSelection);
+
+    // --- 9. Store Subscription Details & Grant Access ---
+    if (stripeSubscriptionId) { // If subscription was successfully created
+        storeSubscriptionDetails(userId, stripeCustomerId, stripeSubscriptionId, subscriptionStatus, subscriptionPeriodEnd);
+    } else {
+        // Log that subscription needs manual check if PI succeeded but sub creation failed
+        Logger.log(`User ${userId} (Cust: ${stripeCustomerId}) registered with PI success, but no Stripe Subscription ID. Manual check advised.`);
+    }
+    updateUserAccess(userId, true, subscriptionStatus === 'active' || subscriptionStatus === 'trialing' || subscriptionStatus === 'payment_succeeded_pi_only' ? "Subscribed/Paid" : "Subscription Issue");
+
+
+    Logger.log(`User ${userId} fully registered. Program: ${selectedProgramName}. Sub Status: ${subscriptionStatus}`);
+    return { 
+        success: true, 
+        message: "Registration successful! Your training program is ready.",
+        programName: selectedProgramName,
+        reasoning: programSelection.reasoningExplanation
+    };
+
+  } catch (error) {
+    Logger.log("CRITICAL Error in registerNewUserWithAssessmentAndPayment: " + error.toString() + " Stack: " + error.stack);
+    return { success: false, message: "Registration failed due to a server error: " + error.message };
+  }
+}
+
+
+/**
+ * Validates user login credentials and creates a session.
+ * @param {string} username The username.
+ * @param {string} password The password.
+ * @return {object} Session object { success, userId, token, message, name } or error object.
+ */
+function validateLoginSecure(username, password) {
+  Logger.log("Login attempt for: " + username);
+  try {
+    const normalizedUsername = username.toLowerCase().trim();
+    const userSpreadsheet = getUserDataSpreadsheet();
+    const credsSheet = getOrCreateSheet(userSpreadsheet, CREDENTIALS_SHEET_NAME);
+
+    const userRecord = findRowByValue(credsSheet, 1, normalizedUsername); // Username in Col A
+
+    if (!userRecord) {
+      Logger.log(`Login failed: Username "${normalizedUsername}" not found.`);
+      return { success: false, message: "Invalid username or password." };
+    }
+
+    const { rowData } = userRecord;
+    const storedHash = rowData[1]; // PasswordHash in Col B
+    const salt = rowData[2];       // Salt in Col C
+    const userId = rowData[3];     // UserID in Col D (should match username or be a UUID)
+
+    if (verifyPassword(password, storedHash, salt)) {
+      Logger.log("Password verified for: " + normalizedUsername);
+
+      // Check subscription status / access
+      const access = checkUserAccess(userId);
+      if (!access.hasAccess) {
+        Logger.log(`Login failed: User "${normalizedUsername}" has no active access. Reason: ${access.reason}`);
+        return { 
+          success: false, 
+          message: access.message || "Your account is inactive. Please check your subscription or contact support.",
+          subscriptionInactive: true // Add a flag for client to handle
+        };
+      }
+
+      const userProfileSheet = getOrCreateSheet(userSpreadsheet, USER_SHEET_NAME);
+      const userProfile = findRowByValue(userProfileSheet, 1, userId); // UserID in Col A
+      const name = userProfile ? userProfile.rowData[3] : normalizedUsername; // Name in Col D
+
+      const session = createUserSession(userId, name);
+      Logger.log("Login successful for: " + normalizedUsername);
+      return { ...session, name: name }; // Add name to the response
+    } else {
+      Logger.log("Login failed: Password incorrect for " + normalizedUsername);
+      return { success: false, message: "Invalid username or password." };
+    }
+  } catch (error) {
+    Logger.log("Error during login: " + error.toString());
+    return { success: false, message: "Login error: " + error.message };
+  }
+}
+
+/**
+ * Creates a new session for a user.
+ * @param {string} userId The user's ID.
+ * @param {string} name The user's name.
+ * @return {object} Session object { success, userId, token }.
+ */
+function createUserSession(userId, name) {
+  const token = generateSecureSessionToken(userId);
+  // Storing the token server-side (e.g., in User Properties or a dedicated sheet)
+  // is more secure for validation than relying solely on client-side storage.
+  // For simplicity matchingf your current model, we'll return it and client stores it.
+  // If using UserProperties: PropertiesService.getUserProperties().setProperty('session_' + userId, token);
+  
+  return {
+    success: true,
+    userId: userId,
+    token: token,
+    name: name // Return name for UI
+  };
+}
+
+/**
+ * Generates a secure, time-limited session token.
+ * @param {string} userId The user's ID.
+ * @return {string} The session token.
+ */
+function generateSecureSessionToken(userId) {
+  const timestamp = new Date().getTime();
+  const random = Math.random().toString(36).substring(2); // More randomness
+  const expiration = new Date();
+  expiration.setDate(expiration.getDate() + SESSION_TOKEN_EXPIRATION_DAYS);
+  const expirationTime = expiration.getTime();
+  
+  // Payload: userId, creation_timestamp, expiration_timestamp
+  const payload = `${userId}|${timestamp}|${expirationTime}`;
+  // "Signature" part (simple HMAC-like structure, NOT cryptographically secure for true JWT)
+  // For real security, use a library or a proper backend for JWTs.
+  const secretPart = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, payload + PropertiesService.getScriptProperties().getProperty('SESSION_SECRET') || "default_secret_for_hybridx");
+  const signature = Utilities.base64EncodeWebSafe(secretPart).substring(0, 16); // Shortened "signature"
+
+  const token = `${Utilities.base64EncodeWebSafe(payload)}.${signature}`;
+  Logger.log(`Generated session token for ${userId}`);
+  return token;
+}
+
+/**
+ * Validates a session token provided by the client.
+ * @param {string} token The session token.
+ * @param {string} userId The UserID from client (to cross-check with token payload).
+ * @return {object} { success: boolean, message?: string, userId?: string, refreshedToken?: string }
+ */
+function validateClientSessionToken(token, clientUserId) {
+  if (!token || !clientUserId) {
+    return { success: false, message: "Token or UserID missing." };
+  }
+
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 2) {
+      return { success: false, message: "Invalid token format (parts)." };
+    }
+
+    const encodedPayload = parts[0];
+    const signature = parts[1];
+    let payloadString;
+    try {
+        payloadString = Utilities.newBlob(Utilities.base64DecodeWebSafe(encodedPayload)).getDataAsString();
+    } catch(e) {
+        Logger.log("Failed to decode token payload: " + e.toString());
+        return { success: false, message: "Invalid token payload encoding." };
+    }
+    
+    const payloadParts = payloadString.split('|');
+    if (payloadParts.length !== 3) {
+      return { success: false, message: "Invalid token payload structure." };
+    }
+
+    const tokenUserId = payloadParts[0];
+    const creationTime = parseInt(payloadParts[1]);
+    const expirationTime = parseInt(payloadParts[2]);
+
+    // Verify "signature"
+    const secretPart = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, payloadString + PropertiesService.getScriptProperties().getProperty('SESSION_SECRET') || "default_secret_for_hybridx");
+    const expectedSignature = Utilities.base64EncodeWebSafe(secretPart).substring(0, 16);
+
+    if (signature !== expectedSignature) {
+      Logger.log(`Token signature mismatch for user ${clientUserId}. Expected: ${expectedSignature}, Got: ${signature}`);
+      return { success: false, message: "Token signature invalid." };
+    }
+
+    if (tokenUserId !== clientUserId) {
+      Logger.log(`Token UserID mismatch. Client: ${clientUserId}, Token: ${tokenUserId}`);
+      return { success: false, message: "Token UserID mismatch." };
+    }
+
+    if (new Date().getTime() > expirationTime) {
+      return { success: false, message: "Token expired." };
+    }
+    
+    // Optional: Check against server-stored token if implementing that.
+    // For now, payload validation is the primary check.
+
+    // If token is valid and nearing expiry (e.g., last 7 days of 30), refresh it
+    const now = new Date().getTime();
+    let refreshedToken = token;
+    if ((expirationTime - now) < (7 * 24 * 60 * 60 * 1000)) { // If less than 7 days to expiry
+        // Find user's name to pass to createUserSession for the refreshed token response
+        const userSpreadsheet = getUserDataSpreadsheet();
+        const userProfileSheet = getOrCreateSheet(userSpreadsheet, USER_SHEET_NAME);
+        const userProfile = findRowByValue(userProfileSheet, 1, tokenUserId);
+        const name = userProfile ? userProfile.rowData[3] : tokenUserId;
+        
+        const newSession = createUserSession(tokenUserId, name); // Generates new token
+        refreshedToken = newSession.token;
+        Logger.log(`Refreshed token for ${tokenUserId}`);
+    }
+
+    return { success: true, userId: tokenUserId, refreshedToken: refreshedToken, message: "Token valid." };
+
+  } catch (error) {
+    Logger.log("Error validating session token: " + error.toString());
+    return { success: false, message: "Token validation error: " + error.message };
+  }
+}
+
+/**
+ * Handles request for password reset.
+ * @param {string} email The user's email address.
+ * @return {object} { success: boolean, message: string }
+ */
+function requestPasswordReset(email) {
+  try {
+    const normalizedEmail = email.toLowerCase().trim();
+    Logger.log("Password reset requested for email: " + normalizedEmail);
+
+    if (!normalizedEmail || !/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
+      return { success: false, message: "Please provide a valid email address." };
+    }
+
+    const userSpreadsheet = getUserDataSpreadsheet();
+    const credsSheet = getOrCreateSheet(userSpreadsheet, CREDENTIALS_SHEET_NAME);
+    const userRecord = findRowByValue(credsSheet, 5, normalizedEmail); // Email in Col E
+
+    if (!userRecord) {
+      Logger.log("Email not found for password reset: " + normalizedEmail);
+      // For security, don't reveal if email exists.
+      return { success: true, message: "If this email is registered, you'll receive reset instructions shortly." };
+    }
+
+    const username = userRecord.rowData[0]; // Username in Col A
+    const userId = userRecord.rowData[3];   // UserID in Col D
+    
+    const userProfileSheet = getOrCreateSheet(userSpreadsheet, USER_SHEET_NAME);
+    const userProfile = findRowByValue(userProfileSheet, 1, userId); // UserID in Col A
+    const userName = userProfile ? userProfile.rowData[3] : username; // Name in Col D
+
+    const resetToken = generatePasswordResetToken(userId);
+    storePasswordResetToken(userId, normalizedEmail, resetToken);
+
+    const resetUrl = `${getScriptUrl()}?page=reset&token=${encodeURIComponent(resetToken)}`;
+    const emailBody = `
+      <h2>Password Reset Request</h2>
+      <p>Hello ${userName},</p>
+      <p>We received a request to reset your password for the HybridX Training Platform.</p>
+      <p>Click the link below to reset your password:</p>
+      <p><a href="${resetUrl}" style="background-color:#fadb5c;color:#333;padding:10px 15px;text-decoration:none;border-radius:5px;">Reset Your Password</a></p>
+      <p>This link will expire in ${PASSWORD_RESET_TOKEN_EXPIRY_HOURS} hours.</p>
+      <p>If you didn't request this, you can safely ignore this email.</p>
+      <p>Best regards,<br>The HybridX Training Team</p>
+    `;
+
+    MailApp.sendEmail({
+      to: normalizedEmail,
+      subject: "HybridX Training - Password Reset",
+      htmlBody: emailBody
+    });
+    Logger.log("Password reset email sent to: " + normalizedEmail);
+
+    return { success: true, message: "If this email is registered, you'll receive reset instructions shortly." };
+  } catch (error) {
+    Logger.log("Error requesting password reset: " + error.toString());
+    return { success: false, message: "Error processing password reset request: " + error.message };
+  }
+}
+
+/**
+ * Generates a password reset token.
+ * @param {string} userId The user's ID.
+ * @return {string} The reset token.
+ */
+function generatePasswordResetToken(userId) {
+  const timestamp = new Date().getTime();
+  const random = Math.random().toString(36).substring(2);
+  const expiration = new Date();
+  expiration.setHours(expiration.getHours() + PASSWORD_RESET_TOKEN_EXPIRY_HOURS);
+  const expirationTime = expiration.getTime();
+  
+  const tokenData = `${userId}|${timestamp}|${random}|${expirationTime}`;
+  const hashedToken = Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, tokenData + (PropertiesService.getScriptProperties().getProperty('RESET_SECRET') || "default_reset_secret")));
+  
+  return `${hashedToken}.${expirationTime}`; // Append expiration for easier validation
+}
+
+/**
+ * Stores a password reset token.
+ * @param {string} userId The user's ID.
+ * @param {string} email The user's email.
+ * @param {string} token The reset token.
+ */
+function storePasswordResetToken(userId, email, token) {
+  const userSpreadsheet = getUserDataSpreadsheet();
+  const resetSheet = getOrCreateSheet(userSpreadsheet, PASSWORD_RESETS_SHEET_NAME, ["UserID", "Email", "Token", "CreatedAt", "ExpiresAt", "Used"]);
+  
+  const tokenParts = token.split('.');
+  const expirationTime = tokenParts[1] ? new Date(parseInt(tokenParts[1])) : new Date(new Date().getTime() + PASSWORD_RESET_TOKEN_EXPIRY_HOURS * 60 * 60 * 1000);
+
+  resetSheet.appendRow([userId, email, token, new Date(), expirationTime, false]);
+  Logger.log(`Password reset token stored for ${userId}`);
+}
+
+/**
+ * Validates a password reset token.
+ * @param {string} token The token to validate.
+ * @return {object} { valid: boolean, message?: string, userId?: string, email?: string, rowIndex?: number }
+ */
+function validateResetToken(token) {
+  try {
+    if (!token) return { valid: false, message: "Invalid token provided." };
+
+    const tokenParts = token.split('.');
+    if (tokenParts.length !== 2) return { valid: false, message: "Malformed token." };
+
+    const expirationTime = parseInt(tokenParts[1]);
+    if (isNaN(expirationTime) || new Date().getTime() > expirationTime) {
+      return { valid: false, message: "Token has expired." };
+    }
+
+    const userSpreadsheet = getUserDataSpreadsheet();
+    const resetSheet = getOrCreateSheet(userSpreadsheet, PASSWORD_RESETS_SHEET_NAME);
+    const data = resetSheet.getDataRange().getValues();
+
+    for (let i = 1; i < data.length; i++) {
+      const storedToken = String(data[i][2] || ""); // Token in Col C
+      if (storedToken === token) {
+        const used = data[i][5]; // Used flag in Col F
+        if (used === true) {
+          return { valid: false, message: "This reset link has already been used." };
+        }
+        // Check expiration again based on stored value, just in case
+        const storedExpiry = new Date(data[i][4]).getTime(); // ExpiresAt in Col E
+        if (new Date().getTime() > storedExpiry) {
+            resetSheet.getRange(i + 1, 6).setValue(true); // Mark as used if found expired
+            return { valid: false, message: "Token has expired (sheet check)." };
+        }
+        return { 
+          valid: true, 
+          userId: String(data[i][0]), // UserID in Col A
+          email: String(data[i][1]),  // Email in Col B
+          rowIndex: i + 1 
+        };
+      }
+    }
+    return { valid: false, message: "Invalid or non-existent token." };
+  } catch (error) {
+    Logger.log("Error validating reset token: " + error.toString());
+    return { valid: false, message: "Error during token validation: " + error.message };
+  }
+}
+
+/**
+ * Resets a user's password using a valid token.
+ * @param {string} token The reset token.
+ * @param {string} newPassword The new password.
+ * @return {object} { success: boolean, message: string }
+ */
+function resetPasswordWithToken(token, newPassword) {
+  try {
+    const validation = validateResetToken(token);
+    if (!validation.valid) {
+      return { success: false, message: validation.message };
+    }
+
+    if (!newPassword || newPassword.length < 6) {
+      return { success: false, message: "Password must be at least 6 characters long." };
+    }
+
+    const userSpreadsheet = getUserDataSpreadsheet();
+    const credsSheet = getOrCreateSheet(userSpreadsheet, CREDENTIALS_SHEET_NAME);
+    const userRecord = findRowByValue(credsSheet, 4, validation.userId); // UserID in Col D
+
+    if (!userRecord) {
+      return { success: false, message: "User account not found for password update." };
+    }
+
+    const salt = generateSalt(); // Generate a new salt for the new password
+    const newPasswordHash = hashPassword(newPassword, salt);
+
+    credsSheet.getRange(userRecord.rowIndex, 2).setValue(newPasswordHash); // PasswordHash in Col B
+    credsSheet.getRange(userRecord.rowIndex, 3).setValue(salt);           // Salt in Col C
+    Logger.log(`Password updated for user ${validation.userId}`);
+
+    // Mark token as used
+    const resetSheet = getOrCreateSheet(userSpreadsheet, PASSWORD_RESETS_SHEET_NAME);
+    if (validation.rowIndex) {
+      resetSheet.getRange(validation.rowIndex, 6).setValue(true); // Mark as used (Col F)
+    }
+
+    // Send confirmation email
+    MailApp.sendEmail({
+      to: validation.email,
+      subject: "HybridX Training - Password Reset Successful",
+      htmlBody: `
+        <h2>Password Reset Successful</h2>
+        <p>Hello,</p>
+        <p>Your password for the HybridX Training Platform has been successfully reset.</p>
+        <p>You can now log in with your new password: <a href="${getScriptUrl()}">Login Here</a></p>
+        <p>If you did not make this change, please contact support immediately.</p>
+        <p>Best regards,<br>The HybridX Training Team</p>
+      `
+    });
+
+    return { success: true, message: "Password has been reset successfully." };
+  } catch (error) {
+    Logger.log("Error resetting password: " + error.toString());
+    return { success: false, message: "Error resetting password: " + error.message };
+  }
+}
+
+/**
+ * Checks if a username is available.
+ * @param {string} username The username to check.
+ * @return {object} { available: boolean, error?: string }
+ */
+function checkUsernameAvailability(username) {
+  try {
+    if (!username || username.trim().length < 4) {
+      return { available: false, message: "Username must be at least 4 characters."};
+    }
+    const userSpreadsheet = getUserDataSpreadsheet();
+    const credsSheet = getOrCreateSheet(userSpreadsheet, CREDENTIALS_SHEET_NAME);
+    const existingUser = findRowByValue(credsSheet, 1, username.toLowerCase().trim()); // Username in Col A
+    return { available: !existingUser };
+  } catch (error) {
+    Logger.log("Error checking username availability: " + error.toString());
+    return { available: false, error: "Error checking username: " + error.message };
+  }
+}

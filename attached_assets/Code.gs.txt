@@ -1,0 +1,2862 @@
+// ========================================================================
+// Code.gs - Main Server File for HybridX Training Platform (Firebase Version)
+// ========================================================================
+
+// --- Firebase Library Information ---
+// Library ID: 1hguuh4Zx72XVC1Zldm_vTtcUUKUA6iBUOoGnJUWLfqDWx5WlOJHqYkrt
+// ASSUMED IDENTIFIER: FirestoreApp
+
+// --- Script Properties Required ---
+// FIREBASE_PROJECT_ID
+// FIREBASE_PRIVATE_KEY
+// FIREBASE_CLIENT_EMAIL
+// FIREBASE_WEB_API_KEY (For client-side Firebase SDK and token verification)
+// STRIPE_SECRET_KEY (If using Stripe)
+// STRIPE_WEBHOOK_SECRET (If using Stripe webhooks, for signature verification)
+
+// --- Global Firestore Instance ---
+/**
+ * Initializes and returns a Firestore instance.
+ */
+function getFirestoreInstance() {
+
+  const scriptProperties = PropertiesService.getScriptProperties();
+  const projectId = scriptProperties.getProperty('FIREBASE_PROJECT_ID');
+  const privateKey = '-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCs+F42ajqBcylP\nxIrpXlfQi4spjvuBtVY6LKZ15zOwZI9ACuY7Tl0dO1N7y/HZy0tXYNqDoh1Hj6tB\n7C/0iGdWmGCHK6nojI1czGECdHWWrQZcEcEJPzp8lwa5x3XTGvQ+l+eeaeRiJaaY\nhEDBweGCX+B8lDz5rOvb6HqV8nUK8prpdCxmgct8+N9IpK3FHt+hZ11t65ZEC0Pf\n77hyvypv9sBBknWQ9YCUMsSeq1hJSIyYl5eTVE5YrFJlavtUocPMeTQ20x0iZ5sr\nLBKx+B9CEzZjEM9DyDdcdJcMvbnV24lW9DDeB/6/ps60Nrm9QT6F8KjkysyI0CFh\n9p59snaTAgMBAAECggEABhS1OzSA2gwyZ5uBRrMKY0qEmfFs5iJ55ZGsSHjYWFsw\nrg+0CGG45E4xoSiKWB3NiETfacFJRjrGyoqDJRWmjGTO//GJB6PpVFnbDzsI50Mt\n9g6puql+ZOLqWZ2phsJr08eDXQ5b+RdZxALiQ+2NAAhe3AJaImzx3clOhfcAJmJS\nP0MYH81ShaLG46stomxhNZVD13aHEPcSj2psSStzE6AIB/OL2nN0G4C+NWs8ffTa\nbXtdl11OOhOQ0kg2i0nAH2cct7RCRTN1YebuMle6/G0LLRtSX4tfG94wGOmlXk85\nTzzE8JKj6M1P5Hvmqld6XaMhbb2g7q+JCc52dRJ4AQKBgQDdaQ7aFQ+WF0NScSj4\n1EySeb11alfm55GHX4FnNG3LRSK2Acb5FjZ8KNldEhsI/6n1Z+uYJB12dG8/Hfzj\ngMQN4OJWOH0blDQhaBD9WMDICYJv8BatA9LStYelPyUX3I+iwUWFyRghilVjBGvZ\nrPV+EhbdPbzP4A07h7vsQ0w+pwKBgQDH/gZHVGWBg1e2ys8eGJkCRSqjC1BK+SB0\nq27LgsqtfgnbI9eCCQufM7L9+byKteoafHj9WnKqoHvdS8JyGvHGrldMWOTl1nQT\n1UsSilXcF6xf/Ov4J1H8vI8rrkqZ+pBjMzqmCzSzDEsfCu0xJdXlN687jkU+2LWY\nXrqquWhSNQKBgF/ra6u/BAmZ+mh07bMfBi1O4G1FrN8z4zAqh/0WEZrGUMtY6cJv\nhRs09zYC6gNz/0V5x+8ZdkojFy7Y5v4IgucgTe3cexa/lfYDB5k6IgqHVCL6eFhs\nF6GBU0qbmI5F11RDNsNG41VkgKls+OxMqe38GDuwy2OjRRhNLXSlkxpxAoGBALp3\ntgDxxsbP4Iu1YxHLm3ZLaSqmFNIioElHwkEMDM9gUe455+j9aBGjEYPOQyYN4V2a\nqvCGUZ2XjoXR6lWbm8xEp26u/5TwtD/9wkZiJxXUGMtSte0lNENyyAbRNguFXPSx\nQkCo+BTtJGmoNWl6vok+tyrPRu8G/aI4yND/mC31AoGBAKtZm9UG5yVr3cIbOA80\nn1zIq7VFu8OUel87kGG5xDIBiQpKoBfKD65V1zp8N76DXzroBaFCVsZyldvM0ys4\ngewInsmxHTFf+dcQSCvI8jb3xZeeF+7yWyVpkSIgkelPar1sx3VNZPLL9ORXbkcf\nsFvFgj+h7tajOfjpv7Ro6zU8\n-----END PRIVATE KEY-----\n';
+  const clientEmail = scriptProperties.getProperty('FIREBASE_CLIENT_EMAIL');
+
+  if (!privateKey || !clientEmail || !projectId) {
+    const missing = [];
+    if (!privateKey) missing.push('FIREBASE_PRIVATE_KEY');
+    if (!clientEmail) missing.push('FIREBASE_CLIENT_EMAIL');
+    if (!projectId) missing.push('FIREBASE_PROJECT_ID');
+    Logger.log("Firebase credentials missing in Script Properties: " + missing.join(', '));
+    throw new Error("Firebase Admin SDK not configured. Check Script Properties.");
+  }
+  try {
+    return FirestoreApp.getFirestore(clientEmail, privateKey, projectId);
+  } catch (e) {
+    Logger.log("Error initializing Firestore with FirestoreApp.getFirestore: " + e.toString());
+    throw e;
+  }
+}
+const firestore = getFirestoreInstance();
+
+// --- Global Date Parser ---
+function parseInputDate(dateInput, fieldName = 'Date Field', userIdentifier = 'N/A User') {
+    // ... (Keep the full parseInputDate function from previous answer)
+    if (dateInput instanceof Date && !isNaN(dateInput.getTime())) return dateInput;
+    if (!dateInput || String(dateInput).trim() === "") return null;
+    const dateInputString = String(dateInput).trim();
+    try {
+        let dateObj;
+        if (/^\d{1,2}\/\d{1,2}\/\d{4}/.test(dateInputString)) {
+            const parts = dateInputString.split(/[\s\/:]+/);
+            if (parts.length >= 3) {
+                const day = parseInt(parts[0], 10);
+                const month = parseInt(parts[1], 10) - 1;
+                const year = parseInt(parts[2], 10);
+                const hour = parts.length >= 4 ? parseInt(parts[3], 10) : 0;
+                const minute = parts.length >= 5 ? parseInt(parts[4], 10) : 0;
+                const second = parts.length >= 6 ? parseInt(parts[5], 10) : 0;
+                dateObj = new Date(year, month, day, hour, minute, second);
+            }
+        } else { dateObj = new Date(dateInputString); }
+        if (!isNaN(dateObj.getTime())) return dateObj;
+        Logger.log(`Invalid date string for ${fieldName} for user ${userIdentifier}: '${dateInputString}'.`);
+        return null;
+    } catch (e) {
+        Logger.log(`Error parsing ${fieldName} for user ${userIdentifier}: '${dateInputString}'. Exception: ${e.toString()}.`);
+        return null;
+    }
+}
+
+// --- Helper to Convert Firestore Timestamps/JS Dates to ISO for Client ---
+// Grahame Earley's library usually returns JS Date objects for timestamp fields
+function convertDatesToISO(dataObject) {
+    if (!dataObject || typeof dataObject !== 'object') return dataObject;
+    const newObj = Array.isArray(dataObject) ? [] : {};
+    for (const key in dataObject) {
+        if (dataObject.hasOwnProperty(key)) {
+            if (dataObject[key] instanceof Date) {
+                newObj[key] = dataObject[key].toISOString();
+            } else if (typeof dataObject[key] === 'object') {
+                newObj[key] = convertDatesToISO(dataObject[key]); // Recurse
+            } else {
+                newObj[key] = dataObject[key];
+            }
+        }
+    }
+    return newObj;
+}
+
+// Add these functions to your fireCode.gs file
+
+/**
+ * Gets the Stripe publishable key from Script Properties
+ * @return {string} Stripe publishable key or fallback value
+ */
+function getStripePublishableKey() {
+  try {
+    const scriptProperties = PropertiesService.getScriptProperties();
+    const publishableKey = scriptProperties.getProperty('STRIPE_PUBLISHABLE_KEY');
+    
+    if (!publishableKey) {
+      Logger.log("WARNING: STRIPE_PUBLISHABLE_KEY not found in Script Properties");
+      return "pk_test_YOUR_PUBLISHABLE_KEY_HERE"; // Fallback - replace with your actual key
+    }
+    
+    Logger.log("Stripe publishable key retrieved successfully");
+    return publishableKey;
+    
+  } catch (error) {
+    Logger.log("Error retrieving Stripe publishable key: " + error.toString());
+    return "pk_test_YOUR_PUBLISHABLE_KEY_HERE"; // Fallback - replace with your actual key
+  }
+}
+
+/**
+ * Gets the Stripe secret key from Script Properties
+ * @return {string} Stripe secret key or null if not found
+ */
+function getStripeSecretKey() {
+  try {
+    const scriptProperties = PropertiesService.getScriptProperties();
+    const secretKey = scriptProperties.getProperty('STRIPE_SECRET_KEY');
+    
+    if (!secretKey) {
+      Logger.log("WARNING: STRIPE_SECRET_KEY not found in Script Properties");
+      return null;
+    }
+    
+    Logger.log("Stripe secret key retrieved successfully");
+    return secretKey;
+    
+  } catch (error) {
+    Logger.log("Error retrieving Stripe secret key: " + error.toString());
+    return null;
+  }
+}
+
+/**
+ * Test function to verify your Stripe keys are properly configured
+ */
+function testStripeConfiguration() {
+  Logger.log("🧪 Testing Stripe configuration...");
+  
+  const publishableKey = getStripePublishableKey();
+  const secretKey = getStripeSecretKey();
+  
+  // Check publishable key
+  if (publishableKey && publishableKey.startsWith('pk_')) {
+    if (publishableKey.includes('test')) {
+      Logger.log("✅ Stripe publishable key (TEST mode): " + publishableKey.substring(0, 20) + "...");
+    } else {
+      Logger.log("✅ Stripe publishable key (LIVE mode): " + publishableKey.substring(0, 20) + "...");
+    }
+  } else {
+    Logger.log("❌ Invalid or missing Stripe publishable key: " + publishableKey);
+  }
+  
+  // Check secret key
+  if (secretKey && secretKey.startsWith('sk_')) {
+    if (secretKey.includes('test')) {
+      Logger.log("✅ Stripe secret key (TEST mode): " + secretKey.substring(0, 20) + "...");
+    } else {
+      Logger.log("✅ Stripe secret key (LIVE mode): " + secretKey.substring(0, 20) + "...");
+    }
+  } else {
+    Logger.log("❌ Invalid or missing Stripe secret key");
+  }
+  
+  // Check if keys match (test vs live)
+  if (publishableKey && secretKey) {
+    const pubIsTest = publishableKey.includes('test');
+    const secretIsTest = secretKey.includes('test');
+    
+    if (pubIsTest === secretIsTest) {
+      Logger.log("✅ Publishable and secret keys are both in " + (pubIsTest ? "TEST" : "LIVE") + " mode");
+    } else {
+      Logger.log("⚠️ WARNING: Publishable and secret keys are in different modes!");
+    }
+  }
+  
+  Logger.log("Stripe configuration test complete.");
+}
+
+/**
+ * Enhanced doGet function with better error handling for Stripe keys
+ */
+function doGet(e) {
+  let pageParameter = e.parameter.page || "index";
+  let templateFile = "Index";
+  let pageTitle = "HybridX Training Platform";
+  let template;
+
+  // Get Stripe publishable key with error handling
+  let currentStripePublishableKey;
+  try {
+    currentStripePublishableKey = getStripePublishableKey();
+  } catch (error) {
+    Logger.log("Error getting Stripe publishable key in doGet: " + error.toString());
+    currentStripePublishableKey = "pk_test_FALLBACK_KEY"; // Fallback
+  }
+
+  switch (pageParameter.toLowerCase()) {
+    case "admin":
+      templateFile = "Admin"; 
+      pageTitle = "HybridX Admin Panel"; 
+      break;
+    case "register":
+      templateFile = "Registration"; 
+      pageTitle = "HybridX Training - Sign Up"; 
+      break;
+    case "forgot":
+      templateFile = "ForgotPassword"; 
+      pageTitle = "HybridX Training - Forgot Password"; 
+      break;
+    case "reset":
+      templateFile = "ResetPassword"; 
+      pageTitle = "HybridX Training - Reset Password"; 
+      break;
+    case "payment":
+      templateFile = "Payment"; 
+      pageTitle = "HybridX Training - Update Payment"; 
+      break;
+    case "payment_success":
+      templateFile = "PaymentSuccess"; 
+      pageTitle = "HybridX Training - Payment Successful"; 
+      break;
+    case "index": 
+    default:
+      templateFile = "Index"; 
+      break;
+  }
+
+  try {
+    template = HtmlService.createTemplateFromFile(templateFile);
+    
+    // Add Stripe key to templates that need it
+    if (templateFile === "Registration" || templateFile === "Payment") {
+      template.stripePublishableKey = currentStripePublishableKey || "pk_test_MISSING_KEY";
+    }
+    
+    // Add token for reset password page
+    if (templateFile === "ResetPassword" && e.parameter.token) {
+      template.token = e.parameter.token;
+    }
+    
+    // Add subscription ID for payment page
+    if (templateFile === "Payment" && e.parameter.subscription) {
+      template.subscriptionId = e.parameter.subscription;
+    }
+    
+    return template.evaluate()
+      .setTitle(pageTitle)
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1.0');
+      
+  } catch (err) {
+    Logger.log(`Error serving page ${templateFile}: ${err.toString()}`);
+    return HtmlService.createHtmlOutput(`
+      <h1>Error</h1>
+      <p>Could not load: ${templateFile}</p>
+      <p>Error: ${err.message}</p>
+      <p><a href="${getScriptUrl()}">Return to Home</a></p>
+    `).setTitle("App Error");
+  }
+}
+
+/**
+ * Helper function to get the script URL
+ */
+function getScriptUrl() {
+  try {
+    return ScriptApp.getService().getUrl();
+  } catch (error) {
+    Logger.log("Error getting script URL: " + error.toString());
+    return "#"; // Fallback
+  }
+}
+
+/**
+ * Include function for HTML templates
+ */
+function include(filename) {
+  try {
+    return HtmlService.createHtmlOutputFromFile(filename).getContent();
+  } catch (error) {
+    Logger.log(`Error including file ${filename}: ${error.toString()}`);
+    return `<!-- Error loading ${filename}: ${error.message} -->`;
+  }
+}
+
+// ========================================================================
+// WEB APP ENTRY POINTS & HELPERS (Keep these from your original file)
+// ========================================================================
+
+// === WEB APP ENTRY POINT: doGet(e) ===
+function doGet(e) {
+  let pageParameter = e.parameter.page || "index";
+  let templateFile = "Index";
+  let pageTitle = "HybridX Training Platform";
+  let template;
+
+  // Ensure Stripe keys are available if needed by templates
+  const currentStripePublishableKey = getStripePublishableKey();
+
+  switch (pageParameter.toLowerCase()) {
+    case "admin":
+      templateFile = "Admin"; pageTitle = "HybridX Admin Panel"; break;
+    case "register":
+      templateFile = "Registration"; pageTitle = "HybridX Training - Sign Up"; break;
+    case "forgot":
+      templateFile = "ForgotPassword"; pageTitle = "HybridX Training - Forgot Password"; break;
+    case "reset":
+      templateFile = "ResetPassword"; pageTitle = "HybridX Training - Reset Password"; break;
+    case "payment":
+      templateFile = "Payment"; pageTitle = "HybridX Training - Update Payment"; break;
+    case "payment_success":
+      templateFile = "PaymentSuccess"; pageTitle = "HybridX Training - Payment Successful"; break;
+    case "index": default:
+      templateFile = "Index"; break;
+  }
+
+  try {
+    template = HtmlService.createTemplateFromFile(templateFile);
+    if (templateFile === "Registration" || templateFile === "Payment") {
+      template.stripePublishableKey = currentStripePublishableKey || "YOUR_FALLBACK_PK_TEST_KEY";
+    }
+    if (templateFile === "ResetPassword" && e.parameter.token) template.token = e.parameter.token;
+    if (templateFile === "Payment" && e.parameter.subscription) template.subscriptionId = e.parameter.subscription;
+    
+    return template.evaluate().setTitle(pageTitle)
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1.0');
+  } catch (err) {
+    Logger.log(`Error serving page ${templateFile}: ${err.toString()}`);
+    return HtmlService.createHtmlOutput(`<h1>Error</h1><p>Could not load: ${templateFile}. ${err.message}</p>`).setTitle("App Error");
+  }
+
+  // ... your existing doGet logic ...
+  // It will now serve Index.html which uses Firebase JS SDK for auth
+  // and calls the new Firebase-backed server functions.
+  // Make sure to pass FIREBASE_WEB_API_KEY to client templates if needed for Firebase JS SDK config
+
+}
+
+function doPost(e) {
+  // Primarily for Stripe Webhooks now
+ // === WEB APP ENTRY POINT: doPost(e) ===
+function doPost(e) {
+  // Ensure Stripe Secret key is loaded for webhook handling
+  if (!getStripeSecretKey()) {
+      Logger.log("CRITICAL: Stripe Secret Key not available for doPost. Webhook processing will likely fail.");
+      // Return an error immediately if Stripe key is essential and missing
+      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Server configuration error." }))
+          .setMimeType(ContentService.MimeType.JSON);
+  }
+  try {
+    if (e.postData && e.postData.type === 'application/json' && e.postData.contents) {
+      const payload = JSON.parse(e.postData.contents);
+      if (payload && payload.id && payload.object === 'event' && payload.type && payload.type.startsWith('stripe.')) { // Be more specific for Stripe
+        Logger.log(`Stripe Webhook Received - Type: ${payload.type}, ID: ${payload.id}`);
+        return handleStripeWebhook(payload, e.requestHeaders); // Pass headers for signature verification
+      }
+    }
+  } catch (error) { /* ... */ }
+  return ContentService.createTextOutput(JSON.stringify({ status: "unhandled_post" })).setMimeType(ContentService.MimeType.JSON);
+}
+
+function include(filename) {
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
+function getScriptUrl() {
+  return ScriptApp.getService().getUrl();
+}
+}
+
+
+// ========================================================================
+// AUTHENTICATION (NEW)
+// ========================================================================
+
+/**
+ * Verifies a Firebase ID token.
+ * @param {string} idToken The Firebase ID token.
+ * @return {object} { isValid: boolean, uid?: string, email?: string, error?: string }
+ */
+/**
+ * Safe token verification that does NOT check Firestore documents
+ * Make sure your verifyFirebaseIdToken function looks like this
+ */
+function verifyFirebaseIdToken(idToken) {
+  if (!idToken) return { isValid: false, error: "No token provided.", uid: null };
+  
+  try {
+    const FIREBASE_WEB_API_KEY = PropertiesService.getScriptProperties().getProperty("FIREBASE_WEB_API_KEY");
+    if (!FIREBASE_WEB_API_KEY) {
+        Logger.log("CRITICAL: FIREBASE_WEB_API_KEY not set in Script Properties.");
+        throw new Error("Server configuration error: Firebase Web API Key not set.");
+    }
+
+    const response = UrlFetchApp.fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${FIREBASE_WEB_API_KEY}`, {
+        method: 'post',
+        contentType: 'application/json',
+        payload: JSON.stringify({ idToken: idToken }),
+        muteHttpExceptions: true
+      }
+    );
+    
+    const responseCode = response.getResponseCode();
+    const responseText = response.getContentText();
+    const data = JSON.parse(responseText);
+
+    if (responseCode === 200 && data && data.users && data.users.length > 0) {
+      return { isValid: true, uid: data.users[0].localId, email: data.users[0].email };
+    }
+    
+    const errorMessage = data.error ? data.error.message : "Invalid token or user not found";
+    Logger.log(`Token verification failed (HTTP ${responseCode}): ${errorMessage}. Response: ${responseText}`);
+    return { isValid: false, error: errorMessage, uid: null };
+    
+  } catch (e) {
+    Logger.log('Token verification exception: ' + e.toString() + (e.stack ? (' Stack: ' + e.stack) : ''));
+    return { isValid: false, error: "Token verification process error.", uid: null };
+  }
+}
+
+/**
+ * If you have a getUserData function, make sure it's not being called during registration
+ * This function often tries to get existing user documents
+ */
+function getUserData(userId) {
+  // This function should NOT be called during user creation!
+  Logger.log("WARNING: getUserData called during registration - this might cause the document not found error");
+  throw new Error("getUserData should not be called during user creation");
+}
+
+/**
+ * Safe alternative that doesn't check existing documents
+ */
+function getUserDataSafe(userId) {
+  Logger.log(`getUserDataSafe called for ${userId} - this should only be called AFTER user creation`);
+  
+  try {
+    const userDoc = firestore.getDocument(`users/${userId}`);
+    if (userDoc && userDoc.fields) {
+      // Convert Firestore format to simple object
+      const userData = {};
+      Object.keys(userDoc.fields).forEach(key => {
+        const field = userDoc.fields[key];
+        if (field.stringValue !== undefined) userData[key] = field.stringValue;
+        else if (field.booleanValue !== undefined) userData[key] = field.booleanValue;
+        else if (field.integerValue !== undefined) userData[key] = parseInt(field.integerValue);
+        else if (field.timestampValue !== undefined) userData[key] = new Date(field.timestampValue);
+        else userData[key] = field;
+      });
+      return userData;
+    }
+    return null;
+  } catch (error) {
+    Logger.log(`getUserDataSafe error for ${userId}: ${error.toString()}`);
+    return null;
+  }
+}
+
+
+/**
+ * Creates a new user profile document in Firestore after Firebase Auth registration.
+ * @param {object} payload { idToken: string, userData: { name: string, email: string, ...otherDefaults } }
+ * @return {object} { success: boolean, message: string, userId?: string }
+ */
+/**
+ * Fixed version of createNewUserProfileSecure with proper error handling
+ * Replace your existing function with this one
+ */
+/**
+ * Fixed createNewUserProfileSecure - removes problematic document existence check
+ * Replace your existing function with this version
+ */
+function createNewUserProfileSecure(payload) {
+  const verification = verifyFirebaseIdToken(payload.idToken);
+  if (!verification.isValid || !verification.uid) {
+    return { success: false, message: verification.error || "Session invalid." };
+  }
+  const userUID = verification.uid;
+  const userEmail = verification.email;
+
+  try {
+    const userProfilePath = `users/${userUID}`;
+    
+    // REMOVED: Document existence check that was causing the error
+    // Just create/update the document directly - Firebase handles duplicates fine
+    
+    Logger.log(`Creating user profile for UID: ${userUID} at path: ${userProfilePath}`);
+
+    const userData = payload.userData;
+    const name = userData.name || userEmail.split('@')[0];
+
+    // Calculate initial program state based on event date
+    let initialState = {
+      currentWeek: 0,
+      currentDay: 0,
+      displayWeek: 0,
+      programPhase: "MAIN",
+      virtualStartDate: new Date(),
+      mainProgramStartDate: new Date(),
+      eventCompleted: false
+    };
+
+    // Enhanced event date handling
+    if (userData.eventDate) {
+      try {
+        const eventDate = new Date(userData.eventDate);
+        const now = new Date();
+        const daysUntilEvent = Math.ceil((eventDate - now) / (1000 * 60 * 60 * 24));
+        const programDays = 14 * 7; // 14 weeks * 7 days
+
+        Logger.log(`Event date processing: Event in ${daysUntilEvent} days`);
+
+        if (daysUntilEvent > programDays) {
+          // Start with PREP phase
+          initialState.programPhase = "PREP";
+          initialState.virtualStartDate = new Date(eventDate.getTime() - (programDays + 28) * 24 * 60 * 60 * 1000);
+          initialState.mainProgramStartDate = new Date(eventDate.getTime() - programDays * 24 * 60 * 60 * 1000);
+          Logger.log("Starting with PREP phase due to event date");
+        } else if (daysUntilEvent > 0) {
+          // Calculate week to start at
+          const weeksFromEnd = Math.ceil(daysUntilEvent / 7);
+          initialState.currentWeek = Math.max(0, 14 - weeksFromEnd);
+          initialState.displayWeek = initialState.currentWeek;
+          initialState.mainProgramStartDate = new Date();
+          Logger.log(`Starting at week ${initialState.currentWeek} due to nearby event`);
+        }
+      } catch (dateError) {
+        Logger.log("Error processing event date: " + dateError.toString());
+        // Continue with default state if date processing fails
+      }
+    }
+
+    // Determine program based on assessment or default
+    let selectedProgramId = "BeginnerProgram"; // Default
+    if (userData.programName) {
+      selectedProgramId = userData.programName;
+    } else if (userData.assessmentData) {
+      // Use assessment data to determine program
+      const assessment = userData.assessmentData;
+      if (assessment.fitnessLevel === "advanced") {
+        selectedProgramId = "AdvancedProgram";
+      } else if (assessment.fitnessLevel === "intermediate") {
+        selectedProgramId = "IntermediateProgram";
+      }
+      Logger.log(`Program selected based on assessment: ${selectedProgramId}`);
+    }
+
+    const newUserProfile = {
+      userId: userUID,
+      email: userEmail,
+      name: name,
+      programName: selectedProgramId,
+      programPhase: initialState.programPhase,
+      currentWeek: initialState.currentWeek,
+      currentDay: initialState.currentDay,
+      displayWeek: initialState.displayWeek,
+      eventLocation: userData.eventLocation || null,
+      eventDate: userData.eventDate ? new Date(userData.eventDate) : null,
+      virtualStartDate: initialState.virtualStartDate,
+      mainProgramStartDate: initialState.mainProgramStartDate,
+      eventCompleted: initialState.eventCompleted,
+      SpecializedPhaseFocus: null,
+      mainProgramCompleted: false,
+      awaitingNextProgramChoice: false,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    Logger.log(`Creating Firestore document at: ${userProfilePath}`);
+    Logger.log(`Profile data: ${JSON.stringify(newUserProfile, null, 2)}`);
+
+    // Create the document directly - this will create new or overwrite existing
+    firestore.createDocument(userProfilePath, newUserProfile);
+    
+    Logger.log("✅ User profile created successfully in Firestore");
+
+    // Store assessment data if provided
+    if (userData.assessmentData && Object.keys(userData.assessmentData).length > 0) {
+      try {
+        const assessmentDoc = {
+          userId: userUID,
+          data: userData.assessmentData,
+          createdAt: new Date()
+        };
+        
+        // Create assessment document with auto-generated ID
+        firestore.createDocument('assessments', assessmentDoc);
+        Logger.log("✅ Assessment data stored successfully");
+      } catch (assessmentError) {
+        Logger.log("⚠️ Warning: Could not store assessment data: " + assessmentError.toString());
+        // Don't fail the whole registration if assessment storage fails
+      }
+    }
+
+    // Handle payment/subscription data if provided
+    if (userData.stripeCustomerId && userData.paymentIntentId) {
+      try {
+        Logger.log(`Processing payment data: Customer ${userData.stripeCustomerId}, PI ${userData.paymentIntentId}`);
+        
+        // Store basic subscription info - use auto-generated ID
+        const subscriptionDoc = {
+          userId: userUID,
+          stripeCustomerId: userData.stripeCustomerId,
+          paymentIntentId: userData.paymentIntentId,
+          status: "payment_succeeded",
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+        
+        firestore.createDocument('subscriptions', subscriptionDoc);
+        Logger.log("✅ Payment data stored successfully");
+        
+      } catch (paymentError) {
+        Logger.log("⚠️ Warning: Could not store payment data: " + paymentError.toString());
+        // Don't fail registration if payment data storage fails
+      }
+    }
+
+    return { 
+      success: true, 
+      message: "User profile created successfully.", 
+      userId: userUID,
+      programName: selectedProgramId
+    };
+
+  } catch (e) {
+    Logger.log(`❌ Error creating user profile for UID ${userUID}: ${e.toString()}`);
+    Logger.log(`❌ Error stack: ${e.stack}`);
+    
+    // Provide more specific error messages based on the error type
+    let errorMessage = "Error creating profile: ";
+    if (e.toString().includes("permission") || e.toString().includes("denied")) {
+      errorMessage += "Permission denied. Please check Firestore security rules.";
+    } else if (e.toString().includes("quota") || e.toString().includes("limit")) {
+      errorMessage += "Database quota exceeded. Please try again later.";
+    } else if (e.toString().includes("network") || e.toString().includes("timeout")) {
+      errorMessage += "Network error. Please check your connection and try again.";
+    } else {
+      errorMessage += e.message;
+    }
+    
+    return { success: false, message: errorMessage };
+  }
+}
+
+/**
+ * Enhanced document retrieval that handles the library's format properly
+ * Use this for other functions that need to get documents
+ */
+function getDocumentSafely(documentPath) {
+  try {
+    const doc = firestore.getDocument(documentPath);
+    
+    // Handle different possible return formats from the Firestore library
+    if (doc && typeof doc === 'object') {
+      // Check various possible properties the library might use
+      if (doc.exists === true || doc.fields || doc.data) {
+        return {
+          exists: true,
+          data: doc.fields || doc.data || doc,
+          document: doc
+        };
+      } else if (doc.exists === false) {
+        return {
+          exists: false,
+          data: null,
+          document: null
+        };
+      } else {
+        // Document returned but structure unclear - assume it exists
+        Logger.log(`Document structure unclear for ${documentPath}: ${JSON.stringify(doc)}`);
+        return {
+          exists: true,
+          data: doc,
+          document: doc
+        };
+      }
+    } else {
+      // No document returned
+      return {
+        exists: false,
+        data: null,
+        document: null
+      };
+    }
+  } catch (error) {
+    // If getDocument throws an error, the document probably doesn't exist
+    Logger.log(`Document ${documentPath} not found or error retrieving: ${error.toString()}`);
+    return {
+      exists: false,
+      data: null,
+      document: null,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Test the document retrieval to understand the structure better
+ */
+function testDocumentStructure() {
+  Logger.log("🔍 Testing document structure understanding...");
+  
+  try {
+    // Create a test document first
+    const testPath = 'structureTest/testDoc';
+    const testData = {
+      name: "Test Document",
+      value: 42,
+      timestamp: new Date(),
+      nested: {
+        field: "value"
+      }
+    };
+    
+    firestore.createDocument(testPath, testData);
+    Logger.log("✅ Test document created");
+    
+    // Now try to retrieve it and see the structure
+    const retrieved = firestore.getDocument(testPath);
+    Logger.log("📋 Retrieved document structure:");
+    Logger.log("   Type: " + typeof retrieved);
+    Logger.log("   Has .exists property: " + (retrieved.hasOwnProperty('exists')));
+    Logger.log("   Has .fields property: " + (retrieved.hasOwnProperty('fields')));
+    Logger.log("   Has .data property: " + (retrieved.hasOwnProperty('data')));
+    Logger.log("   Full object keys: " + Object.keys(retrieved));
+    Logger.log("   Sample data: " + JSON.stringify(retrieved).substring(0, 200) + "...");
+    
+    // Test with our safe retrieval function
+    const safeRetrieved = getDocumentSafely(testPath);
+    Logger.log("📋 Safe retrieval result:");
+    Logger.log("   Exists: " + safeRetrieved.exists);
+    Logger.log("   Has data: " + (safeRetrieved.data !== null));
+    
+    // Clean up
+    firestore.deleteDocument(testPath);
+    Logger.log("✅ Test document cleaned up");
+    
+  } catch (error) {
+    Logger.log("❌ Document structure test error: " + error.toString());
+  }
+}
+
+testDocumentStructure()
+/**
+ * Alternative simpler version that doesn't check for existing documents
+ * Use this if the above still gives errors
+ */
+function createNewUserProfileSecureSimple(payload) {
+  const verification = verifyFirebaseIdToken(payload.idToken);
+  if (!verification.isValid || !verification.uid) {
+    return { success: false, message: verification.error || "Session invalid." };
+  }
+  const userUID = verification.uid;
+  const userEmail = verification.email;
+
+  try {
+    Logger.log(`Simple profile creation for UID: ${userUID}`);
+    
+    const userData = payload.userData;
+    const name = userData.name || userEmail.split('@')[0];
+    const selectedProgramId = userData.programName || "BeginnerProgram";
+
+    // Simple profile with minimal data
+    const newUserProfile = {
+      userId: userUID,
+      email: userEmail,
+      name: name,
+      programName: selectedProgramId,
+      programPhase: "MAIN",
+      currentWeek: 0,
+      currentDay: 0,
+      displayWeek: 0,
+      eventLocation: userData.eventLocation || "",
+      eventDate: userData.eventDate ? new Date(userData.eventDate) : null,
+      virtualStartDate: new Date(),
+      mainProgramStartDate: new Date(),
+      eventCompleted: false,
+      SpecializedPhaseFocus: "",
+      mainProgramCompleted: false,
+      awaitingNextProgramChoice: false,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    // Use updateDocument with merge option instead of createDocument
+    firestore.updateDocument(`users/${userUID}`, newUserProfile);
+    
+    Logger.log("✅ Simple user profile created successfully");
+    return { success: true, message: "User profile created successfully.", userId: userUID };
+
+  } catch (e) {
+    Logger.log(`❌ Simple profile creation failed for UID ${userUID}: ${e.toString()}`);
+    return { success: false, message: "Profile creation failed: " + e.message };
+  }
+}
+
+/**
+ * Test function to verify user profile creation works
+ */
+function testProfileCreation() {
+  Logger.log("🧪 Testing profile creation...");
+  
+  try {
+    // Test with dummy data
+    const testPayload = {
+      idToken: "dummy_token_for_testing",
+      userData: {
+        name: "Test User",
+        email: "test@example.com",
+        programName: "BeginnerProgram"
+      }
+    };
+    
+    // This will fail at token verification but tests the function structure
+    const result = createNewUserProfileSecure(testPayload);
+    Logger.log("Test result: " + JSON.stringify(result));
+    
+  } catch (error) {
+    Logger.log("Test error: " + error.toString());
+  }
+}
+
+// ========================================================================
+// DATA ACCESS FUNCTIONS (Rewritten for Firestore)
+// ========================================================================
+
+
+/**
+ * Updated getUserProfileSecure that works with Firebase/Firestore
+ * This replaces any old Sheets-based profile functions
+ */
+function getUserProfileSecure(payload) {
+  try {
+    Logger.log("getUserProfileSecure: Firebase version called");
+    
+    const verification = verifyFirebaseIdToken(payload.idToken);
+    if (!verification.isValid || !verification.uid) {
+      return { success: false, message: verification.error || "Session validation failed." };
+    }
+
+    const userUID = verification.uid;
+    Logger.log(`getUserProfileSecure: Getting profile for UID: ${userUID}`);
+
+    try {
+      const userDoc = firestore.getDocument(`users/${userUID}`);
+      
+      if (!userDoc || !userDoc.fields) {
+        Logger.log(`getUserProfileSecure: No profile found for UID: ${userUID}`);
+        return { success: false, message: "User profile not found. Please complete registration or contact support." };
+      }
+
+      // Convert Firestore format to simple object
+      const profile = convertFirestoreFieldsToSimpleObject(userDoc.fields);
+      
+      Logger.log(`getUserProfileSecure: Profile found for ${userUID}: ${profile.name}`);
+      
+      return { 
+        success: true, 
+        profile: convertDatesToISO(profile)
+      };
+      
+    } catch (docError) {
+      Logger.log(`getUserProfileSecure: Document error for UID ${userUID}: ${docError.toString()}`);
+      return { success: false, message: "User profile not found. Please complete registration or contact support." };
+    }
+
+  } catch (error) {
+    Logger.log("Error in getUserProfileSecure: " + error.toString() + " Stack: " + error.stack);
+    return { success: false, message: "Server error retrieving profile: " + error.message };
+  }
+}
+
+/**
+ * Helper function to convert Firestore field format to simple JavaScript object
+ */
+function convertFirestoreFieldsToSimpleObject(fields) {
+  const result = {};
+  
+  Object.keys(fields).forEach(key => {
+    const field = fields[key];
+    
+    if (field.stringValue !== undefined) {
+      result[key] = field.stringValue;
+    } else if (field.booleanValue !== undefined) {
+      result[key] = field.booleanValue;
+    } else if (field.integerValue !== undefined) {
+      result[key] = parseInt(field.integerValue);
+    } else if (field.doubleValue !== undefined) {
+      result[key] = parseFloat(field.doubleValue);
+    } else if (field.timestampValue !== undefined) {
+      result[key] = new Date(field.timestampValue);
+    } else if (field.nullValue !== undefined) {
+      result[key] = null;
+    } else {
+      // Fallback for any other format
+      result[key] = field;
+    }
+  });
+  
+  return result;
+}
+
+
+
+/**
+ * New function: Get user data by UID (for internal server use)
+ * This replaces the old getUserData function
+ */
+function getUserDataFirestore(userUID) {
+  if (!userUID) {
+    Logger.log("getUserDataFirestore: No userUID provided.");
+    return null;
+  }
+   
+  try {
+    const userDoc = firestore.getDocument(`users/${userUID}`);
+    
+    if (!userDoc || !userDoc.fields) {
+      Logger.log(`getUserDataFirestore: No user data found for UID: ${userUID}`);
+      return null;
+    }
+
+    // Convert to simple object and add the userUID
+    const userData = convertFirestoreFieldsToSimpleObject(userDoc.fields);
+    userData.userUID = userUID; // Add the UID for reference
+    
+    return userData;
+    
+  } catch (error) {
+    Logger.log(`getUserDataFirestore: Error getting user data for ${userUID}: ${error.toString()}`);
+    return null;
+  }
+}
+
+/**
+ * Session validation function for Firebase tokens
+ * This might be called by other functions during login
+ */
+function validateClientSessionToken(token, clientUserId) {
+  // This is an alias for the Firebase token verification
+  return verifyFirebaseIdToken(token);
+}
+
+/**
+ * Remove old function references and replace with warnings
+ * These help identify any remaining old function calls
+ */
+function getUserData(userId) {
+  Logger.log("WARNING: Old getUserData called. Use getUserDataFirestore instead.");
+  // Instead of throwing error, try to use the new function
+  return getUserDataFirestore(userId);
+}
+
+function getUserDataSs() {
+  Logger.log("WARNING: getUserDataSs called but this is a Firebase app.");
+  throw new Error("Google Sheets functions not available in Firebase version. Use getUserDataFirestore instead.");
+}
+
+/**
+ * Test function to verify the login flow works
+ */
+function testLoginFlow() {
+  Logger.log("🧪 Testing login flow with Firebase...");
+  
+  // Test 1: Test profile retrieval with dummy token
+  Logger.log("1. Testing getUserProfileSecure...");
+  try {
+    const result = getUserProfileSecure({ idToken: "dummy_token_test" });
+    Logger.log("   getUserProfileSecure structure: " + (result.success !== undefined ? "✅ OK" : "❌ Bad"));
+  } catch (error) {
+    Logger.log("   getUserProfileSecure error: " + error.toString());
+  }
+ 
+  
+  // Test 3: Test Firestore user retrieval
+  Logger.log("3. Testing Firestore user data retrieval...");
+  try {
+    const testResult = getUserDataFirestore("test_user_123");
+    Logger.log("   getUserDataFirestore: " + (testResult === null ? "✅ Handled missing user" : "⚠️ Unexpected result"));
+  } catch (error) {
+    Logger.log("   getUserDataFirestore error: " + error.toString());
+  }
+  
+  Logger.log("🧪 Login flow test complete");
+}
+
+/**
+ * Debug function to trace what's calling getUserDataSpreadsheet
+ */
+function traceLoginCalls() {
+  Logger.log("🔍 Tracing login-related function calls...");
+  
+  // Temporarily replace getUserDataSpreadsheet with a tracing version
+  const originalFunction = getUserDataSpreadsheet;
+  
+  getUserDataSpreadsheet = function() {
+    Logger.log("🚨 TRACE: getUserDataSpreadsheet called!");
+    Logger.log("🚨 Call stack trace:");
+    try {
+      throw new Error("Trace");
+    } catch (e) {
+      Logger.log(e.stack);
+    }
+    return originalFunction.apply(this, arguments);
+  };
+  
+  Logger.log("🔍 Tracing enabled. Try login again to see call stack.");
+}
+
+/**
+ * Gets the current workout for the authenticated user.
+ * @param {object} payload { idToken: string }
+ */
+function getWorkoutSecure(payload) {
+  const verification = verifyFirebaseIdToken(payload.idToken);
+  if (!verification.isValid || !verification.uid) {
+    return { success: false, message: verification.error || "Session invalid." };
+  }
+  const userUID = verification.uid;
+
+  try {
+    const userDoc = firestore.getDocument(`users/${userUID}`);
+    if (!userDoc || !userDoc.fields) {
+      return { success: false, message: "User profile not found." };
+    }
+    
+    const userProfile = convertFirestoreFieldsToSimpleObject(userDoc.fields);
+    const { programName, programPhase, currentWeek, currentDay, displayWeek } = userProfile;
+
+    if (!programName || programPhase === null || currentWeek === null || currentDay === null) {
+      return { 
+        success: true, 
+        message: "No program assigned or program state incomplete. Please check your profile.", 
+        programName, 
+        programPhase, 
+        weekNum: currentWeek, 
+        dayNum: currentDay, 
+        workoutText: "Please select a program or update your profile.", 
+        workoutDateForComparison: new Date().toISOString() 
+      };
+    }
+
+    // Construct document ID for masterWorkouts
+    const workoutDocId = `${programName}_${programPhase}_${currentWeek}_${currentDay}`;
+    
+    try {
+      const workoutDoc = firestore.getDocument(`masterWorkouts/${workoutDocId}`);
+      
+      let workoutText = "Rest day or end of program.";
+      if (workoutDoc && workoutDoc.fields && workoutDoc.fields.workoutText) {
+        workoutText = workoutDoc.fields.workoutText.stringValue || workoutDoc.fields.workoutText;
+      }
+
+      return {
+        success: true,
+        programName: programName,
+        programPhase: programPhase,
+        weekNum: currentWeek,
+        dayNum: currentDay,
+        displayWeek: displayWeek !== undefined ? displayWeek : currentWeek,
+        workoutText: workoutText,
+        workoutDateForComparison: new Date().toISOString()
+      };
+      
+    } catch (workoutError) {
+      Logger.log(`Workout not found: ${workoutDocId}`);
+      return {
+        success: true,
+        programName: programName,
+        programPhase: programPhase,
+        weekNum: currentWeek,
+        dayNum: currentDay,
+        displayWeek: displayWeek !== undefined ? displayWeek : currentWeek,
+        workoutText: "Workout content not available for this day.",
+        workoutDateForComparison: new Date().toISOString()
+      };
+    }
+
+  } catch (e) {
+    Logger.log(`getWorkoutSecure error for UID ${userUID}: ${e.toString()}`);
+    return { success: false, message: "Error loading workout: " + e.message };
+  }
+}
+
+
+/**
+ * Gets specific workout text.
+ * @param {object} payload { idToken: string, programName: string, programPhase: string, week: number, day: number }
+ */
+function getWorkoutTextSecure(payload) {
+  const verification = verifyFirebaseIdToken(payload.idToken);
+  if (!verification.isValid) {
+    return { success: false, message: verification.error || "Session invalid." };
+  }
+
+  const { programName, programPhase, week, day } = payload;
+  if (programName == null || programPhase == null || week == null || day == null) {
+      return { success: false, message: "Missing parameters for workout text retrieval." };
+  }
+
+  try {
+    const workoutDocId = `${programName}_${programPhase}_${week}_${day}`;
+    const workoutDoc = firestore.getDocument(`masterWorkouts/${workoutDocId}`);
+
+    if (workoutDoc.exists && workoutDoc.fields && workoutDoc.fields.workoutText) {
+      return { success: true, workoutText: workoutDoc.fields.workoutText };
+    } else {
+      return { success: true, workoutText: "Workout content not found for the specified parameters." };
+    }
+  } catch (e) {
+    Logger.log(`getWorkoutTextSecure error: ${e.toString()}`);
+    return { success: false, message: "Error fetching workout text: " + e.message };
+  }
+}
+
+
+/**
+ * Logs a completed workout.
+ * @param {object} payload { idToken: string, notes: string, rating: string/number, currentWorkoutDetails: { programName, programPhase, weekNum, dayNum } }
+ */
+function completeWorkoutSecure(payload) {
+  const verification = verifyFirebaseIdToken(payload.idToken);
+  if (!verification.isValid || !verification.uid) {
+    return { success: false, message: verification.error || "Session invalid." };
+  }
+  const userUID = verification.uid;
+
+  const { notes, rating, currentWorkoutDetails } = payload;
+  if (!currentWorkoutDetails) {
+      return { success: false, message: "Workout details missing."};
+  }
+  const { programName, programPhase, weekNum, dayNum } = currentWorkoutDetails;
+
+
+  try {
+    // 1. Create Log Entry
+    const logEntry = {
+      userId: userUID,
+      programId: programName,
+      programPhase: programPhase,
+      week: weekNum, // Week of the workout being logged
+      day: dayNum,   // Day of the workout being logged
+      date: new Date(), // Timestamp of completion
+      notes: notes || null,
+      rating: rating ? parseFloat(rating) : null,
+      skipped: false,
+      createdAt: new Date(), // For the log entry itself
+      updatedAt: new Date()
+    };
+    firestore.createDocument('workoutLogs', logEntry); // Auto-generates ID
+
+    // 2. Advance User's Program State
+    const userProfileDoc = firestore.getDocument(`users/${userUID}`);
+    if (!userProfileDoc.exists) {
+        return { success: false, message: "User profile not found to update state." };
+    }
+    const userProfile = userProfileDoc.fields;
+
+    // Simple advancement: +1 day. Robust logic would fetch program total days/weeks from programMetadata.
+    // This is a simplified version. Your actual advancement logic might be more complex
+    // (e.g., handling rest days from masterWorkouts, end of week, end of phase, end of program).
+    let nextDay = dayNum + 1;
+    let nextWeek = weekNum;
+    let nextDisplayWeek = userProfile.displayWeek !== undefined ? userProfile.displayWeek : weekNum;
+    let nextPhase = programPhase;
+
+    // Placeholder: Max days per week (assuming 7 for now)
+    const MAX_DAYS_PER_WEEK = 7; // This should ideally come from programMetadata or be more dynamic
+
+    const programMetaDoc = firestore.getDocument(`programMetadata/${programName}`);
+    let totalWeeksInPhase = 14; // Default
+    if (programMetaDoc.exists && programMetaDoc.fields) {
+        if (programPhase === "PREP" && programMetaDoc.fields.prepCycleWeeks) {
+            totalWeeksInPhase = programMetaDoc.fields.prepCycleWeeks;
+        } else if (programPhase === "MAINTENANCE" && programMetaDoc.fields.maintenanceCycleWeeks) {
+            totalWeeksInPhase = programMetaDoc.fields.maintenanceCycleWeeks;
+        } else if (programMetaDoc.fields.totalWeeks) { // MAIN phase
+            totalWeeksInPhase = programMetaDoc.fields.totalWeeks;
+        }
+    }
+
+
+    if (nextDay >= MAX_DAYS_PER_WEEK) {
+      nextDay = 0;
+      nextWeek += 1;
+      nextDisplayWeek +=1; // Also advance display week
+    }
+
+    // TODO: Add logic for phase transitions and program completion based on totalWeeksInPhase
+    if (nextWeek >= totalWeeksInPhase) {
+        // Example: End of current phase/program.
+        // You might set workoutText to "End of program. Consult your coach."
+        // Or transition to a maintenance phase, or mark program as complete.
+        // For now, let's just stop advancing.
+        Logger.log(`User ${userUID} reached end of program/phase ${programName} - ${programPhase} at Wk ${nextWeek}`);
+        // Potentially set userProfile.eventCompleted = true if event date passed and main program ended
+    }
+
+let programCompletedFlag = false;
+    let nextUserPhase = programPhase; // By default, stay in the same phase
+
+    if (nextWeek >= totalWeeksInPhase) {
+        Logger.log(`User ${userUID} completed phase ${programPhase} of program ${programName} (expected ${totalWeeksInPhase} weeks, reached week ${nextWeek}).`);
+        programCompletedFlag = true;
+
+        // Define phase transition logic (this is specific to your app's flow)
+        if (programPhase === "PREP") {
+            // After PREP, usually go to MAIN phase of the *same* program
+            nextUserPhase = "MAIN";
+            nextWeek = 0; // Reset week for the new phase
+            nextDay = 0;  // Reset day
+            nextDisplayWeek = 0; // Reset display week
+            programCompletedFlag = false; // Not the *entire* program, just the PREP phase
+            Logger.log(`User ${userUID} transitioning from PREP to MAIN phase for ${programName}.`);
+        } else if (programPhase === "MAIN") {
+            // After MAIN, this is true program completion.
+            // Client will handle choice for maintenance or new program.
+            // We could set a status like "awaitingNextProgramChoice"
+            Logger.log(`User ${userUID} completed MAIN phase of ${programName}. Awaiting next step.`);
+            // No automatic phase change here; client will trigger it.
+            // Keep currentWeek/Day at the end of the completed program for record-keeping until user chooses.
+            // OR reset them if you prefer they see "Week 0, Day 0" until a choice is made.
+            // Let's keep them at the end for now so they know what they finished.
+            nextWeek = weekNum; // Stay at the last week completed
+            nextDay = dayNum;   // Stay at the last day completed
+            nextDisplayWeek = displayWeek;
+        } else if (programPhase === "MAINTENANCE") {
+            // After a MAINTENANCE cycle, they might loop or choose something else.
+            // For now, let's assume they might loop the same maintenance if they don't choose.
+            // Or simply mark it as completed and let client prompt.
+            Logger.log(`User ${userUID} completed a MAINTENANCE cycle for ${programName}. Awaiting next step.`);
+            nextWeek = weekNum;
+            nextDay = dayNum;
+            nextDisplayWeek = displayWeek;
+        }
+        // else: other phases?
+    }
+
+    const updateData = {
+      currentDay: nextDay,
+      currentWeek: nextWeek,
+      displayWeek: nextDisplayWeek,
+      programPhase: nextUserPhase, // This might change if transitioning from PREP to MAIN
+      updatedAt: new Date()
+    };
+
+    // Add a flag to user's profile to indicate program completion for client-side handling
+    if (programCompletedFlag && programPhase === "MAIN") { // Only set for MAIN program completion
+        updateData.mainProgramCompleted = true;
+        updateData.awaitingNextProgramChoice = true; // More specific flag
+    }
+
+    firestore.updateDocument(`users/${userUID}`, updateData);
+
+    // The server response will indicate success.
+    // The client, after fetching the updated user profile or current workout,
+    // will see the 'mainProgramCompleted' or 'awaitingNextProgramChoice' flag.
+    return {
+        success: true,
+        message: programCompletedFlag && programPhase === "MAIN" ? "Program completed! Please choose your next step." : (logEntry.skipped ? "Workout skipped and logged." : "Workout completed and logged!"),
+        programJustCompleted: programCompletedFlag && programPhase === "MAIN" // Send a flag back to client
+    };
+
+  } catch (e) {
+    Logger.log(`completeWorkoutSecure error for UID ${userUID}: ${e.toString()}`);
+    return { success: false, message: "Error completing workout: " + e.message };
+  }
+}
+
+/**
+ * Skips the current workout.
+ * @param {object} payload { idToken: string, currentWorkoutDetails: { programName, programPhase, weekNum, dayNum } }
+ */
+function skipWorkoutSecure(payload) {
+  const verification = verifyFirebaseIdToken(payload.idToken);
+  if (!verification.isValid || !verification.uid) {
+    return { success: false, message: verification.error || "Session invalid." };
+  }
+  const userUID = verification.uid;
+
+  const { currentWorkoutDetails } = payload;
+   if (!currentWorkoutDetails) {
+      return { success: false, message: "Workout details missing."};
+  }
+  const { programName, programPhase, weekNum, dayNum } = currentWorkoutDetails;
+
+  try {
+    // 1. Create Log Entry
+    const logEntry = {
+      userId: userUID,
+      programId: programName,
+      programPhase: programPhase,
+      week: weekNum,
+      day: dayNum,
+      date: new Date(), // Timestamp of skip
+      skipped: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    firestore.createDocument('workoutLogs', logEntry);
+
+    // 2. Advance User's Program State (same logic as completeWorkoutSecure)
+    const userProfileDoc = firestore.getDocument(`users/${userUID}`);
+    if (!userProfileDoc.exists) {
+        return { success: false, message: "User profile not found to update state." };
+    }
+    const userProfile = userProfileDoc.fields;
+
+    let nextDay = dayNum + 1;
+    let nextWeek = weekNum;
+    let nextDisplayWeek = userProfile.displayWeek !== undefined ? userProfile.displayWeek : weekNum;
+    // ... (reuse the same advancement logic as in completeWorkoutSecure for nextDay, nextWeek, phase changes) ...
+    const MAX_DAYS_PER_WEEK = 7;
+    const programMetaDoc = firestore.getDocument(`programMetadata/${programName}`);
+    let totalWeeksInPhase = 14; // Default, fetch actual from programMetaDoc as in completeWorkoutSecure
+
+    if (programMetaDoc.exists && programMetaDoc.fields) {
+        if (programPhase === "PREP" && programMetaDoc.fields.prepCycleWeeks) totalWeeksInPhase = programMetaDoc.fields.prepCycleWeeks;
+        else if (programPhase === "MAINTENANCE" && programMetaDoc.fields.maintenanceCycleWeeks) totalWeeksInPhase = programMetaDoc.fields.maintenanceCycleWeeks;
+        else if (programMetaDoc.fields.totalWeeks) totalWeeksInPhase = programMetaDoc.fields.totalWeeks;
+    }
+
+    if (nextDay >= MAX_DAYS_PER_WEEK) {
+      nextDay = 0;
+      nextWeek += 1;
+      nextDisplayWeek += 1;
+    }
+    // TODO: Phase/program end logic
+
+    const updateData = {
+      currentDay: nextDay,
+      currentWeek: nextWeek,
+      displayWeek: nextDisplayWeek,
+      updatedAt: new Date()
+    };
+    firestore.updateDocument(`users/${userUID}`, updateData);
+
+    return { success: true, message: "Workout skipped and logged." };
+
+  } catch (e) {
+    Logger.log(`skipWorkoutSecure error for UID ${userUID}: ${e.toString()}`);
+    return { success: false, message: "Error skipping workout: " + e.message };
+  }
+}
+
+
+/**
+ * Gets workout history for the calendar.
+ * @param {object} payload { idToken: string }
+ */
+function getWorkoutHistorySecure(payload) {
+  const verification = verifyFirebaseIdToken(payload.idToken);
+  if (!verification.isValid || !verification.uid) {
+    return { success: false, message: verification.error || "Session invalid." };
+  }
+  const userUID = verification.uid;
+
+  try {
+    // Grahame Earley's library query syntax might be slightly different.
+    // This is a common way: firestore.query(collectionPath).where(field, op, value).orderBy(field, dir).limit(n).get()
+    // The .get() might return an array of document objects directly, or an object with a .documents property.
+    // Let's assume .get() returns an array of full document objects (with .id, .fields, .createTime, .updateTime, .exists)
+    const queryResponse = firestore.query('workoutLogs')
+                                   .where('userId', '==', userUID)
+                                   .orderBy('date', 'desc') // Get latest first
+                                   .limit(150) // Limit for performance, implement pagination on client if needed
+                                   .get();
+
+    let completedWorkouts = [];
+    if (queryResponse && queryResponse.length > 0) {
+        completedWorkouts = queryResponse.map(doc => {
+            // Grahame Earley's lib often puts fields in doc.fields
+            // and ID in doc.name (full path) or doc.id (just ID part)
+            const data = doc.fields || doc; // Fallback if structure is flatter
+            data.id = doc.id || (doc.name ? doc.name.split('/').pop() : null); // Add ID to data
+            return convertDatesToISO(data);
+        });
+    }
+    return { success: true, completedWorkouts: completedWorkouts };
+  } catch (e) {
+    Logger.log(`Error fetching workout history for UID ${userUID}: ${e.toString()}`);
+    return { success: false, message: 'Error fetching history: ' + e.message };
+  }
+}
+
+/**
+ * Updates the user's profile information.
+ * @param {object} payload { idToken: string, name?: string, eventLocation?: string, eventDate?: string (ISO) }
+ */
+function updateUserProfileSecure(payload) {
+  const verification = verifyFirebaseIdToken(payload.idToken);
+  if (!verification.isValid || !verification.uid) {
+    return { success: false, message: verification.error || "Session invalid." };
+  }
+  const userUID = verification.uid;
+
+  const { name, eventLocation, eventDate } = payload; // Client should send only what changed
+  const updateData = { updatedAt: new Date() };
+  let eventChanged = false;
+
+  if (name !== undefined) updateData.name = name;
+  if (eventLocation !== undefined) updateData.eventLocation = eventLocation;
+  if (eventDate !== undefined) { // eventDate is expected as ISO string or null
+    updateData.eventDate = eventDate ? new Date(eventDate) : null; // Convert ISO string to JS Date for Firestore
+    eventChanged = true;
+  }
+
+  if (Object.keys(updateData).length === 1) { // Only updatedAt
+    return { success: true, message: "No changes to save." };
+  }
+
+  try {
+    firestore.updateDocument(`users/${userUID}`, updateData);
+    // TODO: If eventDate changed, might need to recalculate mainProgramStartDate and phases
+    // This logic can be complex and depends on your business rules for program scheduling.
+    // For now, we just update the fields.
+    return { success: true, message: "Profile updated successfully.", eventChanged: eventChanged };
+  } catch (e) {
+    Logger.log(`Error updating profile for UID ${userUID}: ${e.toString()}`);
+    return { success: false, message: "Error updating profile: " + e.message };
+  }
+}
+
+/**
+ * Gets available training programs.
+ * @param {object} payload (Optional, can add idToken if list is user-specific)
+ */
+function getAvailableTrainingPrograms(payload) {
+  // Optional: Add token verification if this list should be protected
+  // const verification = verifyFirebaseIdToken(payload.idToken);
+  // if (!verification.isValid) return { success: false, message: "Unauthorized" };
+
+  try {
+    const programsSnapshot = firestore.getDocuments('programMetadata'); // Gets all documents
+    let programs = [];
+    if (programsSnapshot && programsSnapshot.length > 0) {
+        programs = programsSnapshot
+            .filter(doc => doc.exists && doc.fields && doc.fields.isAvailable === true)
+            .map(doc => {
+                const data = doc.fields;
+                data.id = doc.id || (doc.name ? doc.name.split('/').pop() : null);
+                return convertDatesToISO(data); // In case any metadata fields are dates
+            })
+            .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
+    }
+    return { success: true, programs: programs };
+  } catch (e) {
+    Logger.log(`Error fetching available programs: ${e.toString()}`);
+    return { success: false, message: "Error fetching programs: " + e.message };
+  }
+}
+
+/**
+ * Changes the user's current training program.
+ * @param {object} payload { idToken: string, programName: string (new program ID), scheduleOption: string ('keep-date' or 'start-fresh'), action: string ('start_full_program' or 'change_program') }
+ */
+function changeUserProgramSecure(payload) {
+  const verification = verifyFirebaseIdToken(payload.idToken);
+  if (!verification.isValid || !verification.uid) {
+    return { success: false, message: verification.error || "Session invalid." };
+  }
+  const userUID = verification.uid;
+  const { programName: newProgramId, scheduleOption, action } = payload;
+
+  if (!newProgramId) {
+    return { success: false, message: "New program ID is required." };
+  }
+
+  try {
+    const userProfileDoc = firestore.getDocument(`users/${userUID}`);
+    if (!userProfileDoc.exists) {
+      return { success: false, message: "User profile not found." };
+    }
+    const userProfile = userProfileDoc.fields;
+
+    const programMetaDoc = firestore.getDocument(`programMetadata/${newProgramId}`);
+    if (!programMetaDoc.exists || !programMetaDoc.fields) {
+      return { success: false, message: "Selected program details not found." };
+    }
+    const newProgramMeta = programMetaDoc.fields;
+
+    const updateData = {
+      programName: newProgramId,
+      programPhase: "MAIN", // Typically start a new program in MAIN phase
+      currentWeek: 0,
+      currentDay: 0,
+      displayWeek: 0,
+      updatedAt: new Date()
+    };
+    const { newProgramId, scheduleOption, action } = payload; // action can now be "start_maintenance_program"
+
+    // Scheduling Logic (Simplified - adapt to your full business rules)
+    // This needs to be robust: calculate mainProgramStartDate based on eventDate or start fresh.
+    // If eventDate exists and scheduleOption is 'keep-date':
+    if (userProfile.eventDate && scheduleOption === 'keep-date' && newProgramMeta.totalWeeks) {
+        const eventD = userProfile.eventDate instanceof Date ? userProfile.eventDate : new Date(userProfile.eventDate);
+        const totalProgramDays = newProgramMeta.totalWeeks * 7;
+        const calculatedStartDate = new Date(eventD.getTime() - totalProgramDays * 24 * 60 * 60 * 1000);
+        updateData.mainProgramStartDate = calculatedStartDate;
+        updateData.virtualStartDate = calculatedStartDate; // Or adjust based on prep phases
+        // currentWeek/Day might need to be adjusted if starting mid-program to align with eventDate
+        // For simplicity, keep-date here might still start from W0D0 of the *new* program,
+        // but the overall timeline respects the event date.
+    } else { // 'start-fresh' or no event date
+        updateData.mainProgramStartDate = new Date(); // Start today
+        updateData.virtualStartDate = new Date();
+    }
+
+    // If action was 'start_full_program' from a PREP/MAINTENANCE phase,
+    // it implies they are now moving to a main program.
+    // SpecializedPhaseFocus might need to be cleared.
+    if (action === 'start_full_program') {
+        updateData.SpecializedPhaseFocus = null;
+    }
+if (action === "start_maintenance_program") {
+       updateData.programPhase = "MAINTENANCE"; // Set phase to maintenance
+     updateData.programName = newProgramId;
+     updateData.currentWeek = 0;
+     updateData.currentDay = 0;
+     updateData.displayWeek = 0;
+     updateData.mainProgramCompleted = false; // Reset these flags
+     updateData.awaitingNextProgramChoice = false;
+     updateData.eventDate = null; // Clear event date if starting maintenance? (Business rule)
+     updateData.mainProgramStartDate = new Date(); // Maintenance starts now
+     updateData.virtualStartDate = new Date();
+   } else if (action === "start_full_program" || action === "change_program" || action === "start_after_completion") {
+     updateData.programPhase = "MAIN"; // Or "PREP" if logic dictates/     
+     updateData.programName = newProgramId;
+     updateData.currentWeek = 0;
+     updateData.currentDay = 0;
+     updateData.displayWeek = 0;
+     updateData.mainProgramCompleted = false;
+     updateData.awaitingNextProgramChoice = false;
+     // Handle scheduleOption for eventDate, mainProgramStartDate etc. as before
+  }
+
+    firestore.updateDocument(`users/${userUID}`, updateData);
+    return { success: true, message: `Program set to ${newProgramMeta.name || newProgramId}.` };
+
+  } catch (e) {
+    Logger.log(`Error changing program for UID ${userUID}: ${e.toString()}`);
+    return { success: false, message: "Error changing program: " + e.message };
+  }
+}
+
+// Add these functions to your fireCode.gs file
+
+/**
+ * Gets available training programs from Firestore
+ */
+function getAvailableTrainingPrograms(payload) {
+  try {
+    // Query the programMetadata collection
+    const programsSnapshot = firestore.getDocuments('programMetadata');
+    let programs = [];
+    
+    if (programsSnapshot && programsSnapshot.length > 0) {
+      programs = programsSnapshot
+        .filter(doc => doc.exists && doc.fields && doc.fields.isAvailable === true)
+        .map(doc => {
+          const data = doc.fields;
+          data.id = doc.id;
+          return convertDatesToISO(data);
+        })
+        .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
+    }
+    
+    return { success: true, programs: programs };
+  } catch (e) {
+    Logger.log(`Error fetching available programs: ${e.toString()}`);
+    return { success: false, message: "Error fetching programs: " + e.message };
+  }
+}
+
+/**
+ * Gets workout text for a specific program, phase, week, and day
+ */
+function getWorkoutTextSecure(payload) {
+  const verification = verifyFirebaseIdToken(payload.idToken);
+  if (!verification.isValid) {
+    return { success: false, message: verification.error || "Session invalid." };
+  }
+
+  const { programName, programPhase, week, day } = payload;
+  if (programName == null || programPhase == null || week == null || day == null) {
+    return { success: false, message: "Missing parameters for workout text retrieval." };
+  }
+
+  try {
+    const workoutDocId = `${programName}_${programPhase}_${week}_${day}`;
+    const workoutDoc = firestore.getDocument(`masterWorkouts/${workoutDocId}`);
+
+    if (workoutDoc.exists && workoutDoc.fields && workoutDoc.fields.workoutText) {
+      return { success: true, workoutText: workoutDoc.fields.workoutText };
+    } else {
+      return { success: true, workoutText: "Workout content not found for the specified parameters." };
+    }
+  } catch (e) {
+    Logger.log(`getWorkoutTextSecure error: ${e.toString()}`);
+    return { success: false, message: "Error fetching workout text: " + e.message };
+  }
+}
+
+/**
+ * Updates user profile information
+ */
+function updateUserProfileSecure(payload) {
+  const verification = verifyFirebaseIdToken(payload.idToken);
+  if (!verification.isValid || !verification.uid) {
+    return { success: false, message: verification.error || "Session invalid." };
+  }
+  const userUID = verification.uid;
+
+  const { name, eventLocation, eventDate } = payload;
+  const updateData = { updatedAt: new Date() };
+  let eventChanged = false;
+
+  if (name !== undefined) updateData.name = name;
+  if (eventLocation !== undefined) updateData.eventLocation = eventLocation;
+  if (eventDate !== undefined) {
+    updateData.eventDate = eventDate ? new Date(eventDate) : null;
+    eventChanged = true;
+  }
+
+  if (Object.keys(updateData).length === 1) {
+    return { success: true, message: "No changes to save." };
+  }
+
+  try {
+    firestore.updateDocument(`users/${userUID}`, updateData);
+    return { success: true, message: "Profile updated successfully.", eventChanged: eventChanged };
+  } catch (e) {
+    Logger.log(`Error updating profile for UID ${userUID}: ${e.toString()}`);
+    return { success: false, message: "Error updating profile: " + e.message };
+  }
+}
+
+/**
+ * Changes user's training program
+ */
+function changeUserProgramSecure(payload) {
+  const verification = verifyFirebaseIdToken(payload.idToken);
+  if (!verification.isValid || !verification.uid) {
+    return { success: false, message: verification.error || "Session invalid." };
+  }
+  const userUID = verification.uid;
+  const { programName: newProgramId, scheduleOption, action } = payload;
+
+  if (!newProgramId) {
+    return { success: false, message: "New program ID is required." };
+  }
+
+  try {
+    const userProfileDoc = firestore.getDocument(`users/${userUID}`);
+    if (!userProfileDoc.exists) {
+      return { success: false, message: "User profile not found." };
+    }
+    const userProfile = userProfileDoc.fields;
+
+    const programMetaDoc = firestore.getDocument(`programMetadata/${newProgramId}`);
+    if (!programMetaDoc.exists || !programMetaDoc.fields) {
+      return { success: false, message: "Selected program details not found." };
+    }
+    const newProgramMeta = programMetaDoc.fields;
+
+    const updateData = {
+      programName: newProgramId,
+      programPhase: "MAIN",
+      currentWeek: 0,
+      currentDay: 0,
+      displayWeek: 0,
+      updatedAt: new Date()
+    };
+
+    // Handle different action types
+    if (action === "start_maintenance_program") {
+      updateData.programPhase = "MAINTENANCE";
+      updateData.mainProgramCompleted = false;
+      updateData.awaitingNextProgramChoice = false;
+      updateData.eventDate = null;
+      updateData.mainProgramStartDate = new Date();
+      updateData.virtualStartDate = new Date();
+    } else if (action === "start_full_program" || action === "change_program" || action === "start_after_completion") {
+      updateData.mainProgramCompleted = false;
+      updateData.awaitingNextProgramChoice = false;
+      
+      // Scheduling Logic
+      if (userProfile.eventDate && scheduleOption === 'keep-date' && newProgramMeta.totalWeeks) {
+        const eventD = userProfile.eventDate instanceof Date ? userProfile.eventDate : new Date(userProfile.eventDate);
+        const totalProgramDays = newProgramMeta.totalWeeks * 7;
+        const calculatedStartDate = new Date(eventD.getTime() - totalProgramDays * 24 * 60 * 60 * 1000);
+        updateData.mainProgramStartDate = calculatedStartDate;
+        updateData.virtualStartDate = calculatedStartDate;
+      } else {
+        updateData.mainProgramStartDate = new Date();
+        updateData.virtualStartDate = new Date();
+      }
+    }
+
+    if (action === 'start_full_program') {
+      updateData.SpecializedPhaseFocus = null;
+    }
+
+    firestore.updateDocument(`users/${userUID}`, updateData);
+    return { success: true, message: `Program set to ${newProgramMeta.name || newProgramId}.` };
+
+  } catch (e) {
+    Logger.log(`Error changing program for UID ${userUID}: ${e.toString()}`);
+    return { success: false, message: "Error changing program: " + e.message };
+  }
+}
+
+/**
+ * Skip current workout
+ */
+function skipWorkoutSecure(payload) {
+  const verification = verifyFirebaseIdToken(payload.idToken);
+  if (!verification.isValid || !verification.uid) {
+    return { success: false, message: verification.error || "Session invalid." };
+  }
+  const userUID = verification.uid;
+
+  const { currentWorkoutDetails } = payload;
+  if (!currentWorkoutDetails) {
+    return { success: false, message: "Workout details missing." };
+  }
+  const { programName, programPhase, weekNum, dayNum } = currentWorkoutDetails;
+
+  try {
+    // Create Log Entry
+    const logEntry = {
+      userId: userUID,
+      programId: programName,
+      programPhase: programPhase,
+      week: weekNum,
+      day: dayNum,
+      date: new Date(),
+      skipped: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    firestore.createDocument('workoutLogs', logEntry);
+
+    // Advance User's Program State (same logic as completeWorkoutSecure)
+    const userProfileDoc = firestore.getDocument(`users/${userUID}`);
+    if (!userProfileDoc.exists) {
+      return { success: false, message: "User profile not found to update state." };
+    }
+    const userProfile = userProfileDoc.fields;
+
+    let nextDay = dayNum + 1;
+    let nextWeek = weekNum;
+    let nextDisplayWeek = userProfile.displayWeek !== undefined ? userProfile.displayWeek : weekNum;
+    
+    const MAX_DAYS_PER_WEEK = 7;
+    if (nextDay >= MAX_DAYS_PER_WEEK) {
+      nextDay = 0;
+      nextWeek += 1;
+      nextDisplayWeek += 1;
+    }
+
+    const updateData = {
+      currentDay: nextDay,
+      currentWeek: nextWeek,
+      displayWeek: nextDisplayWeek,
+      updatedAt: new Date()
+    };
+    firestore.updateDocument(`users/${userUID}`, updateData);
+
+    return { success: true, message: "Workout skipped and logged." };
+
+  } catch (e) {
+    Logger.log(`skipWorkoutSecure error for UID ${userUID}: ${e.toString()}`);
+    return { success: false, message: "Error skipping workout: " + e.message };
+  }
+}
+
+/**
+ * Set current workout to a specific day (for doing workouts out of sequence)
+ */
+function setCurrentWorkoutSecure(payload) {
+  const verification = verifyFirebaseIdToken(payload.idToken);
+  if (!verification.isValid || !verification.uid) {
+    return { success: false, message: verification.error || "Session invalid." };
+  }
+  const userUID = verification.uid;
+
+  const { targetWeek, targetDay, programPhase } = payload;
+
+  try {
+    const userProfileDoc = firestore.getDocument(`users/${userUID}`);
+    if (!userProfileDoc.exists) {
+      return { success: false, message: "User profile not found." };
+    }
+    const userProfile = userProfileDoc.fields;
+
+    // Basic validation - can only jump within current week
+    if (targetWeek !== userProfile.currentWeek) {
+      return { success: false, message: "Can only skip to future day within current week." };
+    }
+    if (targetDay <= userProfile.currentDay) {
+      return { success: false, message: "Can only skip to future day." };
+    }
+
+    // Log intervening days as skipped
+    for (let dayToSkip = userProfile.currentDay; dayToSkip < targetDay; dayToSkip++) {
+      const skipLogEntry = {
+        userId: userUID,
+        programId: userProfile.programName,
+        programPhase: userProfile.programPhase,
+        week: userProfile.currentWeek,
+        day: dayToSkip,
+        date: new Date(),
+        notes: `Skipped to advance to Day ${targetDay + 1}`,
+        skipped: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      firestore.createDocument('workoutLogs', skipLogEntry);
+    }
+
+    // Update user's current position
+    const updateData = {
+      currentWeek: targetWeek,
+      currentDay: targetDay,
+      updatedAt: new Date()
+    };
+    firestore.updateDocument(`users/${userUID}`, updateData);
+
+    return {
+      success: true,
+      message: `Schedule updated. Your current workout is now Week ${targetWeek + 1}, Day ${targetDay + 1}.`,
+      newWorkout: {
+        week: targetWeek,
+        day: targetDay,
+        programPhase: programPhase
+      }
+    };
+
+  } catch (e) {
+    Logger.log(`setCurrentWorkoutSecure error for UID ${userUID}: ${e.toString()}`);
+    return { success: false, message: "Error setting current workout: " + e.message };
+  }
+}
+
+/**
+ * Safe token verification that does NOT check Firestore documents
+ * Make sure your verifyFirebaseIdToken function looks like this
+ */
+function verifyFirebaseIdToken(idToken) {
+  if (!idToken) return { isValid: false, error: "No token provided.", uid: null };
+  
+  try {
+    const FIREBASE_WEB_API_KEY = PropertiesService.getScriptProperties().getProperty("FIREBASE_WEB_API_KEY");
+    if (!FIREBASE_WEB_API_KEY) {
+        Logger.log("CRITICAL: FIREBASE_WEB_API_KEY not set in Script Properties.");
+        throw new Error("Server configuration error: Firebase Web API Key not set.");
+    }
+
+    const response = UrlFetchApp.fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${FIREBASE_WEB_API_KEY}`, {
+        method: 'post',
+        contentType: 'application/json',
+        payload: JSON.stringify({ idToken: idToken }),
+        muteHttpExceptions: true
+      }
+    );
+    
+    const responseCode = response.getResponseCode();
+    const responseText = response.getContentText();
+    const data = JSON.parse(responseText);
+
+    if (responseCode === 200 && data && data.users && data.users.length > 0) {
+      return { isValid: true, uid: data.users[0].localId, email: data.users[0].email };
+    }
+    
+    const errorMessage = data.error ? data.error.message : "Invalid token or user not found";
+    Logger.log(`Token verification failed (HTTP ${responseCode}): ${errorMessage}. Response: ${responseText}`);
+    return { isValid: false, error: errorMessage, uid: null };
+    
+  } catch (e) {
+    Logger.log('Token verification exception: ' + e.toString() + (e.stack ? (' Stack: ' + e.stack) : ''));
+    return { isValid: false, error: "Token verification process error.", uid: null };
+  }
+}
+
+/**
+ * If you have a getUserData function, make sure it's not being called during registration
+ * This function often tries to get existing user documents
+ */
+function getUserData(userId) {
+  // This function should NOT be called during user creation!
+  Logger.log("WARNING: getUserData called during registration - this might cause the document not found error");
+  throw new Error("getUserData should not be called during user creation");
+}
+
+/**
+ * Safe alternative that doesn't check existing documents
+ */
+function getUserDataSafe(userId) {
+  Logger.log(`getUserDataSafe called for ${userId} - this should only be called AFTER user creation`);
+  
+  try {
+    const userDoc = firestore.getDocument(`users/${userId}`);
+    if (userDoc && userDoc.fields) {
+      // Convert Firestore format to simple object
+      const userData = {};
+      Object.keys(userDoc.fields).forEach(key => {
+        const field = userDoc.fields[key];
+        if (field.stringValue !== undefined) userData[key] = field.stringValue;
+        else if (field.booleanValue !== undefined) userData[key] = field.booleanValue;
+        else if (field.integerValue !== undefined) userData[key] = parseInt(field.integerValue);
+        else if (field.timestampValue !== undefined) userData[key] = new Date(field.timestampValue);
+        else userData[key] = field;
+      });
+      return userData;
+    }
+    return null;
+  } catch (error) {
+    Logger.log(`getUserDataSafe error for ${userId}: ${error.toString()}`);
+    return null;
+  }
+}
+
+// REGISTRATION SCRIPT..............................
+
+// Add these functions to your fireCode.gs file
+
+/**
+ * Checks if a username (email) is available using Firebase Auth
+ * Note: In Firebase Auth, usernames are typically email addresses
+ * @param {string} username The username/email to check
+ * @return {object} { available: boolean, message?: string }
+ */
+function checkUsernameAvailability(username) {
+  try {
+    // Basic validation
+    if (!username || username.trim().length < 4) {
+      return { available: false, message: "Username must be at least 4 characters." };
+    }
+
+    const trimmedUsername = username.toLowerCase().trim();
+    
+    // Check if it's a valid email format (since Firebase Auth uses emails)
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmedUsername)) {
+      return { available: false, message: "Please enter a valid email address." };
+    }
+
+    // For Firebase Auth, we can't directly check if an email exists without trying to sign in
+    // So we'll just validate the format and let the registration process handle duplicates
+    // Alternative: You could maintain a separate Firestore collection of usernames if needed
+    
+    Logger.log(`Username availability check for: ${trimmedUsername} - format valid`);
+    return { 
+      available: true, 
+      message: "Email format is valid. Availability will be checked during registration." 
+    };
+
+  } catch (error) {
+    Logger.log("Error checking username availability: " + error.toString());
+    return { available: false, message: "Error checking username: " + error.message };
+  }
+}
+
+/**
+ * Alternative username check that queries Firestore users collection
+ * Use this if you want to check against existing users in Firestore
+ */
+function checkUsernameAvailabilityFirestore(username) {
+  try {
+    if (!username || username.trim().length < 4) {
+      return { available: false, message: "Username must be at least 4 characters." };
+    }
+
+    const trimmedUsername = username.toLowerCase().trim();
+    
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmedUsername)) {
+      return { available: false, message: "Please enter a valid email address." };
+    }
+
+    // Query Firestore to check if user exists
+    try {
+      // Note: This requires setting up a query index in Firestore
+      const existingUsersQuery = firestore.query('users')
+        .where('email', '==', trimmedUsername)
+        .limit(1)
+        .get();
+      
+      if (existingUsersQuery && existingUsersQuery.length > 0) {
+        return { available: false, message: "An account with this email already exists." };
+      }
+      
+      return { available: true, message: "Email is available!" };
+      
+    } catch (firestoreError) {
+      Logger.log("Firestore query error in username check: " + firestoreError.toString());
+      // Fallback to basic validation if Firestore query fails
+      return { 
+        available: true, 
+        message: "Email format valid. Availability will be verified during registration." 
+      };
+    }
+
+  } catch (error) {
+    Logger.log("Error in checkUsernameAvailabilityFirestore: " + error.toString());
+    return { available: false, message: "Error checking username: " + error.message };
+  }
+}
+
+/**
+ * Gets assessment form fields (placeholder for Firebase version)
+ * You'll need to store assessment questions in Firestore or as constants
+ */
+function getAssessmentFormFields() {
+  try {
+    // For now, return a basic assessment structure
+    // You can move this to Firestore later or keep as constants
+    const assessmentFields = {
+      "experience": [
+        {
+          "name": "fitnessLevel",
+          "label": "What's your current fitness level?",
+          "type": "select",
+          "required": true,
+          "options": [
+            {"value": "beginner", "label": "Beginner - New to fitness"},
+            {"value": "intermediate", "label": "Intermediate - Regular exercise"},
+            {"value": "advanced", "label": "Advanced - Competitive athlete"}
+          ],
+          "default": "intermediate"
+        },
+        {
+          "name": "hyroxExperience",
+          "label": "Have you done HYROX before?",
+          "type": "select",
+          "required": true,
+          "options": [
+            {"value": "never", "label": "Never done HYROX"},
+            {"value": "once", "label": "Done it once"},
+            {"value": "multiple", "label": "Multiple times"}
+          ],
+          "default": "never"
+        }
+      ],
+      "background": [
+        {
+          "name": "age",
+          "label": "Age",
+          "type": "number",
+          "required": true,
+          "min": 16,
+          "max": 80,
+          "default": 30
+        },
+        {
+          "name": "goals",
+          "label": "What are your main goals?",
+          "type": "multiselect",
+          "required": true,
+          "options": [
+            {"value": "strength", "label": "Build strength"},
+            {"value": "endurance", "label": "Improve endurance"},
+            {"value": "weight_loss", "label": "Lose weight"},
+            {"value": "performance", "label": "Competitive performance"}
+          ],
+          "default": ["performance"]
+        }
+      ],
+      "event": [
+        {
+          "name": "eventDate",
+          "label": "When is your target HYROX event?",
+          "type": "date",
+          "required": false,
+          "description": "Leave blank if you don't have a specific event date"
+        },
+        {
+          "name": "eventLocation",
+          "label": "Event location (optional)",
+          "type": "text",
+          "required": false,
+          "placeholder": "e.g., London, Manchester"
+        }
+      ]
+    };
+
+    Logger.log("Assessment form fields retrieved successfully");
+    return assessmentFields;
+
+  } catch (error) {
+    Logger.log("Error getting assessment form fields: " + error.toString());
+    return {};
+  }
+}
+
+/**
+ * Processes assessment data and provides program recommendation
+ * @param {object} assessmentData The user's assessment responses
+ * @return {object} { success: boolean, programSelection: object }
+ */
+function submitAssessmentAndGetRecommendation(assessmentData) {
+  try {
+    Logger.log("Processing assessment data: " + JSON.stringify(assessmentData));
+
+    // Simple program recommendation logic
+    let recommendedProgram;
+    let reasoning = "";
+
+    const fitnessLevel = assessmentData.fitnessLevel || "intermediate";
+    const hyroxExperience = assessmentData.hyroxExperience || "never";
+    const age = parseInt(assessmentData.age) || 30;
+
+    // Program recommendation logic
+    if (fitnessLevel === "beginner" || hyroxExperience === "never") {
+      recommendedProgram = {
+        id: "BeginnerProgram",
+        name: "Complete Beginner 14-Week Program"
+      };
+      reasoning = "Based on your fitness level and HYROX experience, we recommend starting with our beginner program to build a solid foundation.";
+    } else if (fitnessLevel === "advanced" || (hyroxExperience === "multiple" && age < 35)) {
+      recommendedProgram = {
+        id: "AdvancedProgram", 
+        name: "Advanced Competitor 14-Week Program"
+      };
+      reasoning = "Your advanced fitness level and HYROX experience make you perfect for our competitive program.";
+    } else {
+      recommendedProgram = {
+        id: "IntermediateProgram",
+        name: "Intermediate Performance 14-Week Program"
+      };
+      reasoning = "Based on your fitness background, our intermediate program will challenge you appropriately while building HYROX-specific skills.";
+    }
+
+    // Check if they have specific goals that might change the recommendation
+    if (assessmentData.goals && Array.isArray(assessmentData.goals)) {
+      if (assessmentData.goals.includes("strength") && !assessmentData.goals.includes("endurance")) {
+        recommendedProgram = {
+          id: "StrengthProgram",
+          name: "Strength Development 14-Week Program"
+        };
+        reasoning = "Since strength is your primary goal, we've selected our strength-focused program.";
+      } else if (assessmentData.goals.includes("endurance") && assessmentData.goals.includes("weight_loss")) {
+        recommendedProgram = {
+          id: "RunnerProgram", 
+          name: "Running Improvement 14-Week Program"
+        };
+        reasoning = "Your focus on endurance and weight loss makes our running-focused program ideal.";
+      }
+    }
+
+    const programSelection = {
+      recommendedProgram: recommendedProgram,
+      reasoningExplanation: reasoning,
+      assessmentData: assessmentData
+    };
+
+    Logger.log("Program recommendation: " + recommendedProgram.name);
+    return { success: true, programSelection: programSelection };
+
+  } catch (error) {
+    Logger.log("Error in submitAssessmentAndGetRecommendation: " + error.toString());
+    return { 
+      success: false, 
+      message: "Error processing assessment: " + error.message 
+    };
+  }
+}
+
+/**
+ * Legacy function wrapper for backward compatibility
+ * Replace calls to getUserDataSpreadsheet with getFirestoreInstance
+ */
+/**
+ * REMOVE or REPLACE your old validateLoginSecure function with this:
+ * This function should NOT be called with Firebase Auth, but just in case...
+ */
+function validateLoginSecure(username, password) {
+  Logger.log("⚠️ WARNING: validateLoginSecure called - but you should be using Firebase Auth!");
+  Logger.log("Login attempt for: " + username);
+  
+  // With Firebase Auth, login happens client-side
+  // Server-side login validation is not needed
+  return { 
+    success: false, 
+    message: "Please use Firebase Authentication. Server-side login is no longer supported.",
+    useFirebaseAuth: true 
+  };
+}
+
+/**
+ * Make sure your getUserProfileSecure function looks like this (no spreadsheet calls):
+ */
+function getUserProfileSecure(payload) {
+  try {
+    Logger.log("getUserProfileSecure: Firebase version called for payload: " + JSON.stringify(payload));
+    
+    // Check if we got the right parameter format
+    if (!payload || !payload.idToken) {
+      Logger.log("getUserProfileSecure: No idToken in payload");
+      return { success: false, message: "No authentication token provided." };
+    }
+    
+    const verification = verifyFirebaseIdToken(payload.idToken);
+    if (!verification.isValid || !verification.uid) {
+      Logger.log("getUserProfileSecure: Token verification failed");
+      return { success: false, message: verification.error || "Session validation failed." };
+    }
+
+    const userUID = verification.uid;
+    Logger.log(`getUserProfileSecure: Getting profile for UID: ${userUID}`);
+
+    try {
+      const userDoc = firestore.getDocument(`users/${userUID}`);
+      
+      if (!userDoc || !userDoc.fields) {
+        Logger.log(`getUserProfileSecure: No profile found for UID: ${userUID}`);
+        return { success: false, message: "User profile not found. Please complete registration or contact support." };
+      }
+
+      // Convert Firestore format to simple object
+      const profile = {};
+      Object.keys(userDoc.fields).forEach(key => {
+        const field = userDoc.fields[key];
+        if (field.stringValue !== undefined) profile[key] = field.stringValue;
+        else if (field.booleanValue !== undefined) profile[key] = field.booleanValue;
+        else if (field.integerValue !== undefined) profile[key] = parseInt(field.integerValue);
+        else if (field.timestampValue !== undefined) profile[key] = field.timestampValue;
+        else profile[key] = field;
+      });
+      
+      Logger.log(`getUserProfileSecure: Profile found for ${userUID}: ${profile.name}`);
+      
+      return { 
+        success: true, 
+        profile: convertDatesToISO(profile)
+      };
+      
+    } catch (docError) {
+      Logger.log(`getUserProfileSecure: Document error for UID ${userUID}: ${docError.toString()}`);
+      return { success: false, message: "User profile not found. Please complete registration or contact support." };
+    }
+
+  } catch (error) {
+    Logger.log("Error in getUserProfileSecure: " + error.toString());
+    return { success: false, message: "Server error retrieving profile: " + error.message };
+  }
+}
+
+/**
+ * Make sure you DON'T have these old functions, or replace them:
+ */
+
+// DELETE this function if it exists:
+/*
+function getUserDataSpreadsheet() {
+  // DELETE THIS ENTIRE FUNCTION
+}
+*/
+
+// REPLACE with this if you have an old getUserData function:
+function getUserData(userId) {
+  Logger.log(`getUserData: Firebase version called for userId: ${userId}`);
+  
+  if (!userId) {
+    Logger.log("getUserData: No userId provided.");
+    return null;
+  }
+   
+  try {
+    const userDoc = firestore.getDocument(`users/${userId}`);
+    
+    if (!userDoc || !userDoc.fields) {
+      Logger.log(`getUserData: No user data found for: ${userId}`);
+      return null;
+    }
+
+    // Convert Firestore format
+    const userData = {};
+    Object.keys(userDoc.fields).forEach(key => {
+      const field = userDoc.fields[key];
+      if (field.stringValue !== undefined) userData[key] = field.stringValue;
+      else if (field.booleanValue !== undefined) userData[key] = field.booleanValue;
+      else if (field.integerValue !== undefined) userData[key] = parseInt(field.integerValue);
+      else if (field.timestampValue !== undefined) userData[key] = new Date(field.timestampValue);
+      else userData[key] = field;
+    });
+    
+    // Add userId for reference
+    userData.userId = userId;
+    
+    Logger.log(`getUserData: Successfully retrieved data for ${userId}`);
+    return userData;
+    
+  } catch (error) {
+    Logger.log(`getUserData error for ${userId}: ${error.toString()}`);
+    return null;
+  }
+}
+
+/**
+ * Remove these old functions completely if they exist:
+ */
+function getUserDataSs() {
+  throw new Error("getUserDataSs not available in Firebase version");
+}
+
+function findRowByValue() {
+  throw new Error("findRowByValue not available in Firebase version");
+}
+
+function getOrCreateSheet() {
+  throw new Error("getOrCreateSheet not available in Firebase version");
+}
+/**
+ * Alternative helper function for any remaining Sheets-based functions
+ * This will help identify where old functions are still being called
+ */
+function getUserDataSs() {
+  Logger.log("WARNING: getUserDataSs called but this is a Firebase app.");
+  throw new Error("Google Sheets functions not available in Firebase version.");
+}
+
+/**
+ * Helper function to get Firestore instance (for compatibility)
+ */
+function getUserDataFirestore() {
+  return getFirestoreInstance();
+}
+
+/**
+ * Debug function to test Firestore operations step by step
+ */
+function debugFirestoreOperations() {
+  Logger.log("🔍 Testing Firestore operations...");
+  
+  try {
+    // Test 1: Basic connection
+    Logger.log("1. Testing Firestore connection...");
+    const firestore = getFirestoreInstance();
+    Logger.log("✅ Firestore instance created");
+    
+    // Test 2: Simple document creation
+    Logger.log("2. Testing simple document creation...");
+    const testDoc = {
+      test: true,
+      timestamp: new Date(),
+      message: "Debug test document"
+    };
+    
+    firestore.createDocument('debugTest/test1', testDoc);
+    Logger.log("✅ Test document created successfully");
+    
+    // Test 3: Document retrieval
+    Logger.log("3. Testing document retrieval...");
+    try {
+      const retrievedDoc = firestore.getDocument('debugTest/test1');
+      if (retrievedDoc && retrievedDoc.exists) {
+        Logger.log("✅ Document retrieved successfully");
+      } else {
+        Logger.log("⚠️ Document exists but structure unexpected");
+      }
+    } catch (getError) {
+      Logger.log("⚠️ Document retrieval issue: " + getError.toString());
+    }
+    
+    // Test 4: User document path
+    Logger.log("4. Testing user document path...");
+    const testUserId = "test_user_123";
+    const userDocPath = `users/${testUserId}`;
+    const userTestDoc = {
+      userId: testUserId,
+      name: "Test User",
+      email: "test@example.com",
+      createdAt: new Date()
+    };
+    
+    firestore.createDocument(userDocPath, userTestDoc);
+    Logger.log("✅ User document created successfully");
+    
+    // Clean up test documents
+    Logger.log("5. Cleaning up test documents...");
+    try {
+      firestore.deleteDocument('debugTest/test1');
+      firestore.deleteDocument(userDocPath);
+      Logger.log("✅ Test documents cleaned up");
+    } catch (cleanupError) {
+      Logger.log("⚠️ Cleanup warning: " + cleanupError.toString());
+    }
+    
+    Logger.log("🎉 All Firestore operations working correctly!");
+    return { success: true, message: "Firestore is working properly" };
+    
+  } catch (error) {
+    Logger.log("❌ Firestore operation failed: " + error.toString());
+    Logger.log("❌ Error stack: " + error.stack);
+    return { success: false, message: error.message };
+  }
+}
+
+/**
+ * Test Firebase token verification with better error details
+ */
+function debugTokenVerification() {
+  Logger.log("🔐 Testing token verification...");
+  
+  try {
+    // Test with obviously invalid token
+    const result = verifyFirebaseIdToken("invalid_token_12345");
+    
+    if (result && typeof result === 'object') {
+      Logger.log("✅ Token verification function structure is correct");
+      Logger.log(`   isValid: ${result.isValid}`);
+      Logger.log(`   error: ${result.error}`);
+      Logger.log(`   uid: ${result.uid}`);
+    } else {
+      Logger.log("❌ Token verification function returns unexpected format");
+    }
+    
+  } catch (error) {
+    Logger.log("❌ Token verification error: " + error.toString());
+  }
+}
+
+/**
+ * Check all required Script Properties
+ */
+function debugScriptProperties() {
+  Logger.log("🔧 Checking Script Properties...");
+  
+  const requiredProps = [
+    'FIREBASE_PROJECT_ID',
+    'FIREBASE_CLIENT_EMAIL', 
+    'FIREBASE_PRIVATE_KEY',
+    'FIREBASE_WEB_API_KEY',
+    'STRIPE_PUBLISHABLE_KEY',
+    'STRIPE_SECRET_KEY'
+  ];
+  
+  const scriptProperties = PropertiesService.getScriptProperties();
+  const properties = scriptProperties.getProperties();
+  
+  requiredProps.forEach(prop => {
+    if (properties[prop]) {
+      Logger.log(`✅ ${prop}: Set (${properties[prop].length} characters)`);
+      
+      // Validate format for specific properties
+      if (prop === 'FIREBASE_PRIVATE_KEY' && !properties[prop].includes('BEGIN PRIVATE KEY')) {
+        Logger.log(`⚠️ ${prop}: Missing BEGIN/END markers`);
+      }
+      if (prop === 'STRIPE_PUBLISHABLE_KEY' && !properties[prop].startsWith('pk_')) {
+        Logger.log(`⚠️ ${prop}: Should start with 'pk_'`);
+      }
+      if (prop === 'STRIPE_SECRET_KEY' && !properties[prop].startsWith('sk_')) {
+        Logger.log(`⚠️ ${prop}: Should start with 'sk_'`);
+      }
+    } else {
+      Logger.log(`❌ ${prop}: MISSING`);
+    }
+  });
+}
+
+/**
+ * Run all debug tests
+ */
+function runAllDebugTests() {
+  Logger.log("🚀 Running complete debug test suite...");
+  Logger.log("=" * 60);
+  
+  debugScriptProperties();
+  Logger.log("-" * 30);
+  
+  debugTokenVerification();
+  Logger.log("-" * 30);
+  
+  debugFirestoreOperations();
+  Logger.log("-" * 30);
+  
+  Logger.log("🏁 Debug tests complete - check results above");
+}
+
+/**
+ * Creates a test user document that STAYS in Firestore for verification
+ * Run this and then check your Firebase Console to see if it appears
+ */
+function createPermanentTestUser() {
+  Logger.log("🧪 Creating permanent test user for verification...");
+  
+  try {
+    const testUID = "test_verification_user_" + new Date().getTime(); // Unique ID with timestamp
+    const testPath = `users/${testUID}`;
+    
+    const testUserProfile = {
+      userId: testUID,
+      email: "test.verification@example.com",
+      name: "Test Verification User",
+      programName: "BeginnerProgram",
+      programPhase: "MAIN",
+      currentWeek: 0,
+      currentDay: 0,
+      displayWeek: 0,
+      eventLocation: null,
+      eventDate: null,
+      virtualStartDate: new Date(),
+      mainProgramStartDate: new Date(),
+      eventCompleted: false,
+      SpecializedPhaseFocus: null,
+      mainProgramCompleted: false,
+      awaitingNextProgramChoice: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      isTestUser: true // Flag to identify this as a test user
+    };
+    
+    Logger.log(`Creating test user at path: ${testPath}`);
+    Logger.log(`Test user data: ${JSON.stringify(testUserProfile, null, 2)}`);
+    
+    // Create the document - this time NO deletion
+    firestore.createDocument(testPath, testUserProfile);
+    
+    Logger.log("✅ Permanent test user created successfully!");
+    Logger.log(`📍 Document path: ${testPath}`);
+    Logger.log(`🔍 Check Firebase Console → Firestore → users collection for user ID: ${testUID}`);
+    
+    return { 
+      success: true, 
+      userId: testUID, 
+      path: testPath,
+      message: "Test user created - check Firebase Console to verify it appears" 
+    };
+    
+  } catch (error) {
+    Logger.log("❌ Failed to create permanent test user: " + error.toString());
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Creates a test document in a different collection to verify Firestore is working
+ */
+function createTestInDifferentCollection() {
+  Logger.log("🧪 Creating test document in 'testing' collection...");
+  
+  try {
+    const testDoc = {
+      testId: "verification_test_" + new Date().getTime(),
+      message: "This is a test document to verify Firestore is working",
+      timestamp: new Date(),
+      data: {
+        working: true,
+        library: "FirestoreApp",
+        project: "hybridx-app"
+      }
+    };
+    
+    // Create document with auto-generated ID
+    firestore.createDocument('testing', testDoc);
+    
+    Logger.log("✅ Test document created in 'testing' collection");
+    Logger.log("🔍 Check Firebase Console → Firestore → testing collection");
+    
+    return { success: true, collection: "testing" };
+    
+  } catch (error) {
+    Logger.log("❌ Failed to create test document: " + error.toString());
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * List all documents in the users collection to see what's actually there
+ */
+function listUsersInFirestore() {
+  Logger.log("📋 Listing all documents in users collection...");
+  
+  try {
+    // Try to get all documents in the users collection
+    const usersSnapshot = firestore.getDocuments('users');
+    
+    if (usersSnapshot && usersSnapshot.length > 0) {
+      Logger.log(`Found ${usersSnapshot.length} documents in users collection:`);
+      
+      usersSnapshot.forEach((doc, index) => {
+        Logger.log(`${index + 1}. Document ID: ${doc.id || 'Unknown'}`);
+        if (doc.fields && doc.fields.email) {
+          Logger.log(`   Email: ${doc.fields.email}`);
+        }
+        if (doc.fields && doc.fields.name) {
+          Logger.log(`   Name: ${doc.fields.name}`);
+        }
+        if (doc.fields && doc.fields.createdAt) {
+          Logger.log(`   Created: ${doc.fields.createdAt}`);
+        }
+      });
+      
+    } else {
+      Logger.log("📭 No documents found in users collection (or collection doesn't exist yet)");
+    }
+    
+    return { success: true, count: usersSnapshot ? usersSnapshot.length : 0 };
+    
+  } catch (error) {
+    Logger.log("❌ Error listing users: " + error.toString());
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Clean up test users (run this to remove test documents)
+ */
+function cleanupTestUsers() {
+  Logger.log("🧹 Cleaning up test users...");
+  
+  try {
+    const usersSnapshot = firestore.getDocuments('users');
+    let cleanedCount = 0;
+    
+    if (usersSnapshot && usersSnapshot.length > 0) {
+      usersSnapshot.forEach(doc => {
+        // Only delete documents that are marked as test users
+        if (doc.fields && (doc.fields.isTestUser === true || 
+                          doc.fields.email && doc.fields.email.includes('test.verification') ||
+                          doc.fields.userId && doc.fields.userId.includes('test_verification'))) {
+          try {
+            firestore.deleteDocument(`users/${doc.id}`);
+            Logger.log(`🗑️ Deleted test user: ${doc.id}`);
+            cleanedCount++;
+          } catch (deleteError) {
+            Logger.log(`⚠️ Could not delete ${doc.id}: ${deleteError.toString()}`);
+          }
+        }
+      });
+    }
+    
+    // Also clean up testing collection
+    try {
+      const testingSnapshot = firestore.getDocuments('testing');
+      if (testingSnapshot && testingSnapshot.length > 0) {
+        testingSnapshot.forEach(doc => {
+          firestore.deleteDocument(`testing/${doc.id}`);
+          cleanedCount++;
+        });
+        Logger.log("🗑️ Cleaned up testing collection");
+      }
+    } catch (testingError) {
+      Logger.log("⚠️ Could not clean testing collection: " + testingError.toString());
+    }
+    
+    Logger.log(`✅ Cleanup complete. Removed ${cleanedCount} test documents.`);
+    return { success: true, cleanedCount: cleanedCount };
+    
+  } catch (error) {
+    Logger.log("❌ Cleanup error: " + error.toString());
+    return { success: false, error: error.message };
+  }
+}
+function testDirectUserCreation() {
+  try {
+    const testUID = "direct_test_" + new Date().getTime();
+    const testUser = {
+      userId: testUID,
+      email: "direct@test.com", 
+      name: "Direct Test",
+      createdAt: new Date()
+    };
+    
+    firestore.createDocument(`users/${testUID}`, testUser);
+    Logger.log("✅ Direct user creation works!");
+    
+    // Verify it was created
+    const retrieved = firestore.getDocument(`users/${testUID}`);
+    Logger.log("✅ Document retrieval works!");
+    
+    // Clean up
+    firestore.deleteDocument(`users/${testUID}`);
+    Logger.log("✅ Direct user creation test complete");
+    
+  } catch (error) {
+    Logger.log("❌ Direct user creation failed: " + error.toString());
+  }
+}
+
+/**
+ * Step 1: Replace the warning function with a tracing version to find where it's called
+ * Add this to your fireCode.gs temporarily to trace the call
+ */
+function getUserDataSpreadsheet() {
+  Logger.log("🚨 TRACE: getUserDataSpreadsheet called during login!");
+  Logger.log("🚨 This function should not be called in Firebase version");
+  
+  // Get the call stack to see what's calling this function
+  try {
+    throw new Error("Trace call stack");
+  } catch (e) {
+    Logger.log("🚨 Call stack:");
+    Logger.log(e.stack);
+  }
+  
+  // For now, return an error that will help identify the calling function
+  throw new Error("getUserDataSpreadsheet is not available in Firebase version. Check execution log for call stack trace.");
+}
+
+/**
+ * Step 2: Safe replacement for getUserDataSpreadsheet if it's needed
+ * This returns a Firestore instance instead of a spreadsheet
+ */
+function getUserDataFirestoreReplacement() {
+  Logger.log("✅ Using Firestore instead of Spreadsheet");
+  return getFirestoreInstance();
+}
+
+/**
+ * Step 3: Check for common functions that might be calling getUserDataSpreadsheet
+ */
+function findOldFunctionCalls() {
+  Logger.log("🔍 Checking for functions that might call getUserDataSpreadsheet...");
+  
+  // List of functions that commonly called getUserDataSpreadsheet in the old version
+  const suspectFunctions = [
+    'validateLoginSecure',
+    'getUserProfileSecure', 
+    'getUserData',
+    'getWorkoutSecure',
+    'completeWorkoutSecure',
+    'getWorkoutHistorySecure',
+    'updateUserProfileSecure',
+    'checkUserAccess'
+  ];
+  
+  suspectFunctions.forEach(funcName => {
+    try {
+      if (typeof eval(funcName) === 'function') {
+        Logger.log(`📍 Function ${funcName} exists - check if it calls getUserDataSpreadsheet`);
+      } else {
+        Logger.log(`✅ Function ${funcName} not found`);
+      }
+    } catch (e) {
+      Logger.log(`✅ Function ${funcName} not accessible`);
+    }
+  });
+  
+  Logger.log("🔍 Check complete - look for functions marked with 📍 above");
+}
+
+/**
+ * Step 4: Alternative - Just remove the function completely
+ * If nothing should be calling it, just delete it
+ */
+function removeUserDataSpreadsheetFunction() {
+  Logger.log("🗑️ To remove getUserDataSpreadsheet completely:");
+  Logger.log("1. Find the getUserDataSpreadsheet function in your code");
+  Logger.log("2. Delete the entire function");
+  Logger.log("3. Deploy your script");
+  Logger.log("4. Try login again");
+  Logger.log("If you get 'function not found' error, that tells us what's trying to call it");
+}
+
+/**
+ * Step 5: Updated getUserData function that works with Firestore
+ * This might be what's actually needed
+ */
+function getUserData(userId) {
+  Logger.log(`getUserData called for: ${userId} (Firebase version)`);
+  
+  if (!userId) {
+    Logger.log("getUserData: No userId provided.");
+    return null;
+  }
+   
+  try {
+    const userDoc = firestore.getDocument(`users/${userId}`);
+    
+    if (!userDoc || !userDoc.fields) {
+      Logger.log(`getUserData: No user data found for: ${userId}`);
+      return null;
+    }
+
+    // Convert Firestore format to the format the old code expects
+    const userData = convertFirestoreFieldsToSimpleObject(userDoc.fields);
+    
+    // Add properties that the old code might expect
+    userData.userRow = null; // This was a Sheets concept, not needed in Firestore
+    userData.userId = userId;
+    
+    Logger.log(`getUserData: Successfully retrieved data for ${userId}`);
+    return userData;
+    
+  } catch (error) {
+    Logger.log(`getUserData error for ${userId}: ${error.toString()}`);
+    return null;
+  }
+}
+
+/**
+ * Step 6: Check what functions exist in your project
+ */
+function checkExistingFunctions() {
+  Logger.log("📋 Checking what functions exist in your project...");
+  
+  const functionsToCheck = [
+    'getUserDataSpreadsheet',
+    'getUserDataSs', 
+    'getUserData',
+    'validateLoginSecure',
+    'getUserProfileSecure',
+    'getWorkoutSecure'
+  ];
+  
+  functionsToCheck.forEach(funcName => {
+    try {
+      const func = eval(funcName);
+      if (typeof func === 'function') {
+        Logger.log(`✅ ${funcName} exists`);
+        
+        // Try to get the function source to see if it calls getUserDataSpreadsheet
+        const funcString = func.toString();
+        if (funcString.includes('getUserDataSpreadsheet')) {
+          Logger.log(`🚨 ${funcName} calls getUserDataSpreadsheet - NEEDS UPDATING`);
+        } else {
+          Logger.log(`✅ ${funcName} doesn't call getUserDataSpreadsheet`);
+        }
+      }
+    } catch (e) {
+      Logger.log(`❌ ${funcName} not found or accessible`);
+    }
+  });
+}
+
+/**
+ * Step 7: Quick fix - replace all old spreadsheet functions with Firestore equivalents
+ */
+function replaceAllOldFunctions() {
+  Logger.log("🔧 Here are the replacements for old functions:");
+  Logger.log("");
+  Logger.log("OLD: getUserDataSpreadsheet()");
+  Logger.log("NEW: getFirestoreInstance()");
+  Logger.log("");
+  Logger.log("OLD: getOrCreateSheet(spreadsheet, sheetName)"); 
+  Logger.log("NEW: firestore collection (auto-created)");
+  Logger.log("");
+  Logger.log("OLD: findRowByValue(sheet, column, value)");
+  Logger.log("NEW: firestore.query('collection').where('field', '==', value).get()");
+  Logger.log("");
+  Logger.log("OLD: sheet.appendRow([data])");
+  Logger.log("NEW: firestore.createDocument('collection', {data})");
+  Logger.log("");
+  Logger.log("OLD: sheet.getRange(row, col).setValue(value)");
+  Logger.log("NEW: firestore.updateDocument('collection/docId', {field: value})");
+}

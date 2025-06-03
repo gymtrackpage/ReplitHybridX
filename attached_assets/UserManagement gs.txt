@@ -1,0 +1,286 @@
+// UserManagement.gs
+
+/**
+ * Retrieves detailed user data for profile display and internal logic.
+ * This function is central and used by many other parts of the application.
+ * @param {string} userId The ID of the user.
+ * @return {object|null} User data object or null if not found.
+ *                         Includes: currentWeek, currentDay, name, startDate, lastCompleted,
+ *                                   programName (ID), eventLocation, eventDate, programPhase,
+ *                                   virtualStartDate, mainProgramStartDate, eventCompleted, userRow.
+ */
+function getUserData(userId) {
+  if (!userId) {
+    Logger.log("getUserData: Error - No userId provided.");
+    return null;
+  }
+   
+try {
+    const userSpreadsheet = getUserDataSs(); // From Code.gs
+    // Ensure UserData sheet exists and has the correct headers for findRowByValue and data indexing.
+    // The order of headers here is CRITICAL for correct data[index] access below.
+    const sheet = getOrCreateSheet(userSpreadsheet, USER_SHEET_NAME, [
+      "UserID",             // Index 0
+      "CurrentWeek",        // Index 1
+      "CurrentDay",         // Index 2
+      "Name",               // Index 3
+      "StartDate",          // Index 4
+      "LastCompleted",      // Index 5
+      "ProgramName",        // Index 6 (This is the main selected Program ID)
+      "EventLocation",      // Index 7
+      "EventDate",          // Index 8
+      "ProgramPhase",       // Index 9
+      "VirtualStartDate",   // Index 10
+      "MainProgramStartDate",// Index 11
+      "EventCompleted",     // Index 12
+      "SpecializedPhaseFocus" // Index 13 (NEW COLUMN - e.g., Column N in the sheet)
+      // Add any other columns you have in UserData sheet here
+    ]);
+     const userRecord = findRowByValue(sheet, 1, userId); // UserID is in Column A (index 1 in sheet, 0 in array)
+
+if (userRecord) {
+      const data = userRecord.rowData; // This is the array of values from the matched row
+      // Logger.log(`getUserData: Raw data for ${userId}: ${JSON.stringify(data)}`);
+
+      // Ensure you are accessing the correct index based on your UserData sheet's column order.
+      // The indices below assume the order defined in getOrCreateSheet headers.
+      return {
+        userId: String(data[0] || ""),                  // Column A
+        currentWeek: Number(data[1] || 0),              // Column B
+        currentDay: Number(data[2] || 0),               // Column C
+        name: String(data[3] || ""),                    // Column D
+        startDate: data[4] ? new Date(data[4]) : new Date(), // Column E
+        lastCompleted: data[5] ? new Date(data[5]) : null, // Column F
+        programName: String(data[6] || ""),             // Column G (Main selected Program ID)
+        eventLocation: String(data[7] || ""),           // Column H
+        eventDate: data[8] ? new Date(data[8]) : null,  // Column I
+        programPhase: String(data[9] || "MAIN"),        // Column J
+        virtualStartDate: data[10] ? new Date(data[10]) : (data[4] ? new Date(data[4]) : new Date()), // Column K
+        mainProgramStartDate: data[11] ? new Date(data[11]) : null, // Column L
+        eventCompleted: data[12] === true,              // Column M
+        
+        // --- THIS IS THE NEW LINE TO ADD/MODIFY ---
+        SpecializedPhaseFocus: String(data[13] || ""),  // Column N (index 13) 
+                                                        // Returns an empty string if blank or not found
+        // ------------------------------------------
+        
+        userRow: userRecord.rowIndex // This is the 1-based sheet row index
+      };
+    } else {
+      Logger.log(`getUserData: No user data row found for userId: ${userId}`);
+      return null;
+    }
+  } catch (error) {
+    Logger.log(`getUserData: Error getting user data for ${userId}: ${error.toString()} Stack: ${error.stack}`);
+    return null;
+  }
+}
+
+
+/**
+ * Retrieves user profile data for client-side display, including email.
+ * @param {object} sessionData Object containing {userId, token}.
+ * @return {object} { success: boolean, message?: string, profile?: object }
+ */
+function getUserProfileSecure(sessionData) {
+  try {
+    Logger.log("getUserProfileSecure: Request for user: " + (sessionData ? sessionData.userId : "undefined"));
+    const validation = validateClientSessionToken(sessionData.token, sessionData.userId);
+    if (!validation.success) {
+      return { success: false, message: validation.message || "Session validation failed." };
+    }
+
+    const userData = getUserData(validation.userId);
+    if (!userData) {
+      Logger.log(`getUserProfileSecure: User data not found for ${validation.userId}`);
+      return { success: false, message: "User profile not found." };
+    }
+
+    // Get email from credentials sheet
+    let email = "";
+    const userSpreadsheet = getUserDataSpreadsheet();
+    const credsSheet = getOrCreateSheet(userSpreadsheet, CREDENTIALS_SHEET_NAME);
+    const credRecord = findRowByValue(credsSheet, 4, validation.userId); // UserID in Col D
+    if (credRecord) {
+      email = String(credRecord.rowData[4] || ""); // Email in Col E
+    }
+
+    const profile = {
+      userId: userData.userId,
+      name: userData.name,
+      email: email,
+      currentWeek: userData.currentWeek,
+      currentDay: userData.currentDay,
+      startDate: userData.startDate ? userData.startDate.toISOString() : null,
+      programName: userData.programName, // Program ID
+      eventLocation: userData.eventLocation,
+      eventDate: userData.eventDate ? userData.eventDate.toISOString() : null,
+      programPhase: userData.programPhase,
+      virtualStartDate: userData.virtualStartDate ? userData.virtualStartDate.toISOString() : null,
+      mainProgramStartDate: userData.mainProgramStartDate ? userData.mainProgramStartDate.toISOString() : null,
+      eventCompleted: userData.eventCompleted
+    };
+    // Logger.log(`getUserProfileSecure: Profile data for ${validation.userId}: ${JSON.stringify(profile)}`);
+    return { success: true, profile: profile, refreshedToken: validation.refreshedToken };
+
+  } catch (error) {
+    Logger.log("Error in getUserProfileSecure: " + error.toString() + " Stack: " + error.stack);
+    return { success: false, message: "Server error retrieving profile: " + error.message };
+  }
+}
+
+/**
+ * Updates a user's profile information.
+ * @param {object} updateData Object containing { sessionData: {userId, token}, name?, programName?, eventLocation?, eventDate? }.
+ * @return {object} { success: boolean, message?: string, programChanged?: boolean, eventChanged?: boolean, refreshedToken?: string }
+ */
+function updateUserProfileSecure(updateData) {
+  try {
+    const sessionData = updateData.sessionData;
+    Logger.log(`updateUserProfileSecure: Request for user: ${sessionData.userId} with data: ${JSON.stringify(updateData)}`);
+    
+    const validation = validateClientSessionToken(sessionData.token, sessionData.userId);
+    if (!validation.success) {
+      return { success: false, message: validation.message || "Session validation failed." };
+    }
+
+    const userId = validation.userId;
+    const currentUserData = getUserData(userId);
+    if (!currentUserData) {
+      return { success: false, message: "User not found for profile update." };
+    }
+
+    const userSpreadsheet = getUserDataSpreadsheet();
+    const userSheet = getOrCreateSheet(userSpreadsheet, USER_SHEET_NAME);
+    const userRow = currentUserData.userRow;
+
+    let programChanged = false;
+    let eventChanged = false;
+
+    // Update Name (Column D, index 3)
+    if (updateData.name !== undefined && updateData.name !== currentUserData.name) {
+      userSheet.getRange(userRow, 4).setValue(updateData.name);
+      Logger.log(`Updated name for ${userId} to: ${updateData.name}`);
+    }
+
+    // Update Event Location (Column H, index 7)
+    if (updateData.eventLocation !== undefined && updateData.eventLocation !== currentUserData.eventLocation) {
+      userSheet.getRange(userRow, 8).setValue(updateData.eventLocation);
+      eventChanged = true;
+      Logger.log(`Updated event location for ${userId} to: ${updateData.eventLocation}`);
+    }
+
+    // Update Event Date (Column I, index 8)
+    let newEventDate = null;
+    if (updateData.eventDate) { // If a new date is provided
+        newEventDate = new Date(updateData.eventDate);
+        if (isNaN(newEventDate.getTime())) newEventDate = null; // Invalid date string
+    }
+    
+    const oldEventDateMs = currentUserData.eventDate ? currentUserData.eventDate.getTime() : null;
+    const newEventDateMs = newEventDate ? newEventDate.getTime() : null;
+
+    if (newEventDateMs !== oldEventDateMs) {
+      userSheet.getRange(userRow, 9).setValue(newEventDate ? newEventDate : ""); // Store as Date or clear
+      eventChanged = true;
+      Logger.log(`Updated event date for ${userId} to: ${newEventDate ? newEventDate.toISOString() : 'cleared'}`);
+    }
+    
+    // If event date changed OR program ID changed, recalculate schedule and phase
+    // Program change is handled by a separate function: changeUserProgramSecure
+    if (eventChanged) {
+      // Recalculate program state based on new event date
+      // The program ID remains the same unless explicitly changed via changeUserProgramSecure
+      const programIdToUse = updateData.programName || currentUserData.programName;
+      const recalculatedState = calculateInitialProgramState(programIdToUse, newEventDate); // Pass current program and new event date
+      
+      userSheet.getRange(userRow, 2).setValue(recalculatedState.currentWeek);
+      userSheet.getRange(userRow, 3).setValue(recalculatedState.currentDay);
+      userSheet.getRange(userRow, 5).setValue(recalculatedState.startDate); // Actual start date
+      userSheet.getRange(userRow, 10).setValue(recalculatedState.programPhase);
+      userSheet.getRange(userRow, 11).setValue(recalculatedState.virtualStartDate);
+      userSheet.getRange(userRow, 12).setValue(recalculatedState.mainProgramStartDate || "");
+      userSheet.getRange(userRow, 13).setValue(recalculatedState.eventCompleted);
+      Logger.log(`Recalculated program state for ${userId} due to event date change. New phase: ${recalculatedState.programPhase}, Week: ${recalculatedState.currentWeek}`);
+    }
+    
+    return { 
+        success: true, 
+        message: "Profile updated successfully.", 
+        programChanged: programChanged, // This will be false as program change is separate
+        eventChanged: eventChanged,
+        refreshedToken: validation.refreshedToken 
+    };
+
+  } catch (error) {
+    Logger.log("Error in updateUserProfileSecure: " + error.toString() + " Stack: " + error.stack);
+    return { success: false, message: "Server error updating profile: " + error.message };
+  }
+}
+
+/**
+ * Changes the user's training program and recalculates their schedule.
+ * @param {object} updateData Object containing { sessionData: {userId, token}, programName (new program ID), scheduleOption ('start-fresh' or 'keep-date') }.
+ * @return {object} { success: boolean, message?: string, refreshedToken?: string }
+ */
+function changeUserProgramSecure(updateData) {
+  try {
+    const sessionData = updateData.sessionData;
+    Logger.log(`changeUserProgramSecure: Request for user: ${sessionData.userId} to program ${updateData.programName}`);
+
+    const validation = validateClientSessionToken(sessionData.token, sessionData.userId);
+    if (!validation.success) {
+      return { success: false, message: validation.message || "Session validation failed." };
+    }
+
+    const userId = validation.userId;
+    const newProgramId = updateData.programName;
+    const scheduleOption = updateData.scheduleOption; // 'start-fresh' or 'keep-date'
+
+    if (!newProgramId || !scheduleOption) {
+      return { success: false, message: "New program ID and schedule option are required." };
+    }
+
+    const currentUserData = getUserData(userId);
+    if (!currentUserData) {
+      return { success: false, message: "User not found." };
+    }
+
+    const userSpreadsheet = getUserDataSpreadsheet();
+    const userSheet = getOrCreateSheet(userSpreadsheet, USER_SHEET_NAME);
+    const userRow = currentUserData.userRow;
+
+    // Update ProgramName (Column G, index 6)
+    userSheet.getRange(userRow, 7).setValue(newProgramId);
+    
+    let newProgramState;
+    if (scheduleOption === 'start-fresh') {
+      // For 'start-fresh', the eventDate might need to be cleared or re-evaluated if it's tied to the old program.
+      // Here, calculateInitialProgramState will set based on the new program and potentially existing event date.
+      // If eventDate is specific to old program, client should prompt to clear/update it.
+      newProgramState = calculateInitialProgramState(newProgramId, currentUserData.eventDate);
+    } else if (scheduleOption === 'keep-date' && currentUserData.eventDate) {
+      // 'keep-date' implies we use the existing eventDate with the new program.
+      newProgramState = calculateInitialProgramState(newProgramId, currentUserData.eventDate);
+    } else { // Fallback or if 'keep-date' but no eventDate, treat as 'start-fresh' for the new program
+      newProgramState = calculateInitialProgramState(newProgramId, null); // No specific event date focus
+    }
+
+    // Apply new program state
+    userSheet.getRange(userRow, 2).setValue(newProgramState.currentWeek);
+    userSheet.getRange(userRow, 3).setValue(newProgramState.currentDay);
+    userSheet.getRange(userRow, 5).setValue(newProgramState.startDate);
+    userSheet.getRange(userRow, 10).setValue(newProgramState.programPhase);
+    userSheet.getRange(userRow, 11).setValue(newProgramState.virtualStartDate);
+    userSheet.getRange(userRow, 12).setValue(newProgramState.mainProgramStartDate || "");
+    userSheet.getRange(userRow, 13).setValue(newProgramState.eventCompleted); // Should be false if starting a new program relative to an event
+
+    Logger.log(`Program changed for ${userId} to ${newProgramId}. New phase: ${newProgramState.programPhase}, Week: ${newProgramState.currentWeek}`);
+    
+    return { success: true, message: "Training program changed successfully.", refreshedToken: validation.refreshedToken };
+
+  } catch (error) {
+    Logger.log("Error in changeUserProgramSecure: " + error.toString() + " Stack: " + error.stack);
+    return { success: false, message: "Server error changing program: " + error.message };
+  }
+}

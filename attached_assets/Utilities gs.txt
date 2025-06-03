@@ -1,0 +1,155 @@
+// Utilities.gs
+
+/**
+ * Finds a row in a sheet by a specific value in a given column.
+ * Normalizes search value and cell values to lowercase strings for case-insensitive comparison.
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet The sheet to search.
+ * @param {number} columnIndex The 1-based index of the column to search in.
+ * @param {string|number} valueToFind The value to search for.
+ * @return {object|null} An object { rowIndex, rowData } or null if not found.
+ */
+function findRowByValue(sheet, columnIndex, valueToFind) {
+  const sheetName = sheet.getName();
+  const searchValue = (valueToFind === null || valueToFind === undefined) ? "" : String(valueToFind).toLowerCase().trim();
+  
+  // Logger.log(`findRowByValue: Searching in sheet "${sheetName}", column ${columnIndex} for normalized value: "${searchValue}"`);
+
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) { // Start from 1 to skip header
+    let cellValue = data[i][columnIndex - 1];
+    let normalizedCellValue = (cellValue === null || cellValue === undefined) ? "" : String(cellValue).toLowerCase().trim();
+
+    if (normalizedCellValue === searchValue) {
+      // Logger.log(`findRowByValue: Match found at row index ${i + 1} for "${searchValue}"`);
+      return { rowIndex: i + 1, rowData: data[i] };
+    }
+  }
+  // Logger.log(`findRowByValue: No match found in sheet "${sheetName}" for "${searchValue}"`);
+  return null;
+}
+
+
+/**
+ * Generates a universally unique identifier (UUID).
+ * @return {string} A UUID string.
+ */
+function generateUniqueId() {
+  return Utilities.getUuid();
+}
+
+/**
+ * Generates a random salt for password hashing.
+ * @return {string} A random salt string.
+ */
+function generateSalt() {
+  return Utilities.getUuid().replace(/-/g, ''); // Simple salt from UUID
+}
+
+/**
+ * Hashes a password using SHA-256 with a provided salt.
+ * @param {string} password The password to hash.
+ * @param {string} salt The salt to use.
+ * @return {string} The base64 encoded hashed password.
+ */
+function hashPassword(password, salt) {
+  if (!password || !salt) {
+    Logger.log("Error: Password or salt missing for hashing.");
+    throw new Error("Password and salt are required for hashing.");
+  }
+  const combined = password + salt;
+  const hashBytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, combined);
+  return Utilities.base64EncodeWebSafe(hashBytes); // Use web safe for easier storage/transmission
+}
+
+/**
+ * Verifies a password against a stored hash and salt.
+ * @param {string} password The password to verify.
+ * @param {string} storedHash The stored hashed password.
+ * @param {string} salt The salt used during the original hashing.
+ * @return {boolean} True if the password matches, false otherwise.
+ */
+function verifyPassword(password, storedHash, salt) {
+  if (!password || !storedHash || !salt) {
+    Logger.log("Error: Missing parameters for password verification.");
+    return false; // Or throw an error
+  }
+  const attemptHash = hashPassword(password, salt);
+  return attemptHash === storedHash;
+}
+
+/**
+ * Gets a sheet by name from a given spreadsheet, creating it if it doesn't exist with specified headers.
+ * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} spreadsheet The spreadsheet instance.
+ * @param {string} sheetName The name of the sheet.
+ * @param {Array<string>=} headers Optional array of header strings to set if the sheet is created.
+ * @return {GoogleAppsScript.Spreadsheet.Sheet} The sheet object.
+ */
+function getOrCreateSheet(spreadsheet, sheetName, headers) {
+  let sheet = spreadsheet.getSheetByName(sheetName);
+  if (!sheet) {
+    sheet = spreadsheet.insertSheet(sheetName);
+    if (headers && headers.length > 0) {
+      sheet.appendRow(headers);
+      Logger.log(`Created sheet "${sheetName}" with headers.`);
+    } else {
+      Logger.log(`Created empty sheet "${sheetName}".`);
+    }
+  }
+  return sheet;
+}
+
+/**
+ * Gets data from cache or, if not found or expired, fetches it using a supplier function and then caches it.
+ * Uses CacheService.getUserCache() by default, suitable for user-specific cached data.
+ * For data shared among all users (like a general program template), CacheService.getScriptCache() might be more appropriate.
+ *
+ * @param {string} cacheKey The unique key for storing/retrieving the item in the cache.
+ * @param {Function} dataSupplier A function that, when called, returns the data to be cached.
+ *                                This function should not take any arguments.
+ * @param {number} [expirationInSeconds=CACHE_EXPIRATION_SECONDS] Optional. The time in seconds for how long the item
+ *                                                                should remain in cache. Defaults to global CACHE_EXPIRATION_SECONDS
+ *                                                                (defined in Code.gs, e.g., 21600 for 6 hours).
+ * @param {GoogleAppsScript.Cache.Cache} [cacheType=CacheService.getUserCache()] Optional. The type of cache to use
+ *                                                                                (CacheService.getUserCache() or CacheService.getScriptCache()).
+ * @return {*} The data retrieved from the cache or freshly fetched from the dataSupplier.
+ *             Returns null if the dataSupplier returns null or if there's an error parsing cached JSON.
+ */
+function getFromCacheOrFetch(cacheKey, dataSupplier, expirationInSeconds, cacheType) {
+  const effectiveCache = cacheType || CacheService.getUserCache(); // Default to user cache
+  const effectiveExpiration = expirationInSeconds || CACHE_EXPIRATION_SECONDS; // Use global default if not specified
+
+  let cachedDataJson = null;
+  try {
+    cachedDataJson = effectiveCache.get(cacheKey);
+  } catch (e) {
+    Logger.log(`Error accessing cache for key "${cacheKey}": ${e.toString()}`);
+    // Proceed to fetch fresh data as if cache miss
+  }
+
+  if (cachedDataJson != null) {
+    // Logger.log(`Cache HIT for key: ${cacheKey}`);
+    try {
+      return JSON.parse(cachedDataJson);
+    } catch (e) {
+      Logger.log(`Error parsing cached JSON for key "${cacheKey}", fetching fresh. Error: ${e.toString()}`);
+      // Fall through to fetch fresh data if parsing fails
+    }
+  }
+  
+  Logger.log(`Cache MISS for key: ${cacheKey}. Fetching fresh data via supplier function.`);
+  const freshData = dataSupplier(); // Call the function that provides the actual data
+
+  if (freshData != null) { // Only attempt to cache non-null/non-undefined data
+    try {
+      effectiveCache.put(cacheKey, JSON.stringify(freshData), effectiveExpiration);
+      Logger.log(`Data for key "${cacheKey}" fetched and stored in cache for ${effectiveExpiration} seconds.`);
+    } catch (e) {
+      Logger.log(`Error putting data into cache for key "${cacheKey}". Data might be too large or unstringifiable. Error: ${e.toString()}`);
+      // Even if caching fails, return the fresh data
+    }
+  } else {
+    Logger.log(`Data supplier for key "${cacheKey}" returned null or undefined. Not caching.`);
+  }
+  
+  return freshData;
+}

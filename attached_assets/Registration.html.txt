@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HybridX Training - Sign Up</title>
+    <?!= include('SharedCss'); ?>
+    <script src="https://js.stripe.com/v3/"></script>
+    <script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js';
+  import { getAuth, createUserWithEmailAndPassword, updateProfile } from 'https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js';
+
+  // Your Firebase config (replace with your actual values)
+  const firebaseConfig = {
+   apiKey: "AIzaSyDIfTE8fhDAag35_UsWp_iD-87Io8ur_6U",
+  authDomain: "hybridx-app.firebaseapp.com",
+  projectId: "hybridx-app",
+  storageBucket: "hybridx-app.firebasestorage.app",
+  messagingSenderId: "789763759471",
+  appId: "1:789763759471:web:e9fd08301a1fafeb9d5c9a",
+  measurementId: "G-2HQPEDVBEE"
+  };
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+
+  // Make available globally for registration
+  window.firebaseAuth = auth;
+  window.createUserWithEmailAndPassword = createUserWithEmailAndPassword;
+  window.updateProfile = updateProfile;
+  
+  console.log("Firebase initialized for registration");
+</script>
+
+</head>
+<body>
+    <header>
+        <h1>HybridX Training Platform</h1>
+    </header>
+
+    <div class="container">
+        <div class="registration-card">
+            <div style="text-align: center;">
+                <img src="https://i.imgur.com/q22Iowu.png" alt="HybridX Logo" class="logo-img" onerror="this.style.display='none'">
+                <h2>Get Started with HybridX Training</h2>
+            </div>
+
+            <div class="steps-indicator">
+                <div class="step-indicator active" id="step-indicator-1"><span class="step-number">1</span> Account</div>
+                <div class="step-indicator" id="step-indicator-2"><span class="step-number">2</span> Assessment & Program</div>
+                <div class="step-indicator" id="step-indicator-3"><span class="step-number">3</span> Payment</div>
+            </div>
+
+            <div id="general-error-message" class="message error-message"></div>
+
+            <!-- Step 1: Account Details -->
+            <div class="step-content active" id="step-content-1">
+                <h3>Create Your Account</h3>
+                <div class="form-group">
+                    <label for="fullname">Full Name</label>
+                    <input type="text" id="fullname" name="fullname" required>
+                </div>
+                <div class="form-group">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" name="email" required>
+                </div>
+               <div class="form-group">
+                <label for="reg-username">Email Address</label>
+                <input type="email" id="reg-username" name="username" required minlength="4" placeholder="your.email@example.com">
+                <div id="reg-username-message" class="message info-message" style="font-size: 0.9em; margin-top: 5px;">This will be your login email.</div>
+            </div>
+                <div class="form-group">
+                    <label for="reg-password">Password</label> <!-- Changed ID -->
+                    <input type="password" id="reg-password" name="password" required minlength="6">
+                     <small>Min 6 characters.</small>
+                </div>
+                <div class="form-group">
+                    <label for="reg-password2">Confirm Password</label> <!-- Changed ID -->
+                    <input type="password" id="reg-password2" name="password2" required>
+                </div>
+                <button class="button" type="button" onclick="goToStep(2)">Continue to Assessment</button>
+            </div>
+
+            <!-- Step 2: Fitness Assessment & Program Selection -->
+            <div class="step-content" id="step-content-2">
+                <h3>Fitness Assessment</h3>
+                <div class="info-box">
+                    Help us tailor the perfect program for you by answering these questions.
+                </div>
+                <div class="assessment-progress-indicator" id="assessment-progress-bar-container" style="display:none;">
+                    <!-- Progress steps will be added here by JS -->
+                </div>
+                <div id="assessment-form-container">
+                    <div class="loading" id="assessment-form-loading" style="display:block;"> <!-- Show loading initially for step 2 -->
+                        <div class="spinner"></div> <p>Loading assessment questions...</p>
+                    </div>
+                    <!-- Assessment form sections will be dynamically loaded here -->
+                </div>
+                
+                <div id="program-recommendation" style="display: none; margin-top: 20px;" class="program-recommendation card">
+                    <h4>Your Recommended Program:</h4>
+                    <div id="recommended-program-name" class="program-badge"></div>
+                    <div id="program-reasoning" class="program-reasoning"></div>
+                    <input type="hidden" id="selected-program-id" name="selectedProgramId">
+                </div>
+
+                <div id="program-schedule-info" class="info-box" style="display: none; margin-top: 20px;">
+                    <h4 style="margin-top: 0; color: var(--heading-color);">Your Training Schedule</h4>
+                    <p id="program-schedule-text"></p>
+                </div>
+                
+                <div class="assessment-buttons" id="step2-nav-buttons"> <!-- Renamed for clarity -->
+                    <button class="button secondary-button" type="button" onclick="goToStep(1)">Back to Account</button>
+                    <button class="button" type="button" id="continue-to-payment-btn" style="display: none;" onclick="goToStep(3)">Continue to Payment</button>
+                </div>
+                 <div id="assessment-error" class="message error-message" style="display: none;"></div>
+            </div>
+
+            <!-- Step 3: Payment -->
+            <div class="step-content" id="step-content-3">
+                <h3>Complete Your Subscription</h3>
+                <div class="pricing-box card">
+                    <h4>HybridX Training Membership</h4>
+                    <div class="price">£5/month</div>
+                    <div class="price-note">Full access, cancel anytime.</div>
+                    <ul class="feature-list">
+                        <li>Personalized training program</li>
+                        <li>Workout tracking & history</li>
+                        <li>Progress monitoring</li>
+                        <li>Mobile-friendly platform</li>
+                    </ul>
+                </div>
+
+                <div id="payment-form-container" style="margin-top: 30px;">
+                    <div id="payment-element">
+                         <div class="loading" id="payment-form-loading" style="display:block">
+                            <div class="spinner"></div><p>Initializing payment form...</p>
+                        </div>
+                    </div>
+                    <div id="card-errors" class="message error-message" style="margin: 10px 0;"></div>
+                </div>
+
+                <p style="text-align: center; margin: 20px 0; font-size: 14px; color: var(--secondary-text);">
+                    By clicking "Start Training", you agree to the £5 monthly subscription.
+                </p>
+                <div class="assessment-buttons"> <!-- Re-using class for consistent layout -->
+                    <button class="button secondary-button" type="button" onclick="goToStep(2)">Back to Program</button>
+                    <button class="button" type="button" id="submit-payment-btn">Start Training & Pay £5</button>
+                </div>
+            </div>
+            
+            <div id="registration-loading" class="loading">
+                <div class="spinner"></div>
+                <p>Finalizing your registration...</p>
+            </div>
+        </div> <!-- end .registration-card -->
+
+        <div id="success-card" class="card" style="display: none; text-align: center;">
+            <div style="font-size: 50px; color: var(--highlight-color); margin-bottom: 20px;">✓</div>
+            <h2>Registration Successful!</h2>
+            <p>Welcome to HybridX! Your account is set up, and your training program is ready.</p>
+            <p>You will be redirected to the login page shortly, or click below to log in now.</p>
+            <a href="<?= getScriptUrl() ?>"><button class="button">Go to Login</button></a>
+        </div>
+
+        <footer>
+            <p>HybridX Training - Elevate Your Fitness</p>
+            <p><a href="https://www.hybridx.club/" target="_blank">www.hybridx.club</a></p>
+        </footer>
+    </div>
+
+    <script>
+        let currentStep = 1;
+        let currentAssessmentSectionKey = null; // Stores the key of the current assessment section
+        let assessmentSectionKeys = []; // Stores the ordered keys: ['experience', 'background', ...]
+        let assessmentFieldConfig = {};
+
+        let stripe;
+        let elements;
+        let paymentElement;
+        let stripeClientSecret;
+
+        const STRIPE_PUBLISHABLE_KEY = '<?= stripePublishableKey ?>';
+        if (!STRIPE_PUBLISHABLE_KEY || STRIPE_PUBLISHABLE_KEY === "undefined" || STRIPE_PUBLISHABLE_KEY.includes("YOUR")) {
+             console.error("Stripe Publishable Key is not configured. Value:", STRIPE_PUBLISHABLE_KEY);
+             // Display an error to the user on the page if critical
+             // document.addEventListener('DOMContentLoaded', () => showGeneralError("Payment system configuration error. Please contact admin."));
+        }
+
+
+       // --- UTILITY FUNCTIONS ---
+        function showGeneralError(message) {
+            const el = document.getElementById('general-error-message');
+            if (el) { el.textContent = message; el.style.display = 'block'; el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+        }
+        function hideGeneralError() {
+            const el = document.getElementById('general-error-message');
+            if (el) el.style.display = 'none';
+        }
+        function validateEmail(email) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).toLowerCase()); }
+        function formatDateForDisplay(dateStr) { if (!dateStr) return ''; return new Date(dateStr + "T00:00:00Z").toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' }); }
+        function capitalizeFirstLetter(string) { return string.charAt(0).toUpperCase() + string.slice(1); }
+
+        // --- STEP NAVIGATION & VALIDATION ---
+        function updateStepIndicator(targetStep) {
+            document.querySelectorAll('.step-indicator').forEach(el => el.classList.remove('active', 'completed'));
+            for (let i = 1; i <= 3; i++) {
+                const indicator = document.getElementById(`step-indicator-${i}`);
+                if(indicator){
+                    if (i < targetStep) indicator.classList.add('completed');
+                    else if (i === targetStep) indicator.classList.add('active');
+                }
+            }
+        }
+
+        function validateCurrentStepInputs() {
+            hideGeneralError(); // Clear previous errors first
+            if (currentStep === 1) {
+                const fullname = document.getElementById('fullname').value.trim();
+                const email = document.getElementById('email').value.trim();
+                const username = document.getElementById('reg-username').value.trim();
+                const password = document.getElementById('reg-password').value;
+                const password2 = document.getElementById('reg-password2').value;
+
+                if (!fullname || !email || !username || !password || !password2) { showGeneralError("Please fill in all account fields."); return false; }
+                if (!validateEmail(email)) { showGeneralError("Invalid email address."); return false; }
+                if (username.length < 4) { showGeneralError("Username must be at least 4 characters."); return false; }
+                const usernameMsgEl = document.getElementById('reg-username-message');
+                if (usernameMsgEl && (usernameMsgEl.textContent.includes("taken") || usernameMsgEl.textContent.includes("Could not check"))) {
+                     showGeneralError("Please resolve username issue (e.g., it might be taken or check failed)."); return false;
+                }
+                if (password.length < 6) { showGeneralError("Password min 6 characters."); return false; }
+                if (password !== password2) { showGeneralError("Passwords do not match."); return false; }
+            } else if (currentStep === 2) {
+                 const selectedProgramIdEl = document.getElementById('selected-program-id');
+                 if (!selectedProgramIdEl || !selectedProgramIdEl.value) {
+                    showGeneralError("Please complete the assessment to get a program recommendation.");
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        function goToStep(nextStep) {
+            console.log(`goToStep called for step: ${nextStep}. Current step: ${currentStep}`);
+            hideGeneralError();
+            if (nextStep > currentStep) { // Moving forward
+                if (!validateCurrentStepInputs()) {
+                    console.log(`Validation failed for current step: ${currentStep}. Cannot proceed to step ${nextStep}.`);
+                    return; // Stop if current step validation fails
+                }
+            }
+            
+            document.querySelectorAll('.step-content').forEach(el => el.classList.remove('active'));
+            const targetContent = document.getElementById(`step-content-${nextStep}`);
+            if (targetContent) {
+                targetContent.classList.add('active');
+                currentStep = nextStep; // Update currentStep *after* successful validation and navigation
+                updateStepIndicator(nextStep);
+                console.log(`Successfully navigated to step: ${nextStep}`);
+
+                if (nextStep === 2 && Object.keys(assessmentFieldConfig).length === 0) {
+                    console.log("Loading assessment form for the first time.");
+                    loadAssessmentForm();
+                } else if (nextStep === 2 && currentAssessmentSectionKey) {
+                     console.log("Re-showing assessment section:", currentAssessmentSectionKey);
+                     showAssessmentSectionUI(currentAssessmentSectionKey); 
+                }
+                if (nextStep === 3) {
+                    console.log("Initializing Stripe for payment step.");
+                    initializeStripePayment();
+                }
+            } else {
+                console.error(`Step content for step ${nextStep} not found.`);
+                showGeneralError(`Error: Could not load step ${nextStep}.`);
+            }
+        }
+        
+        // --- ASSESSMENT FORM LOGIC --- (All these functions are now global)
+        function loadAssessmentForm() { /* ... your existing loadAssessmentForm ... */
+            const container = document.getElementById('assessment-form-container');
+            const loadingEl = document.getElementById('assessment-form-loading');
+            const progressBarContainer = document.getElementById('assessment-progress-bar-container');
+
+            if(!container || !loadingEl || !progressBarContainer) {
+                console.error("Assessment form critical elements not found in DOM.");
+                showGeneralError("Error setting up assessment form. Please refresh.");
+                return;
+            }
+
+            loadingEl.style.display = 'block';
+            container.innerHTML = ''; 
+            progressBarContainer.innerHTML = ''; 
+            progressBarContainer.style.display = 'none'; 
+
+            console.log("Calling server: getAssessmentFormFields");
+            google.script.run
+                .withSuccessHandler(formConfig => {
+                    console.log("getAssessmentFormFields SUCCESS:", formConfig);
+                    if (Object.keys(formConfig).length === 0) {
+                        loadingEl.style.display = 'none';
+                        container.innerHTML = `<p class="message error-message">No assessment questions configured.</p>`;
+                        return;
+                    }
+                    assessmentFieldConfig = formConfig;
+                    assessmentSectionKeys = Object.keys(formConfig);
+                    buildAssessmentFormUI(formConfig, container, progressBarContainer);
+                    loadingEl.style.display = 'none';
+                    
+                    if (assessmentSectionKeys.length > 0) {
+                        currentAssessmentSectionKey = assessmentSectionKeys[0];
+                        showAssessmentSectionUI(currentAssessmentSectionKey);
+                        updateAssessmentProgressIndicatorUI();
+                        progressBarContainer.style.display = 'flex';
+                    } else {
+                         container.innerHTML = `<p class="message info-message">Assessment not available.</p>`;
+                         document.getElementById('continue-to-payment-btn').style.display = 'inline-block';
+                    }
+                })
+                .withFailureHandler(error => {
+                    console.error("getAssessmentFormFields FAILURE:", error);
+                    loadingEl.style.display = 'none';
+                    container.innerHTML = `<p class="message error-message">Could not load assessment: ${error.message || error}</p>`;
+                })
+                .getAssessmentFormFields();
+        }
+         function buildAssessmentFormUI(config, formContainer, progressBarContainer) {
+    console.log("--- buildAssessmentFormUI START ---");
+    console.log("Received config:", JSON.parse(JSON.stringify(config))); // Log a deep copy
+    console.log("Form container:", formContainer);
+    console.log("Progress bar container:", progressBarContainer);
+
+    if (!formContainer || !progressBarContainer) {
+        console.error("buildAssessmentFormUI: formContainer or progressBarContainer is null!");
+        return;
+    }
+
+    formContainer.innerHTML = ''; 
+    progressBarContainer.innerHTML = '';
+    console.log("Containers cleared.");
+
+    assessmentSectionKeys.forEach((sectionKey, index) => {
+        console.log(`Processing section ${index + 1}: ${sectionKey}`);
+
+        const stepEl = document.createElement('div'); /* ... progress bar step ... */
+        stepEl.className = 'assessment-step-indicator';
+        stepEl.dataset.stepKey = sectionKey; 
+        stepEl.textContent = index + 1;
+        progressBarContainer.appendChild(stepEl);
+        if (index < assessmentSectionKeys.length - 1) {
+            const lineEl = document.createElement('div'); lineEl.className = 'assessment-progress-line'; progressBarContainer.appendChild(lineEl);
+        }
+
+        const sectionDiv = document.createElement('div');
+        sectionDiv.id = `section-${sectionKey}`;
+        sectionDiv.className = 'assessment-section';
+        sectionDiv.innerHTML = `<h4 style="margin-top:0;">${capitalizeFirstLetter(sectionKey.replace(/_/g, ' '))}</h4>`;
+        console.log(`Created sectionDiv for ${sectionKey}`);
+
+        const fieldsForThisSection = config[sectionKey];
+        if (!fieldsForThisSection || !Array.isArray(fieldsForThisSection)) {
+            console.warn(`No fields found or not an array for section: ${sectionKey}`);
+            formContainer.appendChild(sectionDiv); // Append empty section
+            return; // Skip to next sectionKey with 'continue' if this was a for loop, or just proceed in forEach
+        }
+
+        fieldsForThisSection.forEach((field, fieldIndex) => {
+            console.log(`Processing field ${fieldIndex + 1} in ${sectionKey}: ${field.name}, type: ${field.type}`);
+            if (!field || !field.name || !field.label) {
+                console.warn("Skipping invalid field object:", field);
+                return; // Skip this field
+            }
+
+            const group = document.createElement('div'); 
+            group.className = 'form-group';
+            const fieldId = `assess-${field.name}`;
+
+            try { // Add try-catch around complex HTML generation
+                if (field.type === 'select') {
+                    // ... (your select logic)
+                    let fieldHtml = `<label for="${fieldId}">${field.label}</label>`;
+                    fieldHtml += `<select id="${fieldId}" name="${field.name}" ${field.required ? 'required' : ''}>`;
+                    (field.options || []).forEach(opt => {
+                        const optionValue = typeof opt === 'object' ? opt.value : opt; 
+                        const optionLabel = typeof opt === 'object' ? opt.label : opt;
+                        fieldHtml += `<option value="${optionValue}" ${optionValue === field.default ? 'selected' : ''}>${optionLabel}</option>`;
+                    });
+                    fieldHtml += `</select>`;
+                    group.innerHTML = fieldHtml;
+                } else if (field.type === 'checkbox') {
+                    const checkboxItemDiv = document.createElement('div');
+                    checkboxItemDiv.className = 'checkbox-item';
+                    checkboxItemDiv.onclick = function() { 
+                        const cb = document.getElementById(fieldId);
+                        if(cb) cb.click(); // Propagate click to the actual checkbox
+                    };
+                    checkboxItemDiv.innerHTML = `
+                        <input type="checkbox" id="${fieldId}" name="${field.name}" value="true" ${field.default ? 'checked' : ''} ${field.required ? 'required' : ''}>
+                        <span class="checkbox-custom"></span>
+                        <label for="${fieldId}">${field.label}</label>`;
+                    group.appendChild(checkboxItemDiv);
+                } else if (field.type === 'multiselect') {
+                    const groupLabel = document.createElement('label');
+                    groupLabel.className = 'checkbox-label';
+                    groupLabel.textContent = field.label;
+                    group.appendChild(groupLabel);
+
+                    const checkboxGroupDiv = document.createElement('div');
+                    checkboxGroupDiv.className = 'checkbox-group';
+                    (field.options || []).forEach(opt => {
+                        const optionValue = typeof opt === 'object' ? opt.value : opt;
+                        const optionLabel = typeof opt === 'object' ? opt.label : opt;
+                        const uniqueOptionId = `${fieldId}-${optionValue.replace(/\W+/g, '-')}`;
+
+                        const itemDiv = document.createElement('div');
+                        itemDiv.className = 'checkbox-item';
+                        itemDiv.onclick = function() { 
+                            const cb = document.getElementById(uniqueOptionId);
+                            if(cb) cb.click(); 
+                        };
+                        itemDiv.innerHTML = `
+                            <input type="checkbox" id="${uniqueOptionId}" name="${field.name}" value="${optionValue}" 
+                                   ${field.default && field.default.includes(optionValue) ? 'checked' : ''}>
+                            <span class="checkbox-custom"></span>
+                            <label for="${uniqueOptionId}">${optionLabel}</label>`;
+                        checkboxGroupDiv.appendChild(itemDiv);
+                    });
+                    group.appendChild(checkboxGroupDiv);
+                } else { // text, number, date, etc.
+                    let fieldHtml = `<label for="${fieldId}">${field.label}</label>`;
+                    fieldHtml += `<input type="${field.type}" id="${fieldId}" name="${field.name}" 
+                                ${field.placeholder ? `placeholder="${field.placeholder}"` : ''} 
+                                ${field.min !== undefined ? `min="${field.min}"` : ''} 
+                                ${field.max !== undefined ? `max="${field.max}"` : ''} 
+                                ${field.step !== undefined ? `step="${field.step}"` : ''} 
+                                value="${field.default !== undefined ? field.default : ''}" 
+                                ${field.required ? 'required' : ''}>`;
+                    group.innerHTML = fieldHtml;
+                }
+
+                if (field.description) { 
+                    const smallDesc = document.createElement('small'); 
+                    smallDesc.textContent = field.description; 
+                    group.appendChild(smallDesc); 
+                }
+                sectionDiv.appendChild(group);
+            } catch (buildError) {
+                console.error(`Error building HTML for field ${field.name} in section ${sectionKey}:`, buildError);
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'message error-message';
+                errorDiv.textContent = `Error rendering field: ${field.name}`;
+                errorDiv.style.display = 'block';
+                sectionDiv.appendChild(errorDiv);
+            }
+        }); // End of fieldsForThisSection.forEach
+        
+        const buttonsDiv = document.createElement('div'); /* ... (buttons logic, seems okay) ... */
+        buttonsDiv.className = 'assessment-buttons';
+        if (index > 0) {
+            const backButton = document.createElement('button');
+            backButton.type = 'button';
+            backButton.className = 'button secondary-button';
+            backButton.textContent = 'Back';
+            backButton.onclick = prevAssessmentSectionUI;
+            buttonsDiv.appendChild(backButton);
+        } else {
+            buttonsDiv.appendChild(document.createElement('div')); // Spacer
+        }
+        
+        if (index < assessmentSectionKeys.length - 1) {
+            const nextButton = document.createElement('button');
+            nextButton.type = 'button';
+            nextButton.className = 'button';
+            nextButton.textContent = 'Next';
+            nextButton.onclick = nextAssessmentSectionUI;
+            buttonsDiv.appendChild(nextButton);
+        } else {
+            const submitButton = document.createElement('button');
+            submitButton.type = 'button';
+            submitButton.className = 'button';
+            submitButton.textContent = 'Get Program Recommendation';
+            submitButton.onclick = submitAssessmentData;
+            buttonsDiv.appendChild(submitButton);
+        }
+        sectionDiv.appendChild(buttonsDiv);
+        formContainer.appendChild(sectionDiv);
+
+        const eventDateInput = sectionDiv.querySelector(`#assess-eventDate`); // Targeted query
+        if (eventDateInput) { // No need to check field.name here, just if the element exists
+            console.log("Attaching event listener to #assess-eventDate in section", sectionKey);
+            eventDateInput.addEventListener('change', (e) => calculateProgramScheduleDisplay(e.target.value));
+        }
+    }); // End of assessmentSectionKeys.forEach
+
+    console.log("--- buildAssessmentFormUI END ---");
+}
+
+        function showAssessmentSectionUI(sectionKeyToShow) { /* ... your existing showAssessmentSectionUI ... */
+            if (!sectionKeyToShow) { console.warn("showAssessmentSectionUI: sectionKeyToShow is null or undefined"); return; }
+            document.querySelectorAll('.assessment-section').forEach(s => s.classList.remove('active'));
+            const targetSection = document.getElementById(`section-${sectionKeyToShow}`);
+            if (targetSection) targetSection.classList.add('active');
+            else console.error("Target assessment section not found:", sectionKeyToShow);
+            currentAssessmentSectionKey = sectionKeyToShow; 
+            updateAssessmentProgressIndicatorUI();
+        }
+        function updateAssessmentProgressIndicatorUI() { /* ... your existing updateAssessmentProgressIndicatorUI ... */
+            const currentIndex = assessmentSectionKeys.indexOf(currentAssessmentSectionKey);
+            assessmentSectionKeys.forEach((key, index) => {
+                const indicator = document.querySelector(`.assessment-step-indicator[data-step-key="${key}"]`);
+                if (!indicator) return;
+                indicator.classList.remove('active', 'completed');
+                if (index < currentIndex) indicator.classList.add('completed');
+                else if (index === currentIndex) indicator.classList.add('active');
+            });
+        }
+        function nextAssessmentSectionUI() { /* ... your existing nextAssessmentSectionUI ... */
+            hideGeneralError(); 
+            if (!validateCurrentAssessmentSectionInputs()) return;
+            const currentIndex = assessmentSectionKeys.indexOf(currentAssessmentSectionKey);
+            if (currentIndex < assessmentSectionKeys.length - 1) {
+                currentAssessmentSectionKey = assessmentSectionKeys[currentIndex + 1];
+                showAssessmentSectionUI(currentAssessmentSectionKey);
+            }
+        }
+        function prevAssessmentSectionUI() { /* ... your existing prevAssessmentSectionUI ... */
+            hideGeneralError();
+            const currentIndex = assessmentSectionKeys.indexOf(currentAssessmentSectionKey);
+            if (currentIndex > 0) {
+                currentAssessmentSectionKey = assessmentSectionKeys[currentIndex - 1];
+                showAssessmentSectionUI(currentAssessmentSectionKey);
+            }
+        }
+        function validateCurrentAssessmentSectionInputs() { /* ... your existing validateCurrentAssessmentSectionInputs ... */
+            const sectionElement = document.getElementById(`section-${currentAssessmentSectionKey}`);
+            if (!sectionElement) { console.warn("Validation: Current assessment section not found for key:", currentAssessmentSectionKey); return true; }
+            const inputs = sectionElement.querySelectorAll('input[required], select[required]'); // Removed quotes around required
+            let firstErrorInput = null;
+
+            for (let input of inputs) {
+                let isMissing = false;
+                const labelEl = sectionElement.querySelector(`label[for="${input.id}"]`);
+                const labelText = labelEl ? labelEl.textContent : (input.name || "a required field");
+
+                if ((input.type === 'checkbox' || input.type === 'radio')) {
+                    if (input.required && !sectionElement.querySelector(`input[name="${input.name}"]:checked`)) {
+                         // For a group, need to check if any in the group (with same name) is checked
+                         // This simplistic check here is for a single required checkbox.
+                         // For a group of checkboxes where at least one is required, you'd check differently.
+                        if(!input.name.includes("goals")){ // Assuming goals are multi-select not strictly required individually
+                             isMissing = !input.checked; // If it's a single required checkbox
+                        }
+                    }
+                } else if (input.type === 'multiselect' && input.required) { // Not a standard type, handle via checkbox group
+                     const group = input.closest('.checkbox-group');
+                     if(group && !group.querySelector('input[type="checkbox"]:checked')){
+                         isMissing = true;
+                     }
+                }
+                else if (!input.value || input.value.trim() === '') {
+                    isMissing = true;
+                }
+
+                if (isMissing) {
+                    input.style.borderColor = 'var(--error-text)'; 
+                    if (!firstErrorInput) firstErrorInput = input;
+                } else {
+                    input.style.borderColor = 'var(--border-color)'; 
+                }
+            }
+            if (firstErrorInput) {
+                const errorLabel = sectionElement.querySelector(`label[for="${firstErrorInput.id}"]`);
+                showGeneralError(`Please complete "${errorLabel ? errorLabel.textContent : (firstErrorInput.name || 'the highlighted field')}".`);
+                firstErrorInput.focus();
+                return false;
+            }
+            return true;
+        }
+        function gatherAssessmentData() { /* ... your existing gatherAssessmentData ... */
+             const data = {};
+            assessmentSectionKeys.forEach(sectionKey => {
+                (assessmentFieldConfig[sectionKey] || []).forEach(field => {
+                    if (field.type === 'multiselect') {
+                        data[field.name] = Array.from(document.querySelectorAll(`input[name="${field.name}"]:checked`)).map(cb => cb.value);
+                    } else {
+                        const inputElement = document.getElementById(`assess-${field.name}`); // Use prefixed ID
+                        if (inputElement) {
+                            data[field.name] = (inputElement.type === 'checkbox') ? inputElement.checked : inputElement.value;
+                        } else {
+                            console.warn(`Assessment field element not found: assess-${field.name} in section ${sectionKey}`);
+                        }
+                    }
+                });
+            });
+            return data;
+        }
+        function submitAssessmentData() { /* ... your existing submitAssessmentData ... */
+            if (!validateCurrentAssessmentSectionInputs()) return;
+            const assessmentData = gatherAssessmentData();
+            const loadingEl = document.getElementById('assessment-form-loading'); 
+            const errorEl = document.getElementById('assessment-error'); 
+            const recommendationEl = document.getElementById('program-recommendation');
+            const scheduleInfoEl = document.getElementById('program-schedule-info');
+            const continueBtn = document.getElementById('continue-to-payment-btn');
+            const submitAssessmentBtn = document.querySelector(`#section-${currentAssessmentSectionKey} .assessment-buttons button:last-child`);
+
+            if(loadingEl) loadingEl.style.display = 'block';
+            if (errorEl) errorEl.style.display = 'none'; 
+            if (recommendationEl) recommendationEl.style.display = 'none';
+            if (scheduleInfoEl) scheduleInfoEl.style.display = 'none';
+            if (continueBtn) continueBtn.style.display = 'none';
+
+            console.log("Submitting assessment data:", assessmentData);
+            google.script.run.withSuccessHandler(result => {
+                if(loadingEl) loadingEl.style.display = 'none';
+                console.log("submitAssessmentAndGetRecommendation result:", result);
+                if (result.success && result.programSelection && result.programSelection.recommendedProgram) {
+                    const ps = result.programSelection;
+                    document.getElementById('recommended-program-name').textContent = ps.recommendedProgram.name;
+                    document.getElementById('program-reasoning').innerHTML = ps.reasoningExplanation; 
+                    document.getElementById('selected-program-id').value = ps.recommendedProgram.id;
+                    if (recommendationEl) recommendationEl.style.display = 'block';
+                    if (assessmentData.eventDate) calculateProgramScheduleDisplay(assessmentData.eventDate);
+                    if (continueBtn) continueBtn.style.display = 'inline-block';
+                    if (submitAssessmentBtn && submitAssessmentBtn.textContent.includes("Get Program")) submitAssessmentBtn.style.display = 'none'; 
+                } else { 
+                    const msg = result.message || (result.programSelection ? "Program recommendation data incomplete." : "Could not get program recommendation.");
+                    if (errorEl) { errorEl.textContent = msg; errorEl.style.display = 'block'; } 
+                    else { showGeneralError(msg); }
+                }
+            }).withFailureHandler(err => {
+                if(loadingEl) loadingEl.style.display = 'none';
+                const errMsg = "Error processing assessment: " + (err.message || err);
+                if (errorEl) { errorEl.textContent = errMsg; errorEl.style.display = 'block';}
+                else { showGeneralError(errMsg); }
+                console.error("submitAssessmentAndGetRecommendation error:", err);
+            }).submitAssessmentAndGetRecommendation(assessmentData);
+        }
+        function calculateProgramScheduleDisplay(eventDateStr) { /* ... your existing calculateProgramScheduleDisplay ... */
+            const scheduleInfoEl = document.getElementById('program-schedule-info');
+            const scheduleTextEl = document.getElementById('program-schedule-text');
+            if (!scheduleInfoEl || !scheduleTextEl) { console.error("Schedule display elements not found"); return; }
+            if (!eventDateStr) { scheduleInfoEl.style.display = 'none'; return; }
+            const eventDate = new Date(eventDateStr + "T00:00:00Z"); 
+            if (isNaN(eventDate.getTime())) { scheduleInfoEl.style.display = 'none'; return; }
+            const currentDate = new Date(); currentDate.setUTCHours(0,0,0,0); 
+            const daysUntilEvent = Math.floor((eventDate - currentDate) / (1000 * 60 * 60 * 24));
+            const fullProgramDays = 14 * 7; 
+            let scheduleText = "";
+            if (daysUntilEvent < 0) scheduleText = `<span style="color: var(--error-text);">Event date has passed. Program will start from Week 1, Day 1.</span>`;
+            else if (daysUntilEvent < fullProgramDays) {
+                const daysIntoProgram = fullProgramDays - daysUntilEvent -1; 
+                const startWeek = Math.max(0, Math.floor(daysIntoProgram / 7)) + 1; 
+                scheduleText = `Event in <strong>${daysUntilEvent} days</strong>. Program will start at <strong>Week ${startWeek}</strong>.`;
+            } else {
+                const prepDays = daysUntilEvent - fullProgramDays;
+                const prepWeeks = Math.ceil(prepDays / 7);
+                const mainProgramStart = new Date(eventDate); mainProgramStart.setDate(eventDate.getDate() - fullProgramDays);
+                scheduleText = `Event in <strong>${daysUntilEvent} days</strong>. You'll start with <strong>${prepWeeks} weeks of PREP</strong>, then main program begins around <strong>${formatDateForDisplay(mainProgramStart.toISOString().split('T')[0])}</strong>.`;
+            }
+            scheduleTextEl.innerHTML = scheduleText; scheduleInfoEl.style.display = 'block';
+        }
+        
+        // --- Stripe Payment Logic ---
+        // initializeStripePayment, submit-payment-btn listener, finalizeRegistration (mostly same as before)
+         function initializeStripePayment() { /* ... (same as before) ... */
+            const paymentFormLoading = document.getElementById('payment-form-loading');
+            const paymentElementContainer = document.getElementById('payment-element');
+            const cardErrors = document.getElementById('card-errors');
+            paymentFormLoading.style.display = 'block'; paymentElementContainer.innerHTML = ''; cardErrors.style.display = 'none';
+
+            if (!stripe) { 
+                if (!STRIPE_PUBLISHABLE_KEY || STRIPE_PUBLISHABLE_KEY === "undefined" || STRIPE_PUBLISHABLE_KEY.includes("YOUR")) {
+                    console.error("Stripe Publishable Key is not configured correctly! Value: ", STRIPE_PUBLISHABLE_KEY);
+                    paymentFormLoading.style.display = 'none'; 
+                    paymentElementContainer.innerHTML = '<p class="message error-message">Payment system misconfiguration. Please contact admin.</p>'; 
+                    return;
+                }
+                stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
+            }
+            const paymentData = { 
+                email: document.getElementById('email').value, 
+                fullname: document.getElementById('fullname').value, 
+                username: document.getElementById('reg-username').value 
+            };
+            google.script.run.withSuccessHandler(result => {
+                paymentFormLoading.style.display = 'none';
+                if (result.success && result.clientSecret) {
+                    stripeClientSecret = result.clientSecret;
+                    const appearance = { theme: 'night', variables: { colorPrimary: '#fadb5c', colorBackground: '#222', colorText: '#ccc', colorDanger: '#f8b5b5'} };
+                    elements = stripe.elements({ clientSecret: stripeClientSecret, appearance });
+                    paymentElement = elements.create('payment', {layout: 'tabs'});
+                    paymentElement.mount('#payment-element');
+                } else { 
+                    paymentElementContainer.innerHTML = `<p class="message error-message">${result.message || "Could not init payment."}</p>`; 
+                    showGeneralError(result.message || "Could not initialize payment form. Please check your details or contact support.");
+                }
+            }).withFailureHandler(error => {
+                paymentFormLoading.style.display = 'none'; 
+                paymentElementContainer.innerHTML = `<p class="message error-message">Error setting up payment: ${error.message || error}</p>`;
+                showGeneralError("Error initializing payment: " + (error.message || error));
+            }).createStripePaymentIntent(paymentData);
+         }
+        document.getElementById('submit-payment-btn').addEventListener('click', async function() { /* ... (same as before) ... */
+            const submitBtn = this; const registrationLoading = document.getElementById('registration-loading'); const cardErrors = document.getElementById('card-errors');
+            if (!stripe || !elements || !stripeClientSecret) { showGeneralError("Payment form not ready. Please go back and try again or contact support."); return; }
+            submitBtn.disabled = true; registrationLoading.style.display = 'block'; cardErrors.style.display = 'none'; hideGeneralError();
+
+            try {
+                const { error, paymentIntent } = await stripe.confirmPayment({ elements, confirmParams: { receipt_email: document.getElementById('email').value, }, redirect: 'if_required' });
+                if (error) {
+                    cardErrors.textContent = error.message || "Unknown payment error."; cardErrors.style.display = 'block';
+                    submitBtn.disabled = false; registrationLoading.style.display = 'none'; return;
+                }
+                if (paymentIntent && paymentIntent.status === 'succeeded') finalizeRegistration(paymentIntent.id, paymentIntent.customer);
+                else { showGeneralError(`Payment status: ${paymentIntent ? paymentIntent.status : 'Unknown'}.`); submitBtn.disabled = false; registrationLoading.style.display = 'none'; }
+            } catch (e) { showGeneralError("Payment error: " + e.message); submitBtn.disabled = false; registrationLoading.style.display = 'none'; }
+        });
+  async function finalizeRegistration(paymentIntentId, stripeCustomerId) {
+    const userData = {
+        fullname: document.getElementById('fullname').value,
+        email: document.getElementById('email').value,
+        username: document.getElementById('reg-username').value, // This should be the same as email
+        password: document.getElementById('reg-password').value,
+        programId: document.getElementById('selected-program-id').value,
+        eventLocation: gatherAssessmentData().eventLocation,
+        eventDate: gatherAssessmentData().eventDate,
+        assessmentData: gatherAssessmentData(),
+        paymentIntentId: paymentIntentId,
+        stripeCustomerId: stripeCustomerId
+    };
+
+    document.getElementById('registration-loading').style.display = 'block';
+
+    try {
+        console.log("Creating Firebase Auth user...");
+        
+        // Step 1: Create Firebase Auth user
+        const userCredential = await createUserWithEmailAndPassword(
+            window.firebaseAuth, 
+            userData.email, 
+            userData.password
+        );
+        const user = userCredential.user;
+        
+        console.log("Firebase user created:", user.uid);
+        
+        // Step 2: Update the user's display name
+        if (userData.fullname) {
+            await updateProfile(user, { displayName: userData.fullname });
+        }
+        
+        // Step 3: Get ID token
+        const idToken = await user.getIdToken();
+        
+        // Step 4: Create user profile in Firestore
+        const profileData = {
+            idToken: idToken,
+            userData: {
+                name: userData.fullname,
+                email: userData.email,
+                programName: userData.programId,
+                eventLocation: userData.eventLocation,
+                eventDate: userData.eventDate,
+                assessmentData: userData.assessmentData,
+                paymentIntentId: paymentIntentId,
+                stripeCustomerId: stripeCustomerId
+            }
+        };
+
+        console.log("Creating user profile in Firestore...");
+        
+        // Call your server function to create the profile
+        google.script.run
+            .withSuccessHandler(result => {
+                document.getElementById('registration-loading').style.display = 'none';
+                if (result.success) {
+                    console.log("Registration successful!");
+                    document.querySelector('.registration-card').style.display = 'none';
+                    document.getElementById('success-card').style.display = 'block';
+                    setTimeout(() => { 
+                        window.location.href = '<?= getScriptUrl() ?>'; 
+                    }, 7000);
+                } else {
+                    console.error("Profile creation failed:", result.message);
+                    showGeneralError(result.message || "Registration failed after payment and auth.");
+                    document.getElementById('submit-payment-btn').disabled = false;
+                }
+            })
+            .withFailureHandler(error => {
+                document.getElementById('registration-loading').style.display = 'none';
+                console.error("Server error during profile creation:", error);
+                showGeneralError("Server error during registration: " + (error.message || error));
+                document.getElementById('submit-payment-btn').disabled = false;
+            })
+            .createNewUserProfileSecure(profileData);
+
+    } catch (error) {
+        document.getElementById('registration-loading').style.display = 'none';
+        console.error('Registration error:', error);
+        
+        let errorMessage = "Registration failed: ";
+        switch (error.code) {
+            case 'auth/email-already-in-use':
+                errorMessage += "An account with this email already exists. Please use a different email or try logging in.";
+                break;
+            case 'auth/invalid-email':
+                errorMessage += "Invalid email address format.";
+                break;
+            case 'auth/weak-password':
+                errorMessage += "Password is too weak. Please choose a stronger password.";
+                break;
+            case 'auth/operation-not-allowed':
+                errorMessage += "Email/password registration is not enabled. Please contact support.";
+                break;
+            default:
+                errorMessage += error.message;
+        }
+        
+        showGeneralError(errorMessage);
+        document.getElementById('submit-payment-btn').disabled = false;
+    }
+}
+        // --- PAGE INITIALIZATION ---
+  document.addEventListener('DOMContentLoaded', function() {
+    console.log("Registration Page DOM Loaded.");
+    updateStepIndicator(1);
+    
+    document.querySelectorAll('.step-content').forEach(el => el.classList.remove('active'));
+    document.getElementById('step-content-1').classList.add('active');
+    
+    // Updated username checking for Firebase
+    const regUsernameInput = document.getElementById('reg-username');
+    if(regUsernameInput) {
+        regUsernameInput.addEventListener('blur', function() {
+            const email = this.value.trim();
+            const msgEl = document.getElementById('reg-username-message');
+            if(!msgEl) return;
+
+            // Basic email validation
+            if (email.length < 4) { 
+                msgEl.textContent = "Email must be at least 4 characters."; 
+                msgEl.className = 'message error-message'; 
+                msgEl.style.display = 'block'; 
+                return; 
+            }
+
+            // Email format validation
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                msgEl.textContent = "Please enter a valid email address."; 
+                msgEl.className = 'message error-message'; 
+                msgEl.style.display = 'block'; 
+                return;
+            }
+
+            msgEl.textContent = "Checking availability..."; 
+            msgEl.className = 'message info-message'; 
+            msgEl.style.display = 'block';
+            
+            // Check with server
+            google.script.run
+                .withSuccessHandler(r => {
+                    if (r.available) {
+                        msgEl.textContent = r.message || "Email format is valid!";
+                        msgEl.className = 'message success-message';
+                    } else {
+                        msgEl.textContent = r.message || "Email may not be available.";
+                        msgEl.className = 'message error-message';
+                    }
+                })
+                .withFailureHandler(e => { 
+                    msgEl.textContent = "Error checking email availability."; 
+                    msgEl.className = 'message error-message';
+                    console.error("Username check error:", e);
+                })
+                .checkUsernameAvailability(email);
+        });
+    } else {
+        console.error("reg-username input not found!");
+    }
+
+    // Password confirmation checking
+    const regPassword2Input = document.getElementById('reg-password2');
+    if(regPassword2Input) {
+         regPassword2Input.addEventListener('blur', function() {
+            const password1 = document.getElementById('reg-password').value;
+            const password2 = this.value;
+            
+            if (password2 && password1 !== password2) {
+                showGeneralError("Passwords do not match."); 
+            } else if (password2 && password1 === password2) {
+                hideGeneralError();
+            }
+        });
+    }
+
+    // Stripe configuration check
+    if (!STRIPE_PUBLISHABLE_KEY || STRIPE_PUBLISHABLE_KEY === "undefined" || STRIPE_PUBLISHABLE_KEY.includes("YOUR")) {
+        console.warn("Stripe Publishable Key not configured. Payment step will likely fail.");
+    }
+});
+
+    </script>
+</body>
+</html>

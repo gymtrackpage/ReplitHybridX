@@ -1,0 +1,647 @@
+<style>
+    /* --- Global Resets & Base Styles --- */
+    :root {
+        /* Dark theme (default) */
+        --bg-color: #222;
+        --card-bg-color: #333;
+        --text-color: #ccc;
+        --heading-color: #fadb5c; /* Gold accent */
+        --border-color: #444;
+        --highlight-color: #fadb5c;
+        --highlight-text:  #fadb5c;
+        --secondary-bg: #444;
+        --secondary-text: #888;
+        --success-bg: #264126;
+        --success-text: #b5f8b5;
+        --error-bg: #412626;
+        --error-text: #f8b5b5;
+        --button-text-color: #222; /* Text color for buttons with highlight background */
+        --link-color: #fadb5c;
+        --link-hover-color: #fff;
+    }
+
+    .light-theme {
+        --bg-color: #f0f2f5; /* Slightly off-white */
+        --card-bg-color: #ffffff;
+        --text-color: #333;
+        --heading-color: #b8860b; /* Darker gold for light theme */
+        --border-color: #ddd;
+        --highlight-color: #fadb5c; /* Gold can still work */
+        --highlight-text:  #000;
+        --secondary-bg: #e9ecef;
+        --secondary-text: #555;
+        --success-bg: #d4edda;
+        --success-text: #155724;
+        --error-bg: #f8d7da;
+        --error-text: #721c24;
+        --button-text-color: #333;
+        --link-color: #b8860b;
+        --link-hover-color: #0056b3;
+    }
+
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+    }
+
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background-color: var(--bg-color);
+        color: var(--text-color);
+        line-height: 1.6;
+        transition: background-color 0.3s, color 0.3s;
+        font-size: 16px; /* Base font size */
+    }
+
+    .container {
+        max-width: 900px; /* Max width for main content */
+        margin: 0 auto;
+        padding: 15px;
+    }
+
+    header {
+        background-color: var(--bg-color); /* Match body or slightly different */
+        color: var(--text-color);
+        padding: 15px 20px;
+        text-align: center;
+        border-bottom: 2px solid var(--highlight-color);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        /* position: sticky; Optional: make header sticky */
+        top: 0;
+        z-index: 100; /* Ensure it's above other content if sticky */
+    }
+
+    header h1 {
+        margin: 0;
+        font-size: 1.8em; /* Responsive font size */
+        color: var(--highlight-text);
+        flex-grow: 1;
+        text-align: center;
+    }
+
+    h2, h3, h4 {
+        color: var(--heading-color);
+        margin-bottom: 0.8em;
+        margin-top: 1.2em;
+    }
+    h2 { font-size: 1.6em; }
+    h3 { font-size: 1.4em; }
+    h4 { font-size: 1.2em; }
+
+    a {
+        color: var(--link-color);
+        text-decoration: none;
+    }
+    a:hover {
+        color: var(--link-hover-color);
+        text-decoration: underline;
+    }
+
+    /* --- Base Card Styling --- */
+    .card { /* Generic card class */
+        background: var(--card-bg-color);
+        border-radius: 8px;
+        padding: 20px;
+        margin-top: 20px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        animation: fadeIn 0.5s ease-in-out;
+    }
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* --- Forms --- */
+    .form-group {
+        margin-bottom: 20px;
+    }
+    .form-group label, label.checkbox-label, label.radio-label { /* Added .checkbox-label */
+        display: block;
+        margin-bottom: 6px;
+        font-weight: bold;
+        color: var(--heading-color);
+        font-size: 0.95em;
+    }
+    input[type="text"],
+    input[type="password"],
+    input[type="email"],
+    input[type="number"],
+    input[type="date"],
+    select,
+    textarea {
+            width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        box-sizing: border-box;
+        background: var(--bg-color);
+        color: var(--text-color);
+        font-size: 1em;
+        transition: border-color 0.2s;
+    }
+
+     input[type="text"]:focus,
+    input[type="password"]:focus,
+    input[type="email"]:focus,
+    input[type="number"]:focus,
+    input[type="date"]:focus,
+    select:focus,
+    textarea:focus {
+        outline: none;
+        border-color: var(--highlight-color);
+        box-shadow: 0 0 0 2px rgba(250, 219, 92, 0.3); /* Assuming gold highlight, adjust RGB if var(--highlight-color-rgb) is defined */
+    }
+
+    /* Custom Checkbox & Radio Styles */
+    .checkbox-item, .radio-item { /* Wrapper for consistent spacing */
+        display: flex;
+        align-items: center;
+        margin-bottom: 10px;
+        cursor: pointer; /* Make the whole item clickable */
+    }
+    .checkbox-item input[type="checkbox"],
+    .radio-item input[type="radio"] {
+        opacity: 0; /* Hide the default input */
+        position: absolute;
+        width: 0;
+        height: 0;
+    }
+    .checkbox-item .checkbox-custom,
+    .radio-item .radio-custom {
+        position: relative;
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        background-color: var(--bg-color);
+        border: 2px solid var(--border-color);
+        margin-right: 10px;
+        transition: background-color 0.2s, border-color 0.2s;
+        flex-shrink: 0; /* Prevent shrinking */
+    }
+    .checkbox-item .checkbox-custom {
+        border-radius: 4px;
+    }
+    .radio-item .radio-custom {
+        border-radius: 50%;
+    }
+
+    /* Checked State - Custom Checkmark/Dot */
+    .checkbox-item input[type="checkbox"]:checked + .checkbox-custom,
+    .radio-item input[type="radio"]:checked + .radio-custom {
+        background-color: var(--highlight-color);
+        border-color: var(--highlight-color);
+    }
+    .checkbox-item input[type="checkbox"]:checked + .checkbox-custom::after {
+        content: '';
+        position: absolute;
+        left: 6px;
+        top: 2px;
+        width: 5px;
+        height: 10px;
+        border: solid var(--button-text-color); /* Color of the checkmark */
+        border-width: 0 3px 3px 0;
+        transform: rotate(45deg);
+    }
+    .radio-item input[type="radio"]:checked + .radio-custom::after {
+        content: '';
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background-color: var(--button-text-color); /* Color of the dot */
+    }
+
+    /* Focus State for Custom Controls (Accessibility) */
+    .checkbox-item input[type="checkbox"]:focus + .checkbox-custom,
+    .radio-item input[type="radio"]:focus + .radio-custom {
+        box-shadow: 0 0 0 2px rgba(250, 219, 92, 0.4); /* Highlight color focus */
+    }
+
+    .checkbox-item label, .radio-item label { /* Label text next to custom control */
+        font-weight: normal;
+        color: var(--text-color);
+        margin-bottom: 0; /* Reset margin for label within item */
+        cursor: pointer;
+        user-select: none; /* Prevent text selection on click */
+    }
+    /* End Custom Checkbox & Radio Styles */
+
+
+    /* Date Input Styling */
+    input[type="date"] {
+        position: relative; /* Needed for custom icon overlay if we go that route */
+    }
+    /* Webkit (Chrome, Safari, Edge) - Invert color for dark theme */
+    input[type="date"]::-webkit-calendar-picker-indicator {
+        filter: invert(1); /* This should make the black icon white */
+        cursor: pointer;
+        padding: 5px; /* Increase clickable area if needed */
+        opacity: 0.8; /* Make it slightly less stark */
+    }
+    .light-theme input[type="date"]::-webkit-calendar-picker-indicator {
+        filter: none; /* Reset for light theme, icon should be dark by default */
+        opacity: 0.7;
+    }
+    /* Firefox doesn't support ::-webkit-calendar-picker-indicator.
+       Styling the Firefox date picker icon is very difficult with pure CSS.
+       It often inherits the input's text color for the icon.
+       If Firefox is an issue, one might need JS solutions or accept browser default.
+       A simple fix is to ensure text color contrasts with background.
+    */
+    /* Ensure text color for date input is readable (already handled by general input styles) */
+    input[type="date"] {
+        color-scheme: dark; /* Hint to browser for dark mode styling of internal UI */
+    }
+    .light-theme input[type="date"] {
+        color-scheme: light;
+    }
+    /* End Date Input Styling */
+
+
+    textarea {
+        min-height: 80px;
+        resize: vertical;
+    }
+    select { /* Basic select styling, custom arrow added earlier */
+        /* ... your existing select styles ... */
+    }
+
+
+    input[type="date"]::-webkit-calendar-picker-indicator { /* Style for date picker icon */
+        filter: invert(var(--bg-color) === '#222' ? 1 : 0); /* Invert if dark theme */
+        cursor: pointer;
+    }
+    textarea {
+        min-height: 100px;
+        resize: vertical;
+    }
+    select {
+        appearance: none; /* For custom select arrow if desired */
+        background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23${'var(--text-color)'.substring(1)}%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E');
+        background-repeat: no-repeat;
+        background-position: right 12px center;
+        background-size: 12px;
+    }
+    /* Add focus styles */
+    input:focus, select:focus, textarea:focus {
+        outline: none;
+        border-color: var(--highlight-color);
+        box-shadow: 0 0 0 2px rgba(var(--highlight-color-rgb, 250,219,92), 0.3); /* Assuming --highlight-color-rgb is defined or fallback */
+    }
+/* In SharedCss.html */
+
+.step-content {
+    display: none; /* Default to hidden */
+    animation: fadeIn 0.5s ease-in-out; /* Keep your animation */
+}
+
+.step-content.active {
+    display: block; /* Only the active step is shown */
+}
+
+/* In SharedCss.html */
+.assessment-section {
+    display: none; /* Default to hidden */
+    animation: fadeIn 0.5s ease-in-out;
+}
+.assessment-section.active {
+    display: block; /* Only the active section is shown */
+}
+
+
+
+    /* --- Buttons --- */
+    .button, button { /* Apply to all buttons and .button class */
+        display: inline-block;
+        padding: 12px 25px;
+        color: var(--button-text-color);
+        background-color: var(--highlight-color);
+        border: none;
+        border-radius: 6px;
+        text-decoration: none;
+        font-size: 1em;
+        font-weight: bold;
+        cursor: pointer;
+        text-align: center;
+        transition: background-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .button:hover, button:hover {
+        background-color: #e0c04b; /* Darker gold */
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    .button:disabled, button:disabled {
+        background-color: var(--secondary-bg);
+        color: var(--secondary-text);
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+    }
+    .button.secondary-button, button.secondary-button {
+        background-color: var(--secondary-bg);
+        color: var(--text-color);
+    }
+    .button.secondary-button:hover, button.secondary-button:hover {
+        background-color: #555; /* Darken secondary */
+        color: var(--text-color);
+    }
+    .button-group {
+        display: flex;
+        gap: 10px; /* Space between buttons */
+        margin-top: 15px;
+        flex-wrap: wrap; /* Allow buttons to wrap on smaller screens */
+    }
+    .button-group .button, .button-group button {
+        flex-grow: 1; /* Make buttons in a group take available space */
+    }
+
+    /* --- Messages & Loaders --- */
+    .loading { text-align: center; padding: 20px 0; display: none; }
+    .spinner {
+        border: 4px solid var(--card-bg-color);
+        border-top: 4px solid var(--highlight-color);
+        border-radius: 50%;
+        width: 24px;
+        height: 24px;
+        animation: spin 0.8s linear infinite;
+        margin: 0 auto 8px;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    .message { /* Base for different message types */
+        padding: 12px 15px;
+        border-radius: 6px;
+        margin-top: 15px;
+        font-size: 0.95em;
+        display: none; /* Hidden by default */
+        border: 1px solid transparent;
+    }
+    .error-message {
+        background-color: var(--error-bg);
+        color: var(--error-text);
+        border-color: var(--error-text);
+    }
+    .success-message {
+        background-color: var(--success-bg);
+        color: var(--success-text);
+        border-color: var(--success-text);
+    }
+    .info-message {
+        background-color: #263141; /* Example info color */
+        color: #b5d5f8;
+        border-color: #b5d5f8;
+    }
+
+    /* --- Tabs --- */
+    .tabs {
+        display: flex;
+        margin-top: 20px;
+        border-bottom: 1px solid var(--border-color);
+        overflow-x: auto; /* For mobile if many tabs */
+    }
+    .tab {
+        padding: 12px 18px;
+        cursor: pointer;
+        background: var(--card-bg-color);
+        color: var(--secondary-text);
+        border-radius: 6px 6px 0 0;
+        margin-right: 2px; /* Minimal gap */
+        border: 1px solid var(--border-color);
+        border-bottom: none;
+        font-weight: 500;
+        white-space: nowrap; /* Prevent tab text wrapping */
+        transition: background-color 0.2s, color 0.2s;
+    }
+    .tab:hover {
+        background-color: var(--secondary-bg);
+        color: var(--text-color);
+    }
+    .tab.active {
+        background: var(--bg-color); /* Match page background for seamless look */
+        color: var(--highlight-text);
+        font-weight: bold;
+        border-bottom: 1px solid var(--bg-color); /* Hide bottom border of active tab */
+        position: relative;
+        top: 1px; /* Align with content area */
+    }
+    .tab-content {
+        display: none;
+        padding-top: 1px; /* To avoid content jump if tabs have borders */
+        /* animation: fadeIn 0.3s; // Applied to .card instead */
+    }
+    .tab-content.active {
+        display: block;
+    }
+    
+    /* --- Logo --- */
+    .logo-img {
+        max-width: 180px;
+        margin-bottom: 15px;
+        display: block; /* For centering if margin auto used on parent */
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    /* --- Footer --- */
+    footer {
+        margin-top: 40px;
+        text-align: center;
+        color: var(--secondary-text);
+        font-size: 0.85em;
+        padding: 20px 10px;
+        border-top: 1px solid var(--border-color);
+    }
+    footer a {
+        color: var(--highlight-text);
+    }
+
+    /* --- Specific Component Styling from Index.html --- */
+    /* User Info Bar */
+    .user-info {
+        display: flex; justify-content: space-around; align-items: center;
+        background: var(--card-bg-color); color: var(--text-color);
+        padding: 12px; border-radius: 8px; margin-top: 15px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1); /* Softer shadow */
+        flex-wrap: wrap; /* Allow wrapping on small screens */
+    }
+    .user-info div { text-align: center; padding: 5px 10px; flex-basis: auto; /* Grow as needed */ }
+    .user-info strong { display: block; margin-bottom: 3px; color: var(--highlight-text); font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.5px;}
+    .user-info span { font-size: 0.95em; }
+    .phase-indicator {
+        padding: 3px 8px; border-radius: 4px; font-size: 0.7em; font-weight: bold;
+        text-transform: uppercase; margin-top: 2px; display: inline-block;
+    }
+    .phase-indicator.prep { background: #3d5afe; color: white; } /* Brighter blue */
+    .phase-indicator.main { background: var(--highlight-color); color: var(--button-text-color); }
+    .phase-indicator.maintenance { background: #4caf50; color: white; } /* Green */
+
+    /* Workout Card in Index.html */
+    .workout-card .workout-title { font-size: 1.5em; margin-bottom: 5px; }
+    .workout-card .workout-date { color: var(--secondary-text); font-style: italic; margin-bottom: 15px; font-size: 0.85em; }
+    .workout-card .workout-content {
+        white-space: pre-wrap; line-height: 1.7; font-size: 1em; color: var(--text-color);
+        background: var(--bg-color); padding: 15px; border-radius: 6px; margin-top: 15px;
+        border: 1px solid var(--border-color); min-height: 100px;
+    }
+    .rating-group { margin: 20px 0; border: none; padding: 0;}
+    .rating-group legend { font-weight: bold; color: var(--highlight-text); margin-bottom: 10px; font-size: 1.05em; }
+    .rating-options { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+    .rating-options input[type="radio"] { display: none; }
+    .rating-options label {
+        cursor: pointer; padding: 10px 15px; background-color: var(--secondary-bg);
+        color: var(--text-color); border-radius: 6px; transition: all 0.2s ease;
+        font-size: 0.9em; text-align: center; min-width: 90px;
+        border: 1px solid transparent;
+    }
+    .rating-options input[type="radio"]:checked + label {
+        background-color: var(--highlight-color); color: var(--button-text-color);
+        border-color: var(--highlight-color); transform: scale(1.03);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+    .rating-options label:hover { background-color: #555; } /* General hover */
+    .rating-options input[type="radio"]:checked + label:hover { background-color: #e0c04b; }
+
+    /* Calendar in Index.html */
+    .calendar-card h2 { text-align: center; margin-bottom:15px; }
+    #calendar-controls { display:flex; justify-content:center; align-items:center; margin-bottom:20px; gap: 8px;}
+    #calendar-controls button, #calendar-controls select {
+        background: var(--secondary-bg); color: var(--text-color); border:1px solid var(--border-color);
+        padding: 8px 12px; border-radius:6px; font-size:0.9em;
+    }
+    #calendar-grid-header {
+        display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px;
+        padding: 0 10px; /* Align with grid padding */
+    }
+    .calendar-header-cell {
+        font-weight: bold; text-align: center; padding: 8px 0;
+        font-size: 0.8em; color: var(--secondary-text);
+    }
+    #calendar-grid {
+        display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px;
+        background-color: var(--bg-color); padding:10px; border-radius: 4px;
+        border: 1px solid var(--border-color);
+    }
+    .calendar-day {
+        padding: 8px 5px; min-height: 80px; background-color: var(--card-bg-color); /* Cells match card */
+        border: 1px solid var(--border-color); border-radius: 4px;
+        text-align: center; cursor: default; font-size: 0.85em;
+        display: flex; flex-direction: column; justify-content: flex-start; /* Align day number top */
+        transition: background-color 0.2s, transform 0.2s;
+        position: relative; /* For status pseudo-elements */
+    }
+    .calendar-day .day-number { font-weight: bold; font-size: 1em; color: var(--text-color); margin-bottom: 5px; }
+    .calendar-day .workout-status { font-size: 0.7em; margin-top: auto; /* Push status to bottom */ padding: 3px; border-radius: 3px; display: block; }
+    
+    .calendar-day.clickable { cursor: pointer; }
+    .calendar-day.clickable:hover { background-color: var(--highlight-color) !important; transform: translateY(-2px); }
+    .calendar-day.clickable:hover .day-number,
+    .calendar-day.clickable:hover .workout-status { color: var(--button-text-color) !important; }
+
+    .calendar-day.completed { background-color: var(--success-bg) !important; } /* Use important if needed */
+    .calendar-day.completed .workout-status { color: var(--success-text); }
+    .calendar-day.skipped { background-color: var(--error-bg) !important; }
+    .calendar-day.skipped .workout-status { color: var(--error-text); }
+    .calendar-day.current { border: 2px solid var(--highlight-color); background-color: var(--secondary-bg); } /* Current day in program */
+    .calendar-day.today { box-shadow: 0 0 0 2px var(--highlight-color) inset; font-weight: bold; } /* Actual today */
+    .calendar-day.other-month .day-number { color: var(--secondary-text); opacity: 0.5; }
+    .calendar-day.other-month { background-color: var(--bg-color); border-color: transparent; }
+    
+    /* Lightbox */
+    .lightbox-overlay {
+        display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background-color: rgba(0,0,0,0.88); z-index: 1000; overflow-y: auto; padding: 20px 0;
+        animation: fadeIn 0.3s;
+    }
+    .lightbox-content {
+        position: relative; width: 90%; max-width: 650px; margin: 5vh auto; /* Vertical centering */
+        background-color: var(--card-bg-color); padding: 25px; border-radius: 8px;
+        box-shadow: 0 5px 25px rgba(0,0,0,0.4);
+    }
+    .lightbox-close {
+        position: absolute; top: 10px; right: 15px; background: none; border: none;
+        color: var(--text-color); font-size: 30px; cursor: pointer; line-height: 1;
+        padding: 0; width:auto; min-width:auto;
+    }
+    .lightbox-close:hover { color: var(--highlight-text); }
+    .lightbox-title { color: var(--highlight-text); margin-top: 0; margin-bottom: 10px; padding-right: 30px; border-bottom: 1px solid var(--border-color); padding-bottom:10px; }
+    .lightbox-workout-details { white-space: pre-wrap; line-height: 1.6; color: var(--text-color); background: var(--bg-color); padding: 15px; border-radius: 4px; margin: 15px 0; max-height: 300px; overflow-y: auto;}
+    .lightbox-status { font-size: 0.9em; padding: 5px 10px; border-radius: 4px; display:inline-block; margin:10px 0;}
+    .lightbox-status.completed { background-color: var(--success-bg); color: var(--success-text); }
+    .lightbox-status.skipped { background-color: var(--error-bg); color: var(--error-text); }
+    .lightbox-rating .stars { color: var(--highlight-text); font-size: 1.5em; letter-spacing: 3px; margin-bottom: 5px; }
+    .lightbox-rating .rating-text { font-size: 0.9em; }
+    .lightbox-notes-section { margin-top:15px; background:var(--bg-color); padding:15px; border-radius:4px;}
+    .lightbox-notes-section .notes-title { font-size: 1.1em; color: var(--highlight-text); margin-bottom: 8px; }
+    .lightbox-notes-section .notes-content { font-size: 0.95em; color: var(--text-color); }
+    .lightbox-notes-section .notes-date { font-size: 0.8em; color: var(--secondary-text); margin-top:5px; }
+
+    /* Profile Tab Specifics */
+    .profile-card .profile-section { margin-bottom: 25px; padding-bottom: 20px; border-bottom: 1px solid var(--border-color); }
+    .profile-card .profile-section:last-child { border-bottom: none; }
+    .profile-card .profile-info-box { background: var(--bg-color); padding: 12px; border-radius: 4px; margin-bottom: 15px; border-left: 3px solid var(--highlight-color); font-size:0.9em; }
+    #profile-status-container { margin-bottom: 15px; }
+    .program-status-card { background: var(--secondary-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; margin-bottom: 15px; }
+    .program-status-card h4 { color: var(--text-color); margin-top: 0; font-size: 1.2em; }
+    .program-phase-info { margin: 10px 0; }
+    .program-phase-info .phase-description { font-size: 0.9em; line-height: 1.5; }
+    .program-progress { margin: 15px 0; }
+    .progress-bar { width: 100%; height: 8px; background: var(--bg-color); border-radius: 4px; overflow: hidden; }
+    .progress-fill { height: 100%; background: var(--highlight-color); border-radius: 4px; transition: width 0.3s ease; }
+    .progress-text { display: block; margin-top: 6px; font-size: 0.85em; }
+    .time-remaining { margin-top:5px; font-size:0.9em; color:var(--secondary-text);}
+    .program-actions .button, .program-actions .secondary-button { margin-top: 5px; width:100%; }
+    .program-actions .action-description {font-size:0.85em; color:var(--secondary-text); margin-top:8px; margin-bottom: 15px; }
+    .event-countdown { background: var(--secondary-bg); padding: 10px; border-radius: 6px; margin-top: 10px; text-align: center; font-weight: bold; font-size:0.95em; }
+
+    /* Logout Button */
+    .logout-button { background-color: #c9302c; color: white; font-size: 0.9em; padding: 8px 15px; }
+    .logout-button:hover { background-color: #a9201c; }
+
+    /* Theme Toggle Button */
+    .theme-toggle-btn {
+        background: none; border: none; font-size: 1.6rem; cursor: pointer;
+        color: var(--highlight-text); padding: 0 5px; margin-left: 10px;
+        transition: transform 0.2s ease;
+        line-height: 1; /* Better vertical alignment */
+    }
+    .theme-toggle-btn:hover { transform: scale(1.15); }
+    .light-theme .theme-toggle-btn { color: var(--heading-color); }
+
+ 
+
+
+    /* Modal styles (re-used from Registration for program change) */
+    .modal { display: none; position: fixed; z-index: 1001; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.75); overflow: auto; }
+    .modal-content { background-color: var(--card-bg-color); margin: 10vh auto; padding: 0; border: 1px solid var(--border-color); border-radius: 8px; width: 90%; max-width: 600px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); position: relative; }
+    .modal-header { padding: 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+    .modal-header h2 { margin: 0; color: var(--highlight-text); font-size:1.5em; }
+    .modal-close { background: none; border: none; font-size: 28px; color: var(--text-color); cursor: pointer; padding: 0 10px; line-height:1; width:auto; min-width:auto;}
+    .modal-close:hover { color: var(--highlight-text); }
+    .modal-body { padding: 20px; max-height: 60vh; overflow-y:auto;}
+    .schedule-options { margin-bottom: 20px; }
+    .option-cards { display: grid; grid-template-columns: 1fr; gap: 15px; margin-top: 15px; } /* Single column for simplicity here */
+    .option-card { border: 2px solid var(--border-color); border-radius: 6px; padding: 15px; cursor: pointer; transition: all 0.3s ease; }
+    .option-card:hover { border-color: var(--highlight-text); background: var(--secondary-bg); }
+    .option-card input[type="radio"] { margin-right: 10px; vertical-align: middle; }
+    .option-card label { font-weight:normal; color:var(--text-color); cursor:pointer; display:flex; align-items:center;}
+    .option-card h4 { margin: 0 0 8px 0; color: var(--highlight-text); font-size:1.1em; }
+    .option-card p { margin: 0; color: var(--secondary-text); font-size: 0.85em; }
+    .programs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-top: 15px; }
+    .program-card { background: var(--secondary-bg); box-shadow: 0 2px 4px rgba(0,0,0,0.15); border-radius: 6px; padding: 15px; text-align: center; }
+    .program-card h4 { color: var(--text-color); margin-top: 0; font-size:1.1em;}
+    .program-description { color: var(--secondary-text); font-size: 0.85em; margin: 10px 0; min-height: 50px; }
+    .select-program-btn { background: var(--highlight-color); color: var(--button-text-color); border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; transition: all 0.3s ease; font-size:0.9em; width:100%; }
+    .select-program-btn:hover { background: #e0c04b; transform: scale(1.03); }
+
+    /* Share Image Modal */
+    #share-image-modal .lightbox-content { max-width: 500px; text-align:center;}
+    #share-image-preview { max-width: 100%; height: auto; border: 1px solid var(--border-color); border-radius: 4px; margin-bottom: 15px; background-color: var(--bg-color);}
+    #share-image-modal .button-group button { width: auto; flex-grow:0;}
+
+</style>

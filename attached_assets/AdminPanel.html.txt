@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <title>HybridX Admin Panel - Firebase</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <style>
+        /* Basic Admin Panel Styles (combine with your SharedCss) */
+        body { font-family: Arial, sans-serif; margin: 0; background-color: #f0f2f5; color: #333; }
+        .container { max-width: 1300px; margin: 20px auto; padding: 20px; background-color: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1, h2, h3 { color: #1a253c; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 0.9em; }
+        th, td { border: 1px solid #dfe3e8; padding: 10px 12px; text-align: left; }
+        th { background-color: #f5f7fa; font-weight: 600; }
+        .action-btn, button { padding: 8px 12px; margin-right: 5px; cursor: pointer; background-color: #007bff; color: white; border: none; border-radius: 4px; font-size: 0.9em; transition: background-color 0.2s ease; }
+        .action-btn:hover, button:hover { background-color: #0056b3; }
+        button.secondary-btn { background-color: #6c757d; }
+        button.secondary-btn:hover { background-color: #545b62; }
+        button.danger-btn { background-color: #dc3545; }
+        button.danger-btn:hover { background-color: #c82333; }
+        .error { color: #dc3545; font-weight: bold; }
+        .success { color: #28a745; font-weight: bold; }
+        .modal { display: none; position: fixed; z-index: 1050; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); }
+        .modal-content { background-color: #fff; margin: 10% auto; padding: 25px; border: 1px solid #888; width: 80%; max-width: 700px; border-radius: 5px; box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+        .close-btn { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; line-height: 1; }
+        .admin-section { margin-bottom: 35px; padding-bottom: 25px; border-bottom: 1px solid #e9ecef;}
+        .form-group { margin-bottom: 18px; }
+        .form-group label { display: block; margin-bottom: 6px; font-weight: 500;}
+        .form-group input[type="text"], .form-group input[type="password"], .form-group input[type="email"], .form-group input[type="number"], .form-group input[type="url"], .form-group select, .form-group textarea {
+            width: calc(100% - 24px); padding: 10px; border: 1px solid #ced4da; border-radius: 4px; box-sizing: border-box;
+        }
+        .form-group textarea { min-height: 80px; }
+        #admin-auth-message { text-align: center; font-size: 1.2em; padding: 20px; color: #dc3545; background-color: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;}
+        .tabs { display: flex; border-bottom: 2px solid #dee2e6; margin-bottom: 25px;}
+        .tab-button { background: transparent; border: none; border-bottom: 2px solid transparent; padding: 12px 18px; cursor: pointer; margin-right: 5px; font-size: 1em; font-weight: 500; color: #495057; }
+        .tab-button.active { color: #007bff; border-bottom-color: #007bff; font-weight: 600;}
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.5s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .user-details-grid { display: grid; grid-template-columns: auto 1fr; gap: 8px 15px; align-items: center;}
+        .user-details-grid strong { font-weight: 600; }
+        .loading-spinner { border: 4px solid #f3f3f3; border-top: 4px solid #007bff; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 20px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        #file-upload-status { margin-top: 10px; font-style: italic; }
+    </style>
+</head>
+<body>
+    <div class="container" id="admin-container" style="display:none;">
+        <header style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <h1>HybridX Admin Panel (Firebase)</h1>
+            <button onclick="adminLogout()" class="secondary-btn">Logout</button>
+        </header>
+        <div id="admin-message-area" style="margin-bottom:15px;"></div>
+
+        <div class="tabs">
+            <button class="tab-button active" onclick="openTab(event, 'users-tab')"><i class="fas fa-users"></i> User Management</button>
+            <button class="tab-button" onclick="openTab(event, 'programs-tab')"><i class="fas fa-cogs"></i> Program Management</button>
+            <button class="tab-button" onclick="openTab(event, 'diagnostics-tab')"><i class="fas fa-stethoscope"></i> Diagnostics</button>
+        </div>
+
+        <div id="users-tab" class="tab-content active">
+            <h2>Registered Users</h2>
+            <button onclick="loadAdminUsers()"><i class="fas fa-sync-alt"></i> Refresh User List</button>
+            <table id="users-table">
+                <thead><tr><th>Username/Email</th><th>Name</th><th>UserID</th><th>Actions</th></tr></thead>
+                <tbody id="users-table-body"><tr><td colspan="4"><div class="loading-spinner"></div></td></tr></tbody>
+            </table>
+             <div class="admin-section">
+                <h3>Register New Client (Admin)</h3>
+                <div class="form-group"><label for="admin-reg-email">Client Email (becomes username):</label><input type="email" id="admin-reg-email"></div>
+                <div class="form-group"><label for="admin-reg-password">Password:</label><input type="password" id="admin-reg-password"></div>
+                <div class="form-group"><label for="admin-reg-name">Full Name:</label><input type="text" id="admin-reg-name"></div>
+                <div class="form-group"><label for="admin-reg-program">Initial Program ID:</label><select id="admin-reg-program"></select></div>
+                <button onclick="adminRegisterNewClient()"><i class="fas fa-user-plus"></i> Register Client</button>
+            </div>
+        </div>
+
+        <div id="programs-tab" class="tab-content">
+            <div class="admin-section">
+                <h2>Training Program Metadata</h2>
+                <button onclick="loadProgramMetadata()"><i class="fas fa-sync-alt"></i> Refresh Program List</button>
+                <table id="program-metadata-table">
+                    <thead><tr><th>Program ID</th><th>Name</th><th>Description</th><th>Total Weeks</th><th>Available</th><th>Actions</th></tr></thead>
+                    <tbody id="program-metadata-body"><tr><td colspan="6"><div class="loading-spinner"></div></td></tr></tbody>
+                </table>
+                <button onclick="openProgramMetadataModal(null)"><i class="fas fa-plus-circle"></i> Add New Program Metadata</button>
+            </div>
+
+            <div class="admin-section">
+                <h2>Upload Program Content (CSV)</h2>
+                <p>Select a Program ID, then upload a CSV with columns: <code>weekNum</code> (0-indexed), <code>dayNum</code> (0-indexed), <code>title</code>, <code>workoutText</code>, <code>phase</code> (optional, e.g., MAIN, PREP). </p>
+                <div class="form-group">
+                    <label for="upload-program-id-select">Select Program ID for Content Upload:</label>
+                    <select id="upload-program-id-select">
+                        <option value="">-- Load Programs First --</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="program-csv-file">Upload Program CSV:</label>
+                    <input type="file" id="program-csv-file" accept=".csv">
+                </div>
+                <button onclick="handleProgramCsvUpload()"><i class="fas fa-upload"></i> Upload CSV Content</button>
+                <div id="file-upload-status"></div>
+                 <pre id="csv-preview" style="max-height: 200px; overflow: auto; background: #eee; padding: 10px; margin-top:10px; display:none;"></pre>
+            </div>
+        </div>
+        
+        <div id="diagnostics-tab" class="tab-content">
+            <h2>System Diagnostics</h2>
+            <button onclick="runFirestoreConnectionTest()"><i class="fas fa-database"></i> Test Firestore Connection</button>
+            <pre id="diagnostics-output" style="background: #f8f9fa; padding:15px; border-radius:4px; white-space:pre-wrap; border: 1px solid #e9ecef; min-height: 100px;"></pre>
+        </div>
+    </div>
+
+    <div id="admin-auth-message" style="display:none;">
+        <p>Access Denied. You must be an authorized admin to view this page.</p>
+        <p>Please ensure you are logged into the correct Google Account that has admin privileges for this Apps Script project.</p>
+    </div>
+
+    <div id="user-details-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal('user-details-modal')">&times;</span>
+            <h3 id="modal-user-title">User Details</h3>
+            <div id="modal-user-content"><div class="loading-spinner"></div></div>
+            <input type="hidden" id="modal-user-id-store">
+            
+            <h4>Change Program</h4>
+            <div class="form-group"><label for="modal-change-program">Select New Program:</label><select id="modal-change-program"></select></div>
+            <div class="form-group">
+                <label for="modal-schedule-option">Schedule Option:</label>
+                <select id="modal-schedule-option">
+                    <option value="start-fresh">Start Fresh (Week 1, Day 1)</option>
+                    <option value="keep-date">Keep Event Date (Adjust Start)</option>
+                </select>
+            </div>
+            <button onclick="submitAdminChangeProgram()"><i class="fas fa-exchange-alt"></i> Change Program</button>
+
+            <h4>Set Progress</h4>
+            <div class="form-group"><label for="modal-set-week">Target Week (0-indexed):</label><input type="number" id="modal-set-week" min="0"></div>
+            <div class="form-group"><label for="modal-set-day">Target Day (0-indexed):</label><input type="number" id="modal-set-day" min="0" max="6"></div>
+            <button onclick="submitAdminSetProgress()"><i class="fas fa-calendar-check"></i> Set Progress</button>
+        </div>
+    </div>
+
+    <div id="program-metadata-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal('program-metadata-modal')">&times;</span>
+            <h3 id="program-metadata-modal-title">Program Metadata</h3>
+            <input type="hidden" id="program-metadata-doc-id">
+            <div class="form-group"><label for="meta-program-id">Program ID (e.g., BeginnerProgram, cannot change after creation):</label><input type="text" id="meta-program-id"></div>
+            <div class="form-group"><label for="meta-program-name">Display Name:</label><input type="text" id="meta-program-name"></div>
+            <div class="form-group"><label for="meta-program-description">Description:</label><textarea id="meta-program-description"></textarea></div>
+            <div class="form-group"><label for="meta-program-total-weeks">Total Weeks (Main Program):</label><input type="number" id="meta-program-total-weeks" min="1" value="14"></div>
+            <div class="form-group"><label for="meta-program-prep-weeks">Prep Cycle Weeks (optional):</label><input type="number" id="meta-program-prep-weeks" min="0" value="4"></div>
+            <div class="form-group"><label for="meta-program-maint-weeks">Maintenance Cycle Weeks (optional):</label><input type="number" id="meta-program-maint-weeks" min="0" value="4"></div>
+            <div class="form-group"><label for="meta-program-display-order">Display Order (optional):</label><input type="number" id="meta-program-display-order" min="0" value="10"></div>
+            <div class="form-group">
+                <label for="meta-program-available">Is Available for users to select?</label>
+                <select id="meta-program-available"><option value="true">Yes</option><option value="false">No</option></select>
+            </div>
+             <div class="form-group">
+                <label for="meta-program-is-main">Is this a Main Program (for selection lists)?</label>
+                <select id="meta-program-is-main"><option value="true">Yes</option><option value="false">No (e.g. Prep/Maintenance only)</option></select>
+            </div>
+            <button onclick="submitProgramMetadata()"><i class="fas fa-save"></i> Save Program Metadata</button>
+        </div>
+    </div>
+
+    <script>
+        let availableProgramsList = [];
+        let currentEditingUserId = null;
+        let currentEditingProgramMetaId = null;
+
+        // --- General UI ---
+        function showAdminMessage(message, type = 'info', duration = 5000) {
+            const area = document.getElementById('admin-message-area');
+            area.textContent = message;
+            area.className = type; // 'success', 'error', 'info'
+            area.style.display = 'block';
+            if (duration > 0) {
+                setTimeout(() => area.style.display = 'none', duration);
+            }
+        }
+
+        function openTab(evt, tabName) {
+            document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+            document.querySelectorAll('.tab-button').forEach(tb => tb.classList.remove('active'));
+            document.getElementById(tabName).classList.add('active');
+            evt.currentTarget.classList.add('active');
+            // Auto-load content if tab is opened for the first time
+            if (tabName === 'programs-tab' && document.getElementById('program-metadata-body').innerHTML.includes('loading-spinner')) {
+                loadProgramMetadata();
+            } else if (tabName === 'users-tab' && document.getElementById('users-table-body').innerHTML.includes('loading-spinner')) {
+                loadAdminUsers();
+            }
+        }
+        function openModal(modalId) { document.getElementById(modalId).style.display = 'block'; }
+        function closeModal(modalId) { document.getElementById(modalId).style.display = 'none'; currentEditingUserId = null; currentEditingProgramMetaId = null; }
+
+        // --- Auth & Init ---
+        document.addEventListener('DOMContentLoaded', () => {
+            google.script.run
+                .withSuccessHandler(isAdmin => {
+                    if (isAdmin) {
+                        document.getElementById('admin-container').style.display = 'block';
+                        document.getElementById('admin-auth-message').style.display = 'none';
+                        loadAdminUsers(); // Load users for the first tab
+                        loadAvailableProgramsForSelect('admin-reg-program'); // For new client registration
+                        loadAvailableProgramsForSelect('upload-program-id-select'); // For CSV upload section
+                        openTab({currentTarget: document.querySelector('.tab-button.active')}, 'users-tab');
+                    } else {
+                        document.getElementById('admin-container').style.display = 'none';
+                        document.getElementById('admin-auth-message').style.display = 'block';
+                    }
+                })
+                .withFailureHandler(err => {
+                     document.getElementById('admin-auth-message').innerHTML = `<p>Error checking admin status: ${err.message || err}. Please ensure you are logged into the correct Google Account and have authorized the script.</p>`;
+                     document.getElementById('admin-auth-message').style.display = 'block';
+                })
+                .isAdminUser();
+        });
+
+        function adminLogout() {
+            // For Apps Script web app, logout is managed by Google session.
+            // This button can inform the user or try to redirect to a Google logout URL if needed.
+            showAdminMessage("To logout, please close this browser tab or sign out of your Google account.", "info", 0);
+            // Potentially: window.open('https://accounts.google.com/Logout', '_blank');
+        }
+
+
+        // --- User Management ---
+        function loadAdminUsers() {
+            const tbody = document.getElementById('users-table-body');
+            tbody.innerHTML = '<tr><td colspan="4"><div class="loading-spinner"></div></td></tr>';
+            google.script.run
+                .withSuccessHandler(response => {
+                    tbody.innerHTML = '';
+                    if (response.success && response.users) {
+                        if (response.users.length === 0) {
+                            tbody.innerHTML = '<tr><td colspan="4">No users found.</td></tr>'; return;
+                        }
+                        response.users.forEach(user => {
+                            const row = tbody.insertRow();
+                            row.insertCell().textContent = user.email || user.username; // Prefer email as username
+                            row.insertCell().textContent = user.name || 'N/A';
+                            row.insertCell().textContent = user.userId;
+                            const actionsCell = row.insertCell();
+                            actionsCell.innerHTML = `<button class="action-btn" onclick="viewUserDetails('${user.userId}')"><i class="fas fa-eye"></i> View/Edit</button>`;
+                        });
+                    } else {
+                        tbody.innerHTML = `<tr><td colspan="4" class="error">${response.message || 'Failed to load users.'}</td></tr>`;
+                    }
+                })
+                .withFailureHandler(err => {
+                    tbody.innerHTML = `<tr><td colspan="4" class="error">Error loading users: ${err.message || err}</td></tr>`;
+                })
+                .adminGetAllUsersFirebase(); // Switched to Firebase function
+        }
+
+        function viewUserDetails(userId) {
+            currentEditingUserId = userId;
+            document.getElementById('modal-user-id-store').value = userId;
+            const modalContent = document.getElementById('modal-user-content');
+            modalContent.innerHTML = '<div class="loading-spinner"></div>';
+            openModal('user-details-modal');
+
+            google.script.run
+                .withSuccessHandler(response => {
+                    if (response.success && response.userDetails) {
+                        const details = response.userDetails;
+                        document.getElementById('modal-user-title').textContent = `Details for ${details.name || details.userId}`;
+                        let html = '<div class="user-details-grid">';
+                        html += `<strong>UserID:</strong><span>${details.userId}</span>`;
+                        html += `<strong>Email:</strong><span>${details.email || 'N/A'}</span>`;
+                        html += `<strong>Name:</strong><span>${details.name || 'N/A'}</span>`;
+                        html += `<strong>Current Program:</strong><span>${details.programName || 'N/A'} (${details.programPhase || 'N/A'})</span>`;
+                        html += `<strong>Current Progress:</strong><span>Week ${details.currentWeek !== undefined ? details.currentWeek + 1 : 'N/A'}, Day ${details.currentDay !== undefined ? details.currentDay + 1 : 'N/A'}</span>`;
+                        html += `<strong>Event Date:</strong><span>${details.eventDate ? new Date(details.eventDate).toLocaleDateString() : 'N/A'}</span>`;
+                        // ... add other relevant fields from userDetails ...
+                        html += '</div>';
+                        modalContent.innerHTML = html;
+                        
+                        loadAvailableProgramsForSelect('modal-change-program', details.programName);
+                        document.getElementById('modal-set-week').value = details.currentWeek !== undefined ? details.currentWeek : '';
+                        document.getElementById('modal-set-day').value = details.currentDay !== undefined ? details.currentDay : '';
+                    } else {
+                        modalContent.innerHTML = `<p class="error">${response.message || 'Failed to load details.'}</p>`;
+                    }
+                })
+                .withFailureHandler(err => {
+                     modalContent.innerHTML = `<p class="error">Error: ${err.message || err}</p>`;
+                })
+                .adminGetUserDetailsFirebase(userId); // Switched
+        }
+        
+        function submitAdminChangeProgram() {
+            const userId = document.getElementById('modal-user-id-store').value;
+            const newProgramId = document.getElementById('modal-change-program').value;
+            const scheduleOption = document.getElementById('modal-schedule-option').value;
+            if (!userId || !newProgramId) { showAdminMessage("User ID or Program ID missing.", "error"); return; }
+            showAdminMessage("Changing program...", "info", 0);
+            google.script.run
+                .withSuccessHandler(response => {
+                    showAdminMessage(response.message, response.success ? "success" : "error");
+                    if (response.success) { closeModal('user-details-modal'); loadAdminUsers(); }
+                })
+                .withFailureHandler(err => showAdminMessage("Error: " + (err.message || err), "error"))
+                .adminChangeUserProgramFirebase(userId, newProgramId, scheduleOption); // Switched
+        }
+
+        function submitAdminSetProgress() {
+            const userId = document.getElementById('modal-user-id-store').value;
+            const week = document.getElementById('modal-set-week').value;
+            const day = document.getElementById('modal-set-day').value;
+            if (!userId || week === '' || day === '') { showAdminMessage("User ID, week, or day missing.", "error"); return; }
+            showAdminMessage("Setting progress...", "info", 0);
+            google.script.run
+                .withSuccessHandler(response => {
+                    showAdminMessage(response.message, response.success ? "success" : "error");
+                    if (response.success) { closeModal('user-details-modal'); loadAdminUsers(); }
+                })
+                .withFailureHandler(err => showAdminMessage("Error: " + (err.message || err), "error"))
+                .adminSetUserProgressFirebase(userId, parseInt(week), parseInt(day)); // Switched
+        }
+
+        function adminRegisterNewClient() {
+            const clientData = {
+                email: document.getElementById('admin-reg-email').value.trim(),
+                password: document.getElementById('admin-reg-password').value,
+                name: document.getElementById('admin-reg-name').value.trim(),
+                programId: document.getElementById('admin-reg-program').value
+            };
+            if (!clientData.email || !clientData.password || !clientData.name || !clientData.programId) {
+                showAdminMessage("All fields are required for client registration.", "error"); return;
+            }
+             if (!/\S+@\S+\.\S+/.test(clientData.email)) { // Basic email validation
+                showAdminMessage("Please enter a valid email address.", "error"); return;
+            }
+            showAdminMessage("Registering client...", "info", 0);
+            google.script.run
+                .withSuccessHandler(response => {
+                    showAdminMessage(response.message, response.success ? "success" : "error");
+                    if (response.success) {
+                        document.getElementById('admin-reg-email').value = '';
+                        document.getElementById('admin-reg-password').value = '';
+                        document.getElementById('admin-reg-name').value = '';
+                        loadAdminUsers();
+                    }
+                })
+                .withFailureHandler(err => showAdminMessage("Error registering client: " + (err.message || err), "error"))
+                .adminRegisterClientFirebase(clientData); // Switched
+        }
+
+        // --- Program Management ---
+        function loadProgramMetadata() {
+            const tbody = document.getElementById('program-metadata-body');
+            tbody.innerHTML = '<tr><td colspan="6"><div class="loading-spinner"></div></td></tr>';
+            google.script.run
+                .withSuccessHandler(response => {
+                    tbody.innerHTML = '';
+                    if (response.success && response.programs) {
+                        availableProgramsList = response.programs; // Cache for dropdowns
+                        populateProgramSelect('upload-program-id-select', availableProgramsList);
+                        if (response.programs.length === 0) {
+                            tbody.innerHTML = '<tr><td colspan="6">No program metadata found. Add one below.</td></tr>'; return;
+                        }
+                        response.programs.forEach(p => {
+                            const row = tbody.insertRow();
+                            row.insertCell().textContent = p.id;
+                            row.insertCell().textContent = p.name;
+                            row.insertCell().textContent = p.description || 'N/A';
+                            row.insertCell().textContent = p.totalWeeks || 'N/A';
+                            row.insertCell().innerHTML = p.isAvailable ? '<i class="fas fa-check-circle" style="color:green;"></i> Yes' : '<i class="fas fa-times-circle" style="color:red;"></i> No';
+                            const actionsCell = row.insertCell();
+                            actionsCell.innerHTML = `<button class="action-btn" onclick="openProgramMetadataModal('${p.id}')"><i class="fas fa-edit"></i> Edit</button> <button class="danger-btn action-btn" onclick="deleteProgramMetadata('${p.id}', '${p.name}')"><i class="fas fa-trash-alt"></i> Delete</button>`;
+                        });
+                    } else {
+                         tbody.innerHTML = `<tr><td colspan="6" class="error">${response.message || 'Failed to load programs.'}</td></tr>`;
+                    }
+                })
+                .withFailureHandler(err => {
+                     tbody.innerHTML = `<tr><td colspan="6" class="error">Error: ${err.message || err}</td></tr>`;
+                })
+                .adminGetProgramMetadataList(); // New server function
+        }
+
+        function openProgramMetadataModal(programId) {
+            currentEditingProgramMetaId = programId;
+            const modal = document.getElementById('program-metadata-modal');
+            document.getElementById('program-metadata-doc-id').value = programId || '';
+            document.getElementById('meta-program-id').readOnly = !!programId; // Cannot change ID if editing
+
+            if (programId) {
+                document.getElementById('program-metadata-modal-title').textContent = "Edit Program Metadata";
+                const program = availableProgramsList.find(p => p.id === programId);
+                if (program) {
+                    document.getElementById('meta-program-id').value = program.id;
+                    document.getElementById('meta-program-name').value = program.name || '';
+                    document.getElementById('meta-program-description').value = program.description || '';
+                    document.getElementById('meta-program-total-weeks').value = program.totalWeeks || 14;
+                    document.getElementById('meta-program-prep-weeks').value = program.prepCycleWeeks || 4;
+                    document.getElementById('meta-program-maint-weeks').value = program.maintenanceCycleWeeks || 4;
+                    document.getElementById('meta-program-display-order').value = program.displayOrder || 10;
+                    document.getElementById('meta-program-available').value = program.isAvailable !== undefined ? String(program.isAvailable) : "true";
+                    document.getElementById('meta-program-is-main').value = program.isMainProgram !== undefined ? String(program.isMainProgram) : "true";
+                } else {
+                    showAdminMessage("Could not find program details to edit.", "error"); return;
+                }
+            } else {
+                document.getElementById('program-metadata-modal-title').textContent = "Add New Program Metadata";
+                document.getElementById('meta-program-id').value = '';
+                document.getElementById('meta-program-name').value = '';
+                document.getElementById('meta-program-description').value = '';
+                document.getElementById('meta-program-total-weeks').value = 14;
+                document.getElementById('meta-program-prep-weeks').value = 4;
+                document.getElementById('meta-program-maint-weeks').value = 4;
+                document.getElementById('meta-program-display-order').value = 10;
+                document.getElementById('meta-program-available').value = "true";
+                document.getElementById('meta-program-is-main').value = "true";
+            }
+            openModal('program-metadata-modal');
+        }
+
+        function submitProgramMetadata() {
+            const docId = document.getElementById('program-metadata-doc-id').value; // Empty if new
+            const programId = document.getElementById('meta-program-id').value.trim();
+            if (!programId && !docId) { showAdminMessage("Program ID is required for new programs.", "error"); return; }
+
+            const metadata = {
+                id: docId || programId, // Use existing docId if editing, otherwise new programId
+                name: document.getElementById('meta-program-name').value.trim(),
+                description: document.getElementById('meta-program-description').value.trim(),
+                totalWeeks: parseInt(document.getElementById('meta-program-total-weeks').value) || 14,
+                prepCycleWeeks: parseInt(document.getElementById('meta-program-prep-weeks').value) || 0,
+                maintenanceCycleWeeks: parseInt(document.getElementById('meta-program-maint-weeks').value) || 0,
+                displayOrder: parseInt(document.getElementById('meta-program-display-order').value) || 10,
+                isAvailable: document.getElementById('meta-program-available').value === "true",
+                isMainProgram: document.getElementById('meta-program-is-main').value === "true",
+            };
+            if (!metadata.name) { showAdminMessage("Program Name is required.", "error"); return; }
+
+            showAdminMessage("Saving program metadata...", "info", 0);
+            google.script.run
+                .withSuccessHandler(response => {
+                    showAdminMessage(response.message, response.success ? "success" : "error");
+                    if (response.success) {
+                        closeModal('program-metadata-modal');
+                        loadProgramMetadata(); // Refresh list
+                        loadAvailableProgramsForSelect('admin-reg-program'); // Refresh dropdowns
+                        loadAvailableProgramsForSelect('upload-program-id-select');
+                    }
+                })
+                .withFailureHandler(err => showAdminMessage("Error: " + (err.message || err), "error"))
+                .adminSaveProgramMetadata(metadata, !docId); // Pass isNew flag
+        }
+
+        function deleteProgramMetadata(programId, programName) {
+            if (!confirm(`Are you sure you want to delete program metadata for "${programName}" (ID: ${programId})? This does NOT delete the workout content, only the metadata entry.`)) return;
+            showAdminMessage("Deleting program metadata...", "info", 0);
+            google.script.run
+                .withSuccessHandler(response => {
+                    showAdminMessage(response.message, response.success ? "success" : "error");
+                    if (response.success) {
+                        loadProgramMetadata();
+                        loadAvailableProgramsForSelect('admin-reg-program');
+                        loadAvailableProgramsForSelect('upload-program-id-select');
+                    }
+                })
+                .withFailureHandler(err => showAdminMessage("Error: " + (err.message || err), "error"))
+                .adminDeleteProgramMetadata(programId);
+        }
+
+        function handleProgramCsvUpload() {
+            const fileInput = document.getElementById('program-csv-file');
+            const programId = document.getElementById('upload-program-id-select').value;
+            const statusDiv = document.getElementById('file-upload-status');
+            const csvPreview = document.getElementById('csv-preview');
+
+            if (!programId) {
+                statusDiv.textContent = 'Please select a Program ID first.';
+                statusDiv.className = 'error'; return;
+            }
+            if (fileInput.files.length === 0) {
+                statusDiv.textContent = 'Please select a CSV file to upload.';
+                statusDiv.className = 'error'; return;
+            }
+
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+            statusDiv.textContent = 'Reading file...'; statusDiv.className = 'info';
+            csvPreview.style.display = 'none'; csvPreview.textContent = '';
+
+            reader.onload = function(event) {
+                const csvData = event.target.result;
+                // Display a preview of the CSV
+                const lines = csvData.split('\n');
+                csvPreview.textContent = lines.slice(0, 10).join('\n') + (lines.length > 10 ? '\n...' : '');
+                csvPreview.style.display = 'block';
+
+                if (!confirm(`Proceed with uploading ${lines.length -1} workout entries from "${file.name}" to program "${programId}"? Check console for parsing details if needed.`)) {
+                    statusDiv.textContent = 'Upload cancelled by user.'; statusDiv.className = 'info';
+                    return;
+                }
+
+                statusDiv.textContent = 'Uploading... this may take a moment for large files.';
+                google.script.run
+                    .withSuccessHandler(response => {
+                        statusDiv.textContent = response.message;
+                        statusDiv.className = response.success ? 'success' : 'error';
+                        if (response.details) {
+                             csvPreview.textContent = `Upload Details:\n${response.details}`;
+                        }
+                        fileInput.value = ''; // Clear file input
+                    })
+                    .withFailureHandler(err => {
+                        statusDiv.textContent = 'Upload failed: ' + (err.message || err);
+                        statusDiv.className = 'error';
+                    })
+                    .adminUploadProgramContentCsv(programId, csvData);
+            };
+            reader.onerror = function() {
+                statusDiv.textContent = 'Error reading file.'; statusDiv.className = 'error';
+            };
+            reader.readAsText(file);
+        }
+
+        function loadAvailableProgramsForSelect(selectElementId, currentProgramId = null) {
+            const selectEl = document.getElementById(selectElementId);
+            if (!selectEl) return;
+            selectEl.innerHTML = '<option value="">Loading Programs...</option>';
+
+            const programsPromise = (availableProgramsList && availableProgramsList.length > 0)
+                ? Promise.resolve(availableProgramsList)
+                : new Promise((resolve, reject) => {
+                    google.script.run
+                        .withSuccessHandler(response => {
+                            if (response.success && response.programs) {
+                                availableProgramsList = response.programs; // Cache
+                                resolve(response.programs);
+                            } else {
+                                reject(new Error(response.message || "Failed to load programs"));
+                            }
+                        })
+                        .withFailureHandler(err => reject(err))
+                        .adminGetProgramMetadataList(); // Using the metadata list
+                  });
+
+            programsPromise.then(programs => {
+                selectEl.innerHTML = '<option value="">-- Select a Program --</option>'; // Default empty option
+                programs.forEach(p => {
+                    const option = document.createElement('option');
+                    option.value = p.id;
+                    option.textContent = `${p.name} (ID: ${p.id})`;
+                    if (currentProgramId && p.id === currentProgramId) {
+                        option.selected = true;
+                    }
+                    selectEl.appendChild(option);
+                });
+            }).catch(err => {
+                selectEl.innerHTML = `<option value="">Error loading: ${err.message || err}</option>`;
+            });
+        }
+        function populateProgramSelect(selectId, programs, currentProgramId = null) {
+            const selectEl = document.getElementById(selectId);
+            if (!selectEl) return;
+            selectEl.innerHTML = '<option value="">-- Select Program --</option>';
+            programs.forEach(p => {
+                const option = document.createElement('option');
+                option.value = p.id;
+                option.textContent = p.name + (p.id ? ` (${p.id})` : '');
+                if (currentProgramId && p.id === currentProgramId) {
+                    option.selected = true;
+                }
+                selectEl.appendChild(option);
+            });
+        }
+
+
+        // --- Diagnostics ---
+        function runFirestoreConnectionTest() {
+            const outputEl = document.getElementById('diagnostics-output');
+            outputEl.textContent = 'Testing Firestore connection...';
+            google.script.run
+                .withSuccessHandler(response => {
+                    outputEl.textContent = `Test Result:\nSuccess: ${response.success}\nMessage: ${response.message || 'N/A'}\n`;
+                    if(response.details) {
+                        outputEl.textContent += `Details:\n${JSON.stringify(response.details, null, 2)}`;
+                    }
+                })
+                .withFailureHandler(err => outputEl.textContent = 'Test failed: ' + (err.message || err))
+                .adminTestFirestoreConnection(); // New server function
+        }
+
+    </script>
+</body>
+</html>

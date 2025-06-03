@@ -1,0 +1,2634 @@
+<!DOCTYPE html>
+<html>
+<head>
+<base target="_top">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HybridX Training Platform</title>
+<?!= include('SharedCss'); ?>
+<!-- Using Font Awesome for icons, include if you want them -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+<!-- html2canvas for image sharing -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<!-- Firebase v9 SDK -->
+<script type="module">
+  // Import the functions you need from the SDKs you need
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js';
+  import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js';
+
+  // Your Firebase config
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "your-project.firebaseapp.com", 
+    projectId: "your-project-id",
+    storageBucket: "your-project.appspot.com",
+    messagingSenderId: "123456789",
+    appId: "your-app-id"
+  };
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+
+  // Make auth available globally
+  window.firebaseAuth = auth;
+  window.signInWithEmailAndPassword = signInWithEmailAndPassword;
+  window.createUserWithEmailAndPassword = createUserWithEmailAndPassword;
+  window.onAuthStateChanged = onAuthStateChanged;
+  window.signOut = signOut;
+</script>
+<style>
+  /* Make tabs more responsive */
+  .tabs {
+    display: flex;
+    width: 100%;
+    overflow: hidden;
+  }
+  
+  .tab {
+    flex: 1;
+    text-align: center;
+    white-space: nowrap;
+    padding: 12px 8px;
+  }
+  
+  /* Mobile adjustments */
+  @media (max-width: 600px) {
+    .tab {
+      padding: 10px 5px;
+      font-size: 14px;
+    }
+    
+    /* Hide icons on very small screens */
+    @media (max-width: 400px) {
+      .tab i {
+        display: none;
+      }
+      
+      .tab {
+        padding: 10px 2px;
+        font-size: 13px;
+      }
+    }
+  }
+
+     /* Full screen app loading */
+
+      #app-loading {
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+          height: 100vh;
+          width: 100%;
+          position: fixed;
+          top: 0;
+          left: 0;
+          background: var(--bg-color);
+          z-index: 2000; /* High z-index */
+      }
+
+   
+        #app-loading img {
+            max-width: 150px; /* Adjust the size as needed */
+            max-height: 150px; /* Ensure the image doesn't get too large */
+            width: auto;
+            height: auto;
+            margin-bottom: 20px;
+}
+
+      #app-loading p {
+          color: var(--text-color);
+          margin-top: 10px;
+      }
+
+      #app-content {
+          display: none; /* Hidden until app-loading is removed */
+}
+</style>
+
+</head>
+<body>
+<!-- App Loading Overlay -->
+<div id="app-loading" style="display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; width: 100%; position: fixed; top: 0; left:0; background: var(--bg-color); z-index: 2000;">
+<img id="app-logo" src="https://i.imgur.com/q22Iowu.png" alt="HybridX Logo" style="max-width: 150px; max-height: 150px;">
+<div class="spinner"></div>
+<p>Loading HybridX Platform...</p>
+</div>
+
+<!-- Error Overlay for Fatal Errors -->
+<div id="error-overlay" class="error-overlay" style="display:none;">
+  <div class="error-container">
+    <h2>Error</h2>
+    <p id="fatal-error-message">An error occurred</p>
+    <button onclick="location.reload()">Refresh Page</button>
+  </div>
+</div>
+
+<!-- Main App Content (hidden initially) -->
+<div id="app-content" style="display:none;">
+<header>
+<h1>HybridX Training</h1>
+<button id="theme-toggle-btn" class="theme-toggle-btn" title="Toggle Theme">🌙</button>
+</header>
+<div class="container">
+  <!-- General Error Message Container -->
+  <div id="general-error-message" class="message error-message" style="display:none; margin-bottom: 20px;"></div>
+
+<!-- Login View -->
+<div id="login-view" class="card" style="display:none;">
+<img src="https://i.imgur.com/q22Iowu.png" alt="HybridX Logo" class="logo-img">
+<h2 style="text-align:center;">Client Login</h2>
+<div class="form-group">
+<label for="username">Username</label>
+<input type="text" id="username" name="username">
+</div>
+<div class="form-group">
+<label for="password">Password</label>
+<input type="password" id="password" name="password">
+
+</div>
+<button class="button login-button" type="button" onclick="handleLogin()">Log In</button>
+<div style="text-align: center; margin-top: 15px; font-size:0.9em;">
+<a href="#" onclick="showForgotPasswordPage(); return false;" class="forgot-link">Forgot Password?</a>
+<span style="margin: 0 10px; color:var(--secondary-text);">|</span>
+
+<a href="<?= getScriptUrl() ?>?page=register" class="forgot-link" target="_blank">New User? Register</a>
+
+</div>
+<div id="login-error" class="message error-message"></div>
+<div id="login-loading" class="loading"><div class="spinner"></div><p>Logging in...</p></div>
+</div>
+<!-- Dashboard View -->
+<div id="dashboard-view" style="display: none;">
+<div class="user-info">
+<div><strong>Client</strong><span id="user-name-display">User</span></div>
+<div><strong>Program</strong><span id="user-program-name-display">N/A</span></div>
+<div><strong>Phase</strong><span id="user-program-phase-display" class="phase-indicator">N/A</span></div>
+<div><strong>Week</strong><span id="user-current-week-display">N/A</span></div>
+<div><strong>Day</strong><span id="user-current-day-display">N/A</span></div>
+</div>
+<div class="tabs">
+<div class="tab active" onclick="showTab('workout')"><i class="fas fa-dumbbell"></i> Today's Workout</div>
+<div class="tab" onclick="showTab('calendar')"><i class="fas fa-calendar-alt"></i> Calendar</div>
+<div class="tab" onclick="showTab('profile')"><i class="fas fa-user-circle"></i> My Profile</div>
+</div>
+<!-- Workout Tab -->
+<div id="workout-tab" class="tab-content active">
+<div class="card workout-card">
+<h3 id="workout-title" class="workout-title">Today's Workout</h3>
+<div id="workout-date" class="workout-date"></div>
+<div id="workout-content" class="workout-content">Loading workout...</div>
+
+<fieldset class="rating-group">
+<legend>How did this workout feel?</legend>
+<div class="rating-options">
+<input type="radio" id="rating-5" name="workout-rating" value="5" checked><label for="rating-5"><i class="fas fa-grin-stars"></i> Great</label>
+<input type="radio" id="rating-4" name="workout-rating" value="4"><label for="rating-4"><i class="fas fa-smile"></i> Good</label>
+<input type="radio" id="rating-3" name="workout-rating" value="3"><label for="rating-3"><i class="fas fa-meh"></i> Average</label>
+<input type="radio" id="rating-2" name="workout-rating" value="2"><label for="rating-2"><i class="fas fa-frown"></i> Difficult</label>
+<input type="radio" id="rating-1" name="workout-rating" value="1"><label for="rating-1"><i class="fas fa-tired"></i> Very Hard</label>
+</div>
+</fieldset>
+<textarea id="workout-notes" placeholder="Add any notes, PBs, or how you felt..."></textarea>
+<div class="button-group">
+<button onclick="handleCompleteWorkout()"><i class="fas fa-check-circle"></i> Mark Complete</button>
+<button class="secondary-button" onclick="handleSkipWorkout()"><i class="fas fa-forward"></i> Skip Workout</button>
+<button id="share-workout-btn" class="secondary-button" style="background-color: #5851DB; color:white;">
+<i class="fas fa-share-alt"></i> Share
+</button>
+</div>
+<div id="workout-message" class="message" style="margin-top:15px;"></div>
+</div>
+</div>
+<!-- Calendar Tab -->
+<div id="calendar-tab" class="tab-content">
+<div class="card calendar-card">
+<h2>Program Calendar</h2>
+<div id="calendar-controls">
+<button onclick="changeMonth(-1)" title="Previous Month"><i class="fas fa-chevron-left"></i></button>
+<select id="calendar-month-select" onchange="renderFullCalendar()" aria-label="Select Month"></select>
+
+<select id="calendar-year-select" onchange="renderFullCalendar()" aria-label="Select Year"></select>
+<button onclick="changeMonth(1)" title="Next Month"><i class="fas fa-chevron-right"></i></button>
+</div>
+<div id="calendar-grid-header"></div>
+<div id="calendar-grid"><div class="loading"><div class="spinner"></div><p>Loading calendar...</p></div></div>
+</div>
+</div>
+<!-- Profile Tab -->
+<div id="profile-tab" class="tab-content">
+<div class="card profile-card">
+<h2>My Training Profile</h2>
+<div id="profile-loading" class="loading" style="display: block;"><div class="spinner"></div><p>Loading profile...</p></div>
+<div id="profile-content-area" style="display: none;">
+<!-- Profile content will be built by JS -->
+</div>
+<div id="profile-message" class="message" style="margin-top:15px;"></div>
+</div>
+</div>
+<div style="text-align: center; margin-top: 30px;">
+<button class="logout-button" onclick="handleLogout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
+</div>
+</div> <!-- End Dashboard View -->
+<!-- Lightbox for Workout Details -->
+<div id="workout-lightbox" class="lightbox-overlay">
+<div class="lightbox-content">
+<button class="lightbox-close" onclick="closeLightbox()" title="Close">×</button>
+<h3 id="lightbox-title" class="lightbox-title">Workout Details</h3>
+<div id="lightbox-date" class="workout-date" style="font-size:0.9em;"></div>
+<div id="lightbox-phase-indicator" class="phase-indicator" style="margin-bottom:10px; display:inline-block;"></div>
+<div id="lightbox-status" class="lightbox-status" style="display:none;"></div>
+<div id="lightbox-workout-details" class="lightbox-workout-details">Loading...</div>
+<div id="lightbox-rating-display" class="lightbox-rating" style="display:none;"></div>
+<div id="lightbox-notes-section" class="lightbox-notes-section" style="display:none;">
+
+<h4 class="notes-title">Your Notes:</h4>
+<div id="lightbox-notes-content" class="notes-content"></div>
+<div id="lightbox-notes-date" class="notes-date"></div>
+</div>
+<div id="lightbox-actions" class="button-group" style="margin-top:20px;"></div>
+</div>
+</div>
+<!-- Image Sharing Modal -->
+<div id="share-image-modal" class="lightbox-overlay">
+<div class="lightbox-content" style="max-width: 90vw; max-height: 90vh; overflow: auto; padding: 20px;">
+<button class="lightbox-close" onclick="closeShareModal()" title="Close">×</button>
+<h3 class="lightbox-title">Share Your Workout</h3>
+<div style="text-align: center; margin: 15px 0;">
+  <img id="share-image-preview" src="#" alt="Workout Share Image Preview" style="max-width: 100%; height: auto; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+</div>
+<p style="font-size:0.9em; color:var(--secondary-text); margin-bottom:15px; text-align: center;">Download this image to share on Instagram or other platforms.</p>
+<div class="button-group" style="justify-content:center; margin-top: 20px;">
+<button id="download-share-image-btn" class="button"><i class="fas fa-download"></i> Download Image</button>
+</div>
+</div>
+</div>
+<!-- Program Modals (for profile tab, HTML structure defined in JS for now) -->
+<div id="program-selection-modal" class="modal"></div>
+<!-- Note: change-program-modal might be merged into program-selection-modal logic -->
+
+<!-- Program Completion Modal -->
+<div id="program-completion-modal" class="lightbox-overlay" style="display:none;">
+  <div class="lightbox-content">
+    <!-- No close button, user must make a choice -->
+    <h3 class="lightbox-title">Congratulations!</h3>
+    <p>You've successfully completed your training program: <strong id="completed-program-name"></strong>!</p>
+    <p>What would you like to do next?</p>
+
+    <div id="completion-options">
+      <h4>Option 1: Continue with a Maintenance Phase</h4>
+      <p>Select a maintenance focus:</p>
+      <div class="program-options-grid" id="maintenance-program-options">
+        <!-- Maintenance programs will be loaded here by JS -->
+        <div class="loading"><div class="spinner"></div><p>Loading maintenance options...</p></div>
+      </div>
+
+      <h4>Option 2: Start a New Full Training Program</h4>
+      <button class="button" onclick="handleStartNewMainProgramChoice()">
+        <i class="fas fa-play-circle"></i> Choose a New Program & Set Event
+      </button>
+    </div>
+    <div id="completion-loading" class="loading" style="display:none;"><div class="spinner"></div><p>Processing...</p></div>
+    <div id="completion-message" class="message" style="margin-top:15px;"></div>
+  </div>
+</div>
+
+</div>
+<footer>
+<p>HybridX Training - Elevate Your Fitness</p>
+<p><a href="https://www.hybridx.club/" target="_blank">www.hybridx.club</a></p>
+</footer>
+</div>
+<script>
+  console.log("🚀 Script loading started...");
+
+// Add this function and call it if stuck
+function emergencyDebug() {
+  debugAppState(); // From the artifact above
+}
+// --- GLOBAL VARIABLES ---
+let currentSession = null;
+let currentWorkoutDetails = null;
+let calendarViewDate = new Date();
+let workoutHistoryCache = null;
+let availableProgramsCache = null;
+let userProfileDataCache = null;
+let currentProgramChangeAction = null;
+const THEME_STORAGE_KEY = 'hybridx-theme';
+const SESSION_STORAGE_KEY = 'hybridx-session';
+const COOKIE_SESSION_KEY = 'hybridxSessionCookie';
+const PREP_CYCLE_WEEKS = 4;
+const MAINTENANCE_CYCLE_WEEKS = 4;
+const MAIN_PROGRAM_WEEKS_CONST = 14;
+const HYROX_PROGRAMS_CLIENT = {
+  "BeginnerProgram": { name: "Complete Beginner 14-Week Program", totalWeeks: 14 },
+  "IntermediateProgram": { name: "Intermediate Performance 14-Week Program", totalWeeks: 14 },
+  "AdvancedProgram": { name: "Advanced Competitor 14-Week Program", totalWeeks: 14 },
+  "RunnerProgram": { name: "Running Improvement 14-Week Program", totalWeeks: 14 },
+  "StrengthProgram": { name: "Strength Development 14-Week Program", totalWeeks: 14 },
+  "MaintenanceProgram": { name: "General Maintenance Program", totalWeeks: 4 },
+  "PrepStrength": { name: "Prep - Strength Focus", totalWeeks: PREP_CYCLE_WEEKS },
+  "PrepRunning": { name: "Prep - Running Focus", totalWeeks: PREP_CYCLE_WEEKS },
+  "PrepHyrox": { name: "Prep - HYROX Balanced", totalWeeks: PREP_CYCLE_WEEKS },
+  "MaintainStrength": { name: "Maintenance - Strength Focus", totalWeeks: MAINTENANCE_CYCLE_WEEKS },
+  "MaintainRunning": { name: "Maintenance - Running Focus", totalWeeks: MAINTENANCE_CYCLE_WEEKS },
+  "MaintainHyrox": { name: "Maintenance - HYROX Balanced", totalWeeks: MAINTENANCE_CYCLE_WEEKS },
+  "DoublesProgram": { name: "HYROX Doubles/Relay Program", totalWeeks: 14}
+};
+
+// --- UTILITY FUNCTIONS ---
+
+// Safe DOM element access functions
+function getElement(id, fallbackValue = null) {
+  const element = document.getElementById(id);
+  if (!element) {
+    console.warn(`Element with id '${id}' not found`);
+    return fallbackValue;
+  }
+  return element;
+}
+
+function updateElementContent(id, content, defaultContent = '') {
+  const element = getElement(id);
+  if (element) {
+    element.textContent = content || defaultContent;
+    return true;
+  }
+  return false;
+}
+
+function updateElementHTML(id, html, defaultHTML = '') {
+  const element = getElement(id);
+  if (element) {
+    element.innerHTML = html || defaultHTML;
+    return true;
+  }
+  return false;
+}
+
+function updateElementVisibility(id, isVisible) {
+  const element = getElement(id);
+  if (element) {
+    element.style.display = isVisible ? 'block' : 'none';
+    return true;
+  }
+  return false;
+}
+
+function showGeneralError(message) {
+  const el = getElement('general-error-message');
+  if (el) {
+    el.textContent = message;
+    el.className = 'message error-message';
+    el.style.display = 'block';
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  } else {
+    console.error("showGeneralError: #general-error-message element not found. Message:", message);
+    alert(message); // Fallback
+  }
+}
+
+function hideGeneralError() {
+  const el = getElement('general-error-message');
+  if (el) el.style.display = 'none';
+}
+
+function showFatalError(message) {
+  console.error("FATAL ERROR:", message);
+  
+  // Hide loading and app content
+  updateElementVisibility('app-loading', false);
+  updateElementVisibility('app-content', false);
+  
+  // Show error overlay
+  const errorMessage = getElement('fatal-error-message');
+  if (errorMessage) errorMessage.textContent = message;
+  
+  const errorOverlay = getElement('error-overlay');
+  if (errorOverlay) errorOverlay.style.display = 'flex';
+}
+
+function displayMessage(elementId, message, isSuccess = true) {
+  const el = getElement(elementId);
+  if (el) {
+    el.textContent = message;
+    el.className = isSuccess ? 'message success-message' : 'message error-message';
+    el.style.display = message ? 'block' : 'none';
+    if (isSuccess && message) {
+      setTimeout(() => { 
+        if (el.textContent === message) el.style.display = 'none'; 
+      }, 5000);
+    }
+  } else {
+    console.warn(`displayMessage: Element with ID "${elementId}" not found.`);
+  }
+}
+
+function validateEmail(email) { 
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).toLowerCase()); 
+}
+
+function formatDate(dateStringOrObject, style = 'long') {
+  if (!dateStringOrObject) return 'N/A';
+  try {
+    const dateObj = new Date(dateStringOrObject);
+    if (isNaN(dateObj.getTime())) return 'Invalid Date';
+    if (style === 'short') {
+      return dateObj.toLocaleDateString('en-GB', {day: '2-digit', month: '2-digit', year: 'numeric'}); // DD/MM/YYYY
+    }
+    return dateObj.toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
+  } catch (e) {
+    console.error("Error formatting date:", dateStringOrObject, e);
+    return 'Date Error';
+  }
+}
+
+function capitalizeFirstLetter(string) {
+  if (!string || typeof string !== 'string') return '';
+  return string.charAt(0).toUpperCase() + string.slice(1);
+}
+
+function escapeHTML(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function handleServerRequest(serverFunctionName, params, successCallback, failureCallback, loadingElementId = null) {
+  // Show loading indicator if specified
+  if (loadingElementId) {
+    updateElementVisibility(loadingElementId, true);
+  }
+  
+  const requestTimeout = setTimeout(() => {
+    console.warn(`Server request to ${serverFunctionName} is taking longer than expected`);
+  }, 10000);
+  
+  console.log(`Making server request to ${serverFunctionName}`, params);
+  
+  // Create the runner with success and failure handlers
+  let scriptRunner = google.script.run
+    .withSuccessHandler(response => {
+      clearTimeout(requestTimeout);
+      
+      // Hide loading indicator if specified
+      if (loadingElementId) {
+        updateElementVisibility(loadingElementId, false);
+      }
+      
+      console.log(`Server response from ${serverFunctionName}:`, response);
+      
+      // Handle token refresh
+      if (response && response.refreshedToken && currentSession && 
+          response.refreshedToken !== currentSession.token) {
+        console.log("Token refreshed from server response");
+        currentSession.token = response.refreshedToken;
+        storeUserSession(currentSession);
+      }
+      
+      // Check for session invalidation messages
+      if (response && response.message && 
+          typeof response.message === 'string' && 
+          response.message.toLowerCase().includes('session') && 
+          (response.message.toLowerCase().includes('invalid') || 
+           response.message.toLowerCase().includes('expired'))) {
+        console.warn("Session invalidation detected");
+        onSessionInvalid(response.message);
+        return;
+      }
+      
+      // Call success callback
+      if (successCallback) {
+        successCallback(response);
+      }
+    })
+    .withFailureHandler(error => {
+      clearTimeout(requestTimeout);
+      
+      // Hide loading indicator if specified
+      if (loadingElementId) {
+        updateElementVisibility(loadingElementId, false);
+      }
+      
+      console.error(`Server request to ${serverFunctionName} failed:`, error);
+      
+      // Call failure callback
+      if (failureCallback) {
+        failureCallback(error);
+      }
+    });
+  
+  // Call the server function with appropriate parameter handling
+  if (Array.isArray(params)) {
+    // Apply array elements as separate parameters
+    scriptRunner[serverFunctionName].apply(scriptRunner, params);
+  } else {
+    // Pass as a single parameter (or null/undefined)
+    scriptRunner[serverFunctionName](params);
+  }
+}
+
+
+window.onload = function() {
+    const ratingButtons = document.getElementsByName('workout-rating');
+    let defaultChecked;
+
+    for (let button of ratingButtons) {
+        if (button.checked) {
+            defaultChecked = button.value;
+            break;
+        }
+    }
+
+    console.log(`The default checked rating is: ${defaultChecked}`);
+};
+
+// --- COOKIE & SESSION MANAGEMENT ---
+function setCookie(name, value, days) {
+  let expires = "";
+  if (days) { 
+    const date = new Date(); 
+    date.setTime(date.getTime() + (days*24*60*60*1000)); 
+    expires = "; expires=" + date.toUTCString(); 
+  }
+  document.cookie = name + "=" + (value || "") + expires + "; path=/; SameSite=Lax; Secure";
+}
+
+function getCookie(name) {
+  const nameEQ = name + "=";
+  const ca = document.cookie.split(';');
+  for(let i=0; i < ca.length; i++) { 
+    let c = ca[i]; 
+    while (c.charAt(0)==' ') c = c.substring(1, c.length); 
+    if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length); 
+  }
+  return null;
+}
+
+function eraseCookie(name) { 
+  document.cookie = name+'=; Max-Age=-99999999; path=/; SameSite=Lax; Secure'; 
+}
+
+function storeUserSession(session) {
+  if (!session || !session.userId || !session.token) {
+    console.error("storeUserSession: Invalid session data", session);
+    return false;
+  }
+  
+  currentSession = session;
+  try { 
+    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session)); 
+  } catch(e) { 
+    console.warn("localStorage not available or full for session storage.");
+  }
+  setCookie(COOKIE_SESSION_KEY, JSON.stringify(session), 30);
+  return true;
+}
+
+function clearUserSession() {
+  currentSession = null;
+  try { 
+    localStorage.removeItem(SESSION_STORAGE_KEY); 
+  } catch(e) {
+    console.warn("localStorage not available for session removal");
+  }
+  eraseCookie(COOKIE_SESSION_KEY);
+}
+
+// --- INITIALIZATION ---
+document.addEventListener('DOMContentLoaded', () => {
+  try {
+    console.log("App initializing...");
+    
+    // Hide content, show loading
+    updateElementVisibility('app-content', false);
+    updateElementVisibility('app-loading', true);
+    
+    // Initialize theme
+    initTheme();
+    
+    // Initialize modals - do this ONCE at startup
+    initModals();
+    
+    // Add global event listeners
+    initGlobalEventListeners();
+    
+    // Check for user session
+    checkUserSession();
+    
+    console.log("App initialization completed successfully");
+  } catch (error) {
+    console.error("Critical initialization error:", error);
+    showFatalError("Application failed to initialize. Please refresh the page.");
+  }
+});
+
+
+function initTheme() {
+    const themeToggleBtn = document.getElementById('theme-toggle-btn');
+    const appLogo = document.getElementById('app-logo');
+    const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+    
+    if (savedTheme === 'light') {
+        document.body.classList.add('light-theme');
+        if (themeToggleBtn) themeToggleBtn.innerHTML = '☀';
+        if (appLogo) appLogo.src = 'https://i.imgur.com/XuPdTRu.png'; // Replace with your light mode image URL
+    } else {
+        if (themeToggleBtn) themeToggleBtn.innerHTML = '🌙';
+        if (appLogo) appLogo.src = 'https://i.imgur.com/q22Iowu.png'; // Replace with your dark mode image URL
+    }
+    
+    if (themeToggleBtn) themeToggleBtn.addEventListener('click', toggleTheme);
+}
+
+
+
+function toggleTheme() {
+    const appLogo = document.getElementById('app-logo');
+    document.body.classList.toggle('light-theme');
+    const isLight = document.body.classList.contains('light-theme');
+    localStorage.setItem(THEME_STORAGE_KEY, isLight ? 'light' : 'dark');
+    document.getElementById('theme-toggle-btn').innerHTML = isLight ? '☀' : '🌙';
+    
+    if (appLogo) {
+        appLogo.src = isLight ? 'https://i.imgur.com/XuPdTRu.png' : 'https://i.imgur.com/q22Iowu.png'; // Replace with your image URLs
+    }
+}
+
+// Call initTheme to set the initial theme and image
+initTheme();
+
+
+function initModals() {
+  // Initialize program selection modal
+  populateProgramSelectionModal();
+  
+  // Initialize other modals if needed
+}
+
+function initGlobalEventListeners() {
+  // Add event listeners for modal background and escape key
+  window.addEventListener('click', handleModalBackgroundClick);
+  document.addEventListener('keydown', handleEscapeKey);
+  
+  // Add event listener for share button
+  const shareWorkoutBtn = getElement('share-workout-btn');
+  if (shareWorkoutBtn) {
+    shareWorkoutBtn.addEventListener('click', () => {
+      if (!currentWorkoutDetails || !currentWorkoutDetails.workoutText) { 
+        alert("No workout loaded."); 
+        return; 
+      }
+      generateShareImage();
+    });
+  }
+  
+  // Global error handler
+  window.onerror = function(message, source, lineno, colno, error) {
+    console.error("Global error:", message, "at", source, ":", lineno, ":", colno);
+    // Only show user errors for critical functions
+    if (source && (source.includes('profile') || source.includes('login'))) {
+      showGeneralError("An error occurred. Please refresh the page and try again.");
+    }
+    return false; // Let the error propagate for console logging
+  };
+}
+
+function handleModalBackgroundClick(event) {
+  if (event.target.classList.contains('lightbox-overlay')) closeLightbox();
+  if (event.target.classList.contains('modal')) closeProgramModal(event.target.id);
+  if (event.target.id === 'share-image-modal') closeShareModal();
+}
+
+function handleEscapeKey(event) {
+  if (event.key === "Escape") {
+    closeLightbox();
+    closeProgramModal('program-selection-modal');
+    closeShareModal();
+  }
+}
+
+// --- SESSION MANAGEMENT ---
+function checkUserSession() {
+  console.log("checkUserSession: Starting session check.");
+  
+  let sessionStr = null;
+  
+  // Try localStorage first
+  try { 
+    sessionStr = localStorage.getItem(SESSION_STORAGE_KEY); 
+  } catch(e) {
+    console.warn("localStorage not available for session retrieval");
+  }
+  
+  // If not in localStorage, try cookies
+  if (!sessionStr) {
+    sessionStr = getCookie(COOKIE_SESSION_KEY);
+  }
+  
+  console.log("checkUserSession: Session string from storage:", sessionStr ? "Found" : "Not found");
+  
+  if (sessionStr) {
+    try {
+      const parsedSession = JSON.parse(sessionStr);
+      if (parsedSession && parsedSession.userId && parsedSession.token) {
+        currentSession = parsedSession;
+        console.log("checkUserSession: Parsed session. Validating with server for userId:", currentSession.userId);
+        
+        handleServerRequest(
+          "validateClientSessionToken",
+          [currentSession.token, currentSession.userId],
+          onSessionValidated,
+          onSessionInvalid
+        );
+        return;
+      } else {
+        console.warn("checkUserSession: Parsed session data is invalid (missing userId or token).");
+      }
+    } catch (e) { 
+      console.error("checkUserSession: Error parsing stored session:", e); 
+    }
+  }
+  
+  console.log("checkUserSession: No valid session string. Calling onSessionInvalid.");
+  onSessionInvalid("No client-side session found.");
+}
+
+function onSessionValidated(response) {
+  console.log("onSessionValidated: Server response:", response);
+  
+  if (response && response.success) {
+    if (response.refreshedToken && response.refreshedToken !== currentSession.token) {
+      console.log("onSessionValidated: Token refreshed by server.");
+      currentSession.token = response.refreshedToken;
+    }
+    
+    if (!currentSession.name || !currentSession.email || !userProfileDataCache) {
+      // Fetch profile if not fully cached
+      console.log("onSessionValidated: Fetching full user profile.");
+      
+      handleServerRequest(
+        "getUserProfileSecure",
+        {userId: response.userId, token: currentSession.token},
+        profileResp => {
+          console.log("onSessionValidated (profile fetch): Server response:", profileResp);
+          
+          if (profileResp.success && profileResp.profile) {
+            currentSession.name = profileResp.profile.name;
+            currentSession.email = profileResp.profile.email;
+            userProfileDataCache = profileResp.profile;
+            storeUserSession(currentSession);
+            console.log("onSessionValidated: Profile fetched and cached. Showing dashboard.");
+            showDashboardUI();
+          } else {
+            console.error("onSessionValidated: Failed to fetch profile after token validation.", profileResp.message);
+            onSessionInvalid("Failed to fetch user profile after validation.");
+          }
+        },
+        err => {
+          console.error("onSessionValidated: Error fetching profile:", (err.message || err));
+          onSessionInvalid("Error fetching user profile: " + (err.message || err));
+        }
+      );
+    } else {
+      storeUserSession(currentSession);
+      console.log("onSessionValidated: Using existing session name/email. Showing dashboard.");
+      showDashboardUI();
+    }
+  } else {
+    console.warn("onSessionValidated: Token validation failed on server.", response.message);
+    onSessionInvalid(response.message || "Server reported session as invalid.");
+  }
+}
+
+function onSessionInvalid(message = "Session invalid or expired.") {
+  console.warn("onSessionInvalid called. Reason:", message);
+  clearUserSession();
+  
+  updateElementVisibility('app-loading', false);
+  updateElementVisibility('login-view', true);
+  updateElementVisibility('dashboard-view', false);
+  updateElementVisibility('app-content', true);
+  
+  // Clear any cached data
+  userProfileDataCache = null;
+  workoutHistoryCache = null;
+  availableProgramsCache = null;
+  
+  console.log("onSessionInvalid: UI set to show login.");
+  
+  // Show error message if not just a normal session expiration
+  if (message && message !== "No client-side session found.") {
+    displayMessage('login-error', message, false);
+  }
+}
+
+function scheduleTokenRefresh() {
+  setInterval(() => {
+    if (currentSession && currentSession.userId && currentSession.token) {
+      handleServerRequest(
+        "validateClientSessionToken",
+        [currentSession.token, currentSession.userId],
+        response => {
+          if (response.success && response.refreshedToken) { 
+            currentSession.token = response.refreshedToken;
+            storeUserSession(currentSession); 
+            console.log("Token refreshed."); 
+          } else { 
+            console.warn("Auto token refresh failed:", response.message); 
+            if(response.message && response.message.toLowerCase().includes("expired")){ 
+              onSessionInvalid(); 
+            }
+          }
+        },
+        err => console.error("Token refresh error:", err)
+      );
+    }
+  }, 15 * 60 * 1000); // Refresh every 15 mins
+}
+
+// --- UI MANAGEMENT ---
+function showDashboardUI() {
+  console.log("showDashboardUI: Initializing dashboard.");
+  
+  try {
+    // Update visibility
+    updateElementVisibility('app-loading', false);
+    updateElementVisibility('login-view', false);
+    updateElementVisibility('dashboard-view', true);
+    updateElementVisibility('app-content', true);
+    
+    // Update user name
+    if (currentSession && currentSession.name) {
+      updateElementContent('user-name-display', currentSession.name);
+    }
+    
+    // Initialize modals
+    populateProgramSelectionModal();
+    
+    // Show workout tab by default
+    showTab('workout');
+    
+    // Load workout data
+    loadCurrentWorkout();
+    loadWorkoutHistoryForCalendar();
+    
+    // Schedule token refresh
+    scheduleTokenRefresh();
+    
+    console.log("showDashboardUI: Dashboard initialized.");
+  } catch (error) {
+    console.error("Error initializing dashboard:", error);
+    showGeneralError("Error loading dashboard. Please try refreshing the page.");
+  }
+}
+
+function showTab(tabName) {
+  console.log(`showTab: Switching to ${tabName}`);
+  
+  try {
+    // Validate tab name
+    if (!['workout', 'calendar', 'profile'].includes(tabName)) {
+      throw new Error(`Invalid tab name: ${tabName}`);
+    }
+    
+    // Update UI: tabs and content
+    document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    
+    const tabContentEl = getElement(`${tabName}-tab`);
+    if (!tabContentEl) throw new Error(`Tab content for ${tabName} not found`);
+    tabContentEl.classList.add('active');
+    
+    const tabButtonEl = document.querySelector(`.tab[onclick="showTab('${tabName}')"]`);
+    if (!tabButtonEl) throw new Error(`Tab button for ${tabName} not found`);
+    tabButtonEl.classList.add('active');
+    
+    // Handle tab-specific initialization
+    if (tabName === 'calendar') {
+      renderFullCalendar();
+    } else if (tabName === 'profile') {
+      handleProfileTabActivation();
+    }
+    
+    console.log(`Successfully switched to ${tabName} tab`);
+  } catch (error) {
+    console.error(`Error switching to ${tabName} tab:`, error);
+    showGeneralError(`Failed to switch to ${tabName} tab. Please try again.`);
+  }
+}
+
+// In Index.html <script>
+
+function handleProfileTabActivation() {
+    console.log("Profile tab activated, initializing profile view");
+    
+    populateProgramSelectionModal(); // Ensure modal structure is ready
+
+    updateElementVisibility('profile-loading', true);
+    updateElementVisibility('profile-content-area', false);
+    
+    const profileMessage = getElement('profile-message');
+    if (profileMessage) profileMessage.style.display = 'none';
+
+    if (userProfileDataCache && currentSession && userProfileDataCache.userId === currentSession.userId) {
+        console.log("Using cached profile data for userId:", currentSession.userId);
+        try {
+            buildProfileForm(userProfileDataCache); // This must ensure loader is hidden and content shown
+            // buildProfileForm itself will now handle hiding loader and showing content area
+        } catch (error) {
+            console.error("Error building profile from cache:", error);
+            userProfileDataCache = null; // Invalidate cache if build fails
+            loadUserProfile(); // Try fresh load
+        }
+    } else {
+        console.log("No valid profile cache or different user, fetching fresh profile data");
+        loadUserProfile();
+    }
+}
+
+checkAndShowProgramCompletionModal();
+
+function loadUserProfile() {
+    console.log("loadUserProfile: Started");
+    if (!currentSession) {
+        console.error("loadUserProfile: No current session.");
+        displayMessage('profile-message', "Please log in to view your profile", false);
+        updateElementVisibility('profile-loading', false); // Hide loader if called without session
+        return;
+    }
+
+    // We've already set loading true in handleProfileTabActivation
+    // updateElementVisibility('profile-content-area', false); // Already done
+    // const profileMessage = getElement('profile-message');
+    // if (profileMessage) profileMessage.style.display = 'none'; // Already done
+
+    handleServerRequest(
+        "getUserProfileSecure",
+        currentSession,
+        response => { // successCallback of handleServerRequest
+            if (response.success && response.profile && Object.keys(response.profile).length > 0) {
+                userProfileDataCache = response.profile;
+                console.log("loadUserProfile: Profile data fetched. Calling buildProfileForm.");
+                try {
+                    buildProfileForm(response.profile); 
+                    // buildProfileForm will now handle hiding loader & showing content area
+                } catch (error) {
+                    console.error("loadUserProfile: Error occurred within buildProfileForm:", error);
+                    displayMessage('profile-message', "Error displaying profile information. Please try again.", false);
+                    updateElementVisibility('profile-loading', false); // Ensure loader hidden on error
+                    updateElementVisibility('profile-content-area', true); // Show area to display error
+                    updateElementHTML('profile-content-area', `<p class="message error-message">Error displaying profile: ${escapeHTML(error.message)}</p>`);
+                }
+            } else {
+                console.error("loadUserProfile: Failed to load profile data from server.", response.message);
+                displayMessage('profile-message', response.message || "Failed to load profile data.", false);
+                updateElementVisibility('profile-loading', false); // Hide loader on failure
+                updateElementVisibility('profile-content-area', true);
+                updateElementHTML('profile-content-area', `<p class="message error-message">${escapeHTML(response.message || "Failed to load profile.")}</p>`);
+            }
+        },
+        err => { // failureCallback of handleServerRequest
+            console.error("loadUserProfile: Server call to getUserProfileSecure failed.", err);
+            displayMessage('profile-message', "Error loading profile: " + (err.message || "Server communication error"), false);
+            updateElementVisibility('profile-loading', false); // Hide loader on failure
+            updateElementVisibility('profile-content-area', true);
+            updateElementHTML('profile-content-area', `<p class="message error-message">Error loading profile: ${escapeHTML(err.message || "Server error")}</p>`);
+        }
+    );
+    console.log("loadUserProfile: Request to getUserProfileSecure sent.");
+}
+
+function buildProfileForm(profile) {
+    console.log("buildProfileForm: Starting with profile data for userId:", profile ? profile.userId : "PROFILE UNDEFINED");
+    
+    const container = getElement('profile-content-area');
+    if (!container) {
+        console.error("buildProfileForm: CRITICAL - #profile-content-area NOT FOUND!");
+        showFatalError("Profile display area missing. Please contact support.");
+        updateElementVisibility('profile-loading', false); // Attempt to hide loader
+        return;
+    }
+
+    if (!profile || typeof profile !== 'object' || !profile.userId) {
+        console.error("buildProfileForm: Invalid or incomplete profile data received.", profile);
+        updateElementHTML(container.id, "<p class='message error-message'>Failed to process profile details: Incomplete data received.</p>");
+        updateElementVisibility('profile-loading', false);
+        updateElementVisibility(container.id, true);
+        return;
+    }
+
+    let sections = [];
+    // Wrap each section builder in a try-catch and push its result or an error message
+    const sectionBuilders = [
+        buildProgramStatusSection,
+        buildPersonalInfoSection,
+        buildEventDetailsSection,
+        buildSpecializedPhaseSection, // This will return '' if not applicable
+        buildSubscriptionSection
+    ];
+
+    sectionBuilders.forEach(builderFunc => {
+        try {
+            const sectionHTML = builderFunc(profile);
+            if (sectionHTML) sections.push(sectionHTML); // Only push if it returns content
+        } catch (error) {
+            console.error(`Error building profile section (${builderFunc.name}):`, error);
+            sections.push(`<div class='profile-section'><p class='message error-message'>Error loading section: ${escapeHTML(builderFunc.name.replace("build",""))}</p></div>`);
+        }
+    });
+    
+    sections.push(`
+        <div class="button-group" style="justify-content:flex-end; margin-top:20px;">
+            <button class="secondary-button" onclick="handleResetProfileChanges()">Cancel Changes</button>
+            <button class="button" onclick="handleUpdateProfile()">Save Profile Changes</button>
+        </div>
+    `);
+
+    try {
+        container.innerHTML = sections.join('');
+        console.log("buildProfileForm: All sections rendered to container.");
+        updateElementVisibility('profile-loading', false); // Hide loader
+        updateElementVisibility('profile-content-area', true); // Show content
+    } catch (error) {
+        console.error("Error setting final profile HTML:", error);
+        container.innerHTML = "<p class='message error-message'>Failed to render the full profile. Please try refreshing.</p>";
+        updateElementVisibility('profile-loading', false);
+        updateElementVisibility('profile-content-area', true);
+        throw error; // Re-throw if critical for calling function to know
+    }
+    
+    try {
+        initProfilePostRender();
+        console.log("buildProfileForm: Post-render initialization called.");
+    } catch (error) {
+        console.error("Error in initProfilePostRender:", error);
+        displayMessage('profile-message', "Some profile features might not be fully initialized.", false);
+    }
+    console.log("buildProfileForm: Complete");
+}
+
+function handleResetProfileChanges() {
+    console.log("handleResetProfileChanges: Resetting profile form.");
+    if (userProfileDataCache) {
+        buildProfileForm(userProfileDataCache); // Rebuild from cache
+        displayMessage('profile-message', "Changes discarded.", true);
+    } else {
+        loadUserProfile(); // If no cache, reload from server
+    }
+}
+
+// Make sure initProfilePostRender and its callees are robust
+function initProfilePostRender() {
+  console.log("initProfilePostRender: Called");
+  // populateProgramSelectionModal(); // Already called when dashboard loads
+  loadAvailableProgramsForModals(); // For program change dropdowns
+  fetchSubscriptionStatus();        // For subscription status display
+}
+
+// --- AUTH HANDLERS ---
+function handleLogin() {
+  const usernameInput = getElement('username');
+  const passwordInput = getElement('password');
+  
+  if (!usernameInput || !passwordInput) {
+    displayMessage('login-error', "Login form not initialized correctly", false);
+    return;
+  }
+  
+  const username = usernameInput.value.trim();
+  const password = passwordInput.value;
+  
+  if (!username || !password) { 
+    displayMessage('login-error', "Username and password required.", false);
+    return; 
+  }
+  
+  updateElementVisibility('login-loading', true);
+  updateElementVisibility('login-error', false);
+  
+  handleServerRequest(
+    "validateLoginSecure",
+    [username, password],
+    response => {
+      updateElementVisibility('login-loading', false);
+      
+      if (response.success) {
+        // Make sure username is a string and handle the case where it might not be
+        const userEmail = typeof username === 'string' ? username.toLowerCase() : username;
+        
+        const sessionData = { 
+          userId: response.userId, 
+          token: response.token, 
+          name: response.name, 
+          email: userEmail 
+        };
+        
+        if (storeUserSession(sessionData)) {
+          showDashboardUI();
+        } else {
+          displayMessage('login-error', "Failed to store session. Please try again.", false);
+        }
+      } else { 
+        displayMessage('login-error', response.message || "Login failed.", false);
+      }
+    },
+    error => {
+      updateElementVisibility('login-loading', false);
+      displayMessage('login-error', "Login error: " + (error.message || error), false);
+    }
+  );
+}
+
+function showForgotPasswordPage() {
+  window.location.href = "<?= getScriptUrl() ?>?page=forgot";
+}
+
+function handleLogout() {
+  clearUserSession();
+  showTab('workout');
+  updateElementVisibility('login-view', true);
+  updateElementVisibility('dashboard-view', false);
+}
+
+// --- WORKOUT FUNCTIONS ---
+function loadCurrentWorkout() {
+  if (!currentSession) return;
+  
+  updateElementHTML('workout-content', '<div class="loading"><div class="spinner"></div><p>Loading...</p></div>');
+  updateElementVisibility('workout-message', false);
+  
+  handleServerRequest(
+    "getWorkoutSecure",
+    currentSession,
+    response => {
+      if (response.success) {
+        currentWorkoutDetails = response;
+        
+        // Get program details
+        const programObj = HYROX_PROGRAMS_CLIENT[response.programName] || {name: response.programName, totalWeeks: 14};
+        
+        // Update UI
+        updateElementContent('user-program-name-display', programObj.name);
+        updateElementContent('user-program-phase-display', response.programPhase);
+        
+        const phaseElement = getElement('user-program-phase-display');
+        if (phaseElement) {
+          phaseElement.className = `phase-indicator ${(response.programPhase || 'main').toLowerCase()}`;
+        }
+        
+        updateElementContent('user-current-week-display', `Wk ${response.displayWeek + 1}`);
+        updateElementContent('user-current-day-display', `Day ${response.dayNum + 1}`);
+        
+        // Set workout title with phase prefix if needed
+        let titlePrefix = "";
+        if (response.programPhase === "PREP") {
+          titlePrefix = `Prep Cycle ${Math.floor(response.weekNum / PREP_CYCLE_WEEKS) + 1}, `;
+        } else if (response.programPhase === "MAINTENANCE") {
+          titlePrefix = `Maintenance Cycle ${Math.floor(response.weekNum / MAINTENANCE_CYCLE_WEEKS) + 1}, `;
+        }
+        
+        updateElementContent('workout-title', `${titlePrefix}Week ${response.displayWeek + 1}, Day ${response.dayNum + 1}`);
+        updateElementContent('workout-date', new Date().toLocaleDateString('en-US', { 
+          weekday: 'long', 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric' 
+        }));
+        
+        updateElementContent('workout-content', response.workoutText || "No workout scheduled or end of program.");
+        
+        // Show/hide workout actions based on content
+        const workoutActions = document.querySelector('#workout-tab .workout-card .rating-group, #workout-tab .workout-card textarea, #workout-tab .workout-card .button-group');
+        if (workoutActions) {
+          workoutActions.style.display = response.workoutText && 
+                                        response.workoutText.toLowerCase() !== 'rest day' ? 'block' : 'none';
+        }
+      } else {
+        updateElementContent('workout-content', response.message || "Failed to load workout.");
+        
+        // Handle session invalidation
+        if (response.message && response.message.toLowerCase().includes("session")) {
+          onSessionInvalid(response.message);
+        }
+      }
+    },
+    err => {
+      updateElementContent('workout-content', "Error loading workout: " + (err.message || err));
+    }
+  );
+}
+
+function handleCompleteWorkout() {
+  if (!currentSession || !currentWorkoutDetails) return;
+  
+  const ratingEl = document.querySelector('input[name="workout-rating"]:checked');
+  if (!ratingEl) { 
+    displayMessage('workout-message', "Please select a rating.", false);
+    return; 
+  }
+  
+  const rating = ratingEl.value;
+  const notes = getElement('workout-notes').value;
+  
+  updateElementHTML('workout-content', '<div class="loading"><div class="spinner"></div><p>Saving...</p></div>');
+  
+  handleServerRequest(
+    "completeWorkoutSecure",
+    [currentSession, notes, rating],
+    response => {
+      if (response.success) {
+        displayMessage('workout-message', response.message, true);
+        
+        // Reset form
+        const notesElement = getElement('workout-notes');
+        if (notesElement) notesElement.value = '';
+        
+        const defaultRating = document.querySelector('input[name="workout-rating"][value="3"]');
+        if (defaultRating) defaultRating.checked = true;
+        
+        // Reload data
+        loadCurrentWorkout();
+        loadWorkoutHistoryForCalendar();
+      } else {
+        displayMessage('workout-message', response.message, false);
+        loadCurrentWorkout();
+      }
+    },
+    err => {
+      displayMessage('workout-message', "Error saving: " + (err.message || err), false);
+      loadCurrentWorkout();
+    }
+  );
+}
+
+function handleSkipWorkout() {
+  if (!currentSession || !currentWorkoutDetails) return;
+  
+  if (!confirm("Are you sure you want to skip this workout?")) return;
+  
+  updateElementHTML('workout-content', '<div class="loading"><div class="spinner"></div><p>Skipping...</p></div>');
+  
+  const skipData = { 
+    sessionData: currentSession, 
+    week: currentWorkoutDetails.weekNum, 
+    day: currentWorkoutDetails.dayNum, 
+    programPhase: currentWorkoutDetails.programPhase 
+  };
+  
+  handleServerRequest(
+    "skipWorkoutSecure",
+    skipData,
+    response => {
+      if (response.success) {
+        displayMessage('workout-message', response.message, true);
+        loadCurrentWorkout();
+        loadWorkoutHistoryForCalendar();
+      } else {
+        displayMessage('workout-message', response.message, false);
+        loadCurrentWorkout();
+      }
+    },
+    err => {
+      displayMessage('workout-message', "Error skipping: " + (err.message || err), false);
+      loadCurrentWorkout();
+    }
+  );
+}
+
+// --- CALENDAR FUNCTIONS ---
+function initCalendarControls() {
+  const monthSelect = getElement('calendar-month-select');
+  const yearSelect = getElement('calendar-year-select');
+  
+  if (!monthSelect || !yearSelect) {
+    console.error("Calendar selects not found");
+    return;
+  }
+  
+  const currentYear = calendarViewDate.getFullYear();
+  const currentMonth = calendarViewDate.getMonth();
+  
+  monthSelect.innerHTML = '';
+  
+  const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  months.forEach((month, index) => { 
+    const option = document.createElement('option');
+    option.value = index; 
+    option.textContent = month; 
+    if (index === currentMonth) option.selected = true; 
+    monthSelect.appendChild(option); 
+  });
+  
+  yearSelect.innerHTML = '';
+  
+  const baseYear = new Date().getFullYear(); // Base for year range
+  for (let y = baseYear - 2; y <= baseYear + 1; y++) { 
+    const option = document.createElement('option'); 
+    option.value = y; 
+    option.textContent = y; 
+    if (y === currentYear) option.selected = true; 
+    yearSelect.appendChild(option); 
+  }
+}
+
+function changeMonth(offset) {
+  calendarViewDate.setMonth(calendarViewDate.getMonth() + offset);
+  
+  // Ensure month/year selects are updated *before* rendering
+  const monthSelect = getElement('calendar-month-select');
+  const yearSelect = getElement('calendar-year-select');
+  
+  if (monthSelect) monthSelect.value = calendarViewDate.getMonth();
+  if (yearSelect) yearSelect.value = calendarViewDate.getFullYear();
+  
+  renderFullCalendar();
+}
+
+function loadWorkoutHistoryForCalendar() {
+  if (!currentSession) return;
+  
+  handleServerRequest(
+    "getWorkoutHistorySecure",
+    currentSession,
+    response => {
+      if (response.success) { 
+        workoutHistoryCache = response.completedWorkouts;
+        initCalendarControls(); 
+        renderFullCalendar();
+      } else { 
+        console.error("Failed to load workout history:", response.message);
+      }
+    },
+    err => console.error("Error loading history:", (err.message || err))
+  );
+}
+
+function renderFullCalendar() {
+  const grid = getElement('calendar-grid');
+  if (!grid) {
+    console.error("Calendar grid not found");
+    return;
+  }
+  
+  const monthSelect = getElement('calendar-month-select');
+  const yearSelect = getElement('calendar-year-select');
+  
+  if (!monthSelect || !yearSelect) {
+    console.error("Calendar controls not found");
+    return;
+  }
+  
+  const month = parseInt(monthSelect.value);
+  const year = parseInt(yearSelect.value);
+  
+  calendarViewDate = new Date(year, month, 1);
+  grid.innerHTML = '';
+  
+  const gridHeader = getElement('calendar-grid-header');
+  if (gridHeader && !gridHeader.innerHTML) {
+    // Add day headers only once
+    const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    daysOfWeek.forEach(day => { 
+      const headerCell = document.createElement('div');
+      headerCell.className = 'calendar-header-cell'; 
+      headerCell.textContent = day;
+      gridHeader.appendChild(headerCell); 
+    });
+  }
+  
+  const firstDayOfMonth = calendarViewDate.getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const today = new Date(); 
+  today.setHours(0,0,0,0);
+  
+  // Add empty cells for days before the 1st
+  for (let i = 0; i < firstDayOfMonth; i++) { 
+    const emptyCell = document.createElement('div'); 
+    emptyCell.className = 'calendar-day other-month';
+    grid.appendChild(emptyCell); 
+  }
+  
+  // Create cells for each day in the month
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dayCell = document.createElement('div');
+    dayCell.className = 'calendar-day';
+    
+    const currentDate = new Date(year, month, day);
+    
+    // Create day number
+    const dayNumberEl = document.createElement('span'); 
+    dayNumberEl.className = 'day-number'; 
+    dayNumberEl.textContent = day;
+    
+    // Create status indicator
+    const statusEl = document.createElement('span'); 
+    statusEl.className = 'workout-status';
+    
+    dayCell.appendChild(dayNumberEl); 
+    dayCell.appendChild(statusEl);
+    
+    // Check for completed workouts
+    if (workoutHistoryCache) {
+      const logEntry = workoutHistoryCache.find(entry => {
+        if (!entry.date) return false;
+        const entryDate = new Date(entry.date); 
+        entryDate.setHours(0,0,0,0);
+        return entryDate.getTime() === currentDate.getTime();
+      });
+      
+      if (logEntry) {
+        dayCell.classList.add('clickable');
+        statusEl.textContent = logEntry.skipped ? '✕ Skipped' : '✓ Done';
+        dayCell.classList.add(logEntry.skipped ? 'skipped' : 'completed');
+        dayCell.onclick = () => showWorkoutDetailsInLightbox(
+          logEntry.programId,
+          logEntry.programPhase, 
+          logEntry.week, 
+          logEntry.day, 
+          logEntry
+        );
+      }
+    }
+    
+    // Highlight today
+    if (currentDate.getTime() === today.getTime()) {
+      dayCell.classList.add('today');
+    }
+    
+    // Highlight current workout day
+    if (currentWorkoutDetails && 
+        currentWorkoutDetails.workoutDateForComparison && 
+        new Date(currentWorkoutDetails.workoutDateForComparison).getTime() === currentDate.getTime()) {
+      
+      dayCell.classList.add('current'); // The program's current workout day
+      
+      if (!dayCell.classList.contains('clickable')) { // If not already logged
+        dayCell.classList.add('clickable');
+        dayCell.onclick = () => showWorkoutDetailsInLightbox(
+          currentWorkoutDetails.programName,
+          currentWorkoutDetails.programPhase, 
+          currentWorkoutDetails.weekNum,
+          currentWorkoutDetails.dayNum, 
+          null
+        );
+      }
+    }
+    
+    grid.appendChild(dayCell);
+  }
+}
+
+// --- LIGHTBOX FUNCTIONS ---
+function showWorkoutDetailsInLightbox(programId, programPhase, week, day, logEntry) {
+  const lightbox = getElement('workout-lightbox');
+  if (!lightbox) {
+    console.error("Workout lightbox not found");
+    return;
+  }
+  
+  const titleEl = getElement('lightbox-title');
+  const dateEl = getElement('lightbox-date');
+  const phaseEl = getElement('lightbox-phase-indicator');
+  const workoutEl = getElement('lightbox-workout-details');
+  const notesSectionEl = getElement('lightbox-notes-section');
+  const notesContentEl = getElement('lightbox-notes-content');
+  const notesDateEl = getElement('lightbox-notes-date');
+  const statusEl = getElement('lightbox-status');
+  const ratingEl = getElement('lightbox-rating-display');
+  const actionsEl = getElement('lightbox-actions');
+  
+  if (!titleEl || !dateEl || !phaseEl || !workoutEl || !notesSectionEl || 
+      !notesContentEl || !notesDateEl || !statusEl || !ratingEl || !actionsEl) {
+    console.error("One or more lightbox elements not found");
+    return;
+  }
+  
+  actionsEl.innerHTML = '';
+  
+  let displayWeek = week;
+  let titlePrefix = "";
+  
+  const programObj = HYROX_PROGRAMS_CLIENT[programId] || { name: programId };
+  
+  if (programPhase === "PREP") {
+    titlePrefix = `Prep Cycle ${Math.floor(week / PREP_CYCLE_WEEKS) + 1}, `; 
+    displayWeek = week % PREP_CYCLE_WEEKS;
+  } else if (programPhase === "MAINTENANCE") {
+    titlePrefix = `Maintenance Cycle ${Math.floor(week / MAINTENANCE_CYCLE_WEEKS) + 1}, `; 
+    displayWeek = week % MAINTENANCE_CYCLE_WEEKS;
+  }
+  
+  titleEl.textContent = `${programObj.name} - ${titlePrefix}Week ${displayWeek + 1}, Day ${day + 1}`;
+  phaseEl.textContent = programPhase;
+  phaseEl.className = `phase-indicator ${(programPhase || 'main').toLowerCase()}`;
+  
+  workoutEl.innerHTML = '<div class="loading"><div class="spinner"></div><p>Loading...</p></div>';
+  notesSectionEl.style.display = 'none'; 
+  statusEl.style.display = 'none';
+  ratingEl.style.display = 'none';
+  
+  // Get the workout content
+  const requestData = { 
+    sessionData: currentSession, 
+    week: week, 
+    day: day, 
+    programPhase: programPhase 
+  };
+  
+  handleServerRequest(
+    "getWorkoutTextSecure",
+    requestData,
+    response => {
+      if (response.success) { 
+        workoutEl.textContent = response.workoutText || "No content.";
+      } else { 
+        workoutEl.textContent = response.message || "Error loading content.";
+      }
+    },
+    err => workoutEl.textContent = "Error: " + (err.message || err)
+  );
+  
+  // Handle log entry data if present
+  if (logEntry) {
+    dateEl.textContent = logEntry.date ? 
+      new Date(logEntry.date).toLocaleDateString('en-US', { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      }) : "Date N/A";
+    
+    if (logEntry.notes) { 
+      notesContentEl.textContent = logEntry.notes;
+      notesDateEl.textContent = `Logged: ${new Date(logEntry.date).toLocaleDateString()}`;
+      notesSectionEl.style.display = 'block';
+    }
+    
+    statusEl.textContent = logEntry.skipped ? "Skipped" : "Completed";
+    statusEl.className = `lightbox-status ${logEntry.skipped ? 'skipped' : 'completed'}`;
+    statusEl.style.display = 'block';
+    
+    if (logEntry.rating) { 
+      ratingEl.innerHTML = displayWorkoutRatingStars(logEntry.rating);
+      ratingEl.style.display = 'block';
+    }
+  } else {
+    dateEl.textContent = "Future or Unlogged Workout";
+    
+    // Add "Do this workout now" button for future workouts
+    if (currentWorkoutDetails && 
+        week === currentWorkoutDetails.weekNum && 
+        day > currentWorkoutDetails.dayNum) {
+      
+      const doEarlyBtn = document.createElement('button');
+      doEarlyBtn.className = "button"; 
+      doEarlyBtn.textContent = "Do This Workout Now";
+      doEarlyBtn.onclick = () => handleDoWorkoutEarly(week, day, programPhase);
+      actionsEl.appendChild(doEarlyBtn);
+    }
+  }
+  
+  lightbox.style.display = 'block';
+}
+
+function closeLightbox() {
+  const lightbox = getElement('workout-lightbox');
+  if (lightbox) lightbox.style.display = 'none';
+}
+
+function displayWorkoutRatingStars(rating) {
+  let stars = ''; 
+  for (let i = 1; i <= 5; i++) stars += (i <= rating ? '★' : '☆');
+  
+  const ratingText = {
+    1: "Very Hard", 
+    2: "Difficult", 
+    3: "Average", 
+    4: "Good", 
+    5: "Great!"
+  }[rating] || `Rated ${rating}/5`;
+  
+  return `<div class="stars">${stars}</div><div class="rating-text">${ratingText}</div>`;
+}
+
+function handleDoWorkoutEarly(week, day, programPhase) {
+  if (!confirm("This will mark your current workout as skipped and set this as your new current workout. Continue?")) return;
+  
+  closeLightbox();
+  displayMessage('workout-message', "Updating schedule...", true);
+  
+  const requestData = { 
+    sessionData: currentSession, 
+    targetWeek: week, 
+    targetDay: day, 
+    programPhase: programPhase 
+  };
+  
+  handleServerRequest(
+    "setCurrentWorkoutSecure",
+    requestData,
+    response => {
+      if (response.success) { 
+        displayMessage('workout-message', response.message, true);
+        loadCurrentWorkout();
+        loadWorkoutHistoryForCalendar();
+      } else { 
+        displayMessage('workout-message', response.message, false);
+      }
+    },
+    err => displayMessage('workout-message', "Error: " + (err.message || err), false)
+  );
+}
+
+// --- PROFILE FUNCTIONS ---
+
+
+
+
+function buildProgramStatusSection(profile) {
+  const programPhase = profile.programPhase || "MAIN";
+  const programClientDetails = HYROX_PROGRAMS_CLIENT[profile.programName] || {
+    name: profile.programName || "N/A Program", 
+    totalWeeks: MAIN_PROGRAM_WEEKS_CONST
+  };
+  
+  return `
+    <div id="profile-status-container" class="profile-section">
+      <h3>Current Training Status</h3>
+      <div class="program-status-card">
+        <h4>${escapeHTML(programClientDetails.name)}</h4>
+        <div class="program-phase-info">
+          <span class="phase-badge ${programPhase.toLowerCase()}">${escapeHTML(programPhase)}</span>
+          <p class="phase-description">${getPhaseDescriptionText(programPhase, profile)}</p>
+        </div>
+        <div class="program-progress" style="margin-top:10px;">
+          <div class="progress-bar">
+            <div class="progress-fill" style="width: ${calculateProgramCompletionPercentage(profile)}%"></div>
+          </div>
+          <span class="progress-text">Week ${profile.displayWeek !== undefined ? profile.displayWeek + 1 : (profile.currentWeek || 0) + 1} of ${getProgramTotalWeeks(profile)} - ${calculateProgramCompletionPercentage(profile)}% Complete</span>
+        </div>
+        ${getEventTimeRemainingHTML(profile)}
+      </div>
+      <div class="program-actions" style="margin-top:15px;">
+        ${getProgramActionButtonsHTML(profile)}
+      </div>
+    </div>
+  `;
+}
+
+function buildPersonalInfoSection(profile) {
+  return `
+    <div class="profile-section">
+      <h3>Personal Information</h3>
+      <div class="form-group profile-field">
+        <label for="profile-name">Full Name</label>
+        <input type="text" id="profile-name" value="${escapeHTML(profile.name || '')}">
+      </div>
+      <div class="form-group profile-field">
+        <label for="profile-email">Email</label>
+        <input type="email" id="profile-email" value="${escapeHTML(profile.email || '')}" readonly>
+        <small>Contact support to change email.</small>
+      </div>
+    </div>
+  `;
+}
+
+function buildEventDetailsSection(profile) {
+  const eventDate = profile.eventDate ? profile.eventDate.split('T')[0] : '';
+  const eventCountdownText = profile.eventDate ? getDaysToEventText(profile.eventDate) : '';
+  
+  return `
+    <div class="profile-section">
+      <h3>Event Details</h3>
+      <div class="form-group profile-field">
+        <label for="profile-event-location">Event Location/Name</label>
+        <input type="text" id="profile-event-location" value="${escapeHTML(profile.eventLocation || '')}">
+      </div>
+      <div class="form-group profile-field">
+        <label for="profile-event-date">Event Date</label>
+        <input type="date" id="profile-event-date" value="${eventDate}">
+      </div>
+      ${eventCountdownText ? `<div class="event-countdown"><strong>${eventCountdownText}</strong></div>` : ''}
+    </div>
+  `;
+}
+
+function buildSpecializedPhaseSection(profile) {
+  // Only show this section for PREP or MAINTENANCE phases
+  if (profile.programPhase !== "PREP" && profile.programPhase !== "MAINTENANCE") {
+    return '';
+  }
+  
+  const currentFocus = profile.SpecializedPhaseFocus || '';
+  const phaseType = profile.programPhase;
+  
+  // Options depend on phase type
+  const options = (phaseType === "PREP")
+    ? ["PrepStrength", "PrepRunning", "PrepHyrox"]
+    : ["MaintainStrength", "MaintainRunning", "MaintainHyrox", "MaintenanceProgram"];
+  
+  return `
+    <div class="profile-section">
+      <h3>${capitalizeFirstLetter(phaseType.toLowerCase())} Phase Focus</h3>
+      <p>Choose your training focus for your current ${phaseType.toLowerCase()} phase:</p>
+      
+      <div class="form-group profile-field">
+        <label for="specialized-focus-select">Select Focus:</label>
+        <select id="specialized-focus-select">
+          <option value="">-- Select a Focus --</option>
+          ${options.map(opt => {
+            // Make option text more readable
+            let optLabel = opt.replace(phaseType, ''); // Remove "Prep" or "Maintain"
+            if (optLabel === "Program") optLabel = "Generic"; // For "MaintenanceProgram"
+            return `<option value="${opt}" ${currentFocus === opt ? 'selected' : ''}>${optLabel}</option>`;
+          }).join('')}
+        </select>
+      </div>
+      <button class="button" onclick="saveSpecializedFocus('${phaseType}')">Save ${phaseType} Focus</button>
+    </div>
+  `;
+}
+
+function buildSubscriptionSection() {
+  return `
+    <div class="profile-section">
+      <h3>Subscription</h3>
+      <p id="profile-subscription-status">Loading status...</p>
+    </div>
+  `;
+}
+
+
+function getPhaseDescriptionText(phase, profile) {
+  const programObj = HYROX_PROGRAMS_CLIENT[profile.programName] || {};
+  
+  if (phase === "PREP") {
+    return `Building foundation. Main program (${programObj.name || 'Selected Program'}) starts around ${profile.mainProgramStartDate ? formatDate(profile.mainProgramStartDate) : 'N/A'}.`;
+  }
+  
+  if (phase === "MAINTENANCE") {
+    return `Maintaining fitness post-event or during off-season. Current cycle: Week ${(profile.currentWeek % MAINTENANCE_CYCLE_WEEKS) + 1} of ${MAINTENANCE_CYCLE_WEEKS}.`;
+  }
+  
+  return `Focused training for your event on ${profile.eventDate ? formatDate(profile.eventDate) : 'N/A'}.`;
+}
+
+function calculateProgramCompletionPercentage(profile) {
+  const programDetails = HYROX_PROGRAMS_CLIENT[profile.programName] || {totalWeeks: 14};
+  
+  const total = (profile.programPhase === "PREP" || profile.programPhase === "MAINTENANCE") 
+    ? (profile.programPhase === "PREP" ? PREP_CYCLE_WEEKS : MAINTENANCE_CYCLE_WEEKS) 
+    : (programDetails.totalWeeks || 14);
+  
+  const currentActualWeekInPhase = (profile.programPhase === "PREP" || profile.programPhase === "MAINTENANCE") 
+    ? (profile.currentWeek % total) 
+    : profile.currentWeek;
+  
+  return Math.min(100, Math.max(0, Math.round(((currentActualWeekInPhase * 7 + (profile.currentDay || 0)) / (total * 7)) * 100)));
+}
+
+function getProgramTotalWeeks(profile) {
+  const programDetails = HYROX_PROGRAMS_CLIENT[profile.programName] || {totalWeeks: 14};
+  
+  return (profile.programPhase === "PREP" || profile.programPhase === "MAINTENANCE") 
+    ? (profile.programPhase === "PREP" ? PREP_CYCLE_WEEKS : MAINTENANCE_CYCLE_WEEKS) 
+    : (programDetails.totalWeeks || 14);
+}
+
+function getEventTimeRemainingHTML(profile) {
+  if (profile.programPhase === "MAIN" && profile.eventDate) {
+    const days = Math.ceil((new Date(profile.eventDate) - new Date()) / (1000 * 60 * 60 * 24));
+    return `<div class="time-remaining">${days > 0 
+      ? `${days} days until event` 
+      : (days === 0 ? 'Event is TODAY!' : 'Event has passed')}</div>`;
+  } else if (profile.programPhase === "PREP" && profile.mainProgramStartDate) {
+    const days = Math.ceil((new Date(profile.mainProgramStartDate) - new Date()) / (1000 * 60 * 60 * 24));
+    return `<div class="time-remaining">${days > 0 
+      ? `${days} days until main program starts` 
+      : 'Main program starting soon!'}</div>`;
+  }
+  return '';
+}
+
+function getDaysToEventText(eventDateStr) {
+  if (!eventDateStr) return "No event date set.";
+  
+  const eventDate = new Date(eventDateStr);
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  eventDate.setHours(0,0,0,0);
+  
+  const diffTime = eventDate - today;
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  if (diffDays < 0) return `Event was ${Math.abs(diffDays)} days ago.`;
+  if (diffDays === 0) return "Event is TODAY!";
+  return `${diffDays} days until event.`;
+}
+
+function getProgramActionButtonsHTML(profile) {
+  const phase = profile.programPhase || "MAIN";
+  
+  if (phase === "PREP" || phase === "MAINTENANCE") { 
+    return `
+      <button onclick="openProgramSelectionModal('start')" class="button">
+        <i class="fas fa-play-circle"></i> Start Full Program
+      </button>
+      <p class="action-description">Transition to a 14-week main training program.</p>
+    `; 
+  } else if (phase === "MAIN") { 
+    return `
+      <button onclick="openProgramSelectionModal('change')" class="secondary-button">
+        <i class="fas fa-exchange-alt"></i> Change Program
+      </button>
+      <p class="action-description">Switch to a different 14-week program.</p>
+    `; 
+  }
+  
+  return '';
+}
+
+function handleUpdateProfile() {
+  if (!currentSession) {
+    displayMessage('profile-message', "Session expired. Please log in again.", false);
+    return;
+  }
+  
+  const nameElement = getElement('profile-name');
+  const eventLocationElement = getElement('profile-event-location');
+  const eventDateElement = getElement('profile-event-date');
+  
+  if (!nameElement || !eventLocationElement || !eventDateElement) {
+    displayMessage('profile-message', "Profile form not properly loaded.", false);
+    return;
+  }
+  
+  const updatedData = { 
+    sessionData: currentSession, 
+    name: nameElement.value,
+    eventLocation: eventLocationElement.value,
+    eventDate: eventDateElement.value || null
+  };
+  
+  updateElementVisibility('profile-loading', true);
+  displayMessage('profile-message', '', true); // Clear previous
+  
+  handleServerRequest(
+    "updateUserProfileSecure",
+    updatedData,
+    response => {
+      updateElementVisibility('profile-loading', false);
+      displayMessage('profile-message', response.message, response.success);
+      
+      if (response.success) {
+        userProfileDataCache = null; // Invalidate cache to force reload
+        loadUserProfile();
+        
+        if (response.eventChanged || response.programChanged) {
+          loadCurrentWorkout();
+          loadWorkoutHistoryForCalendar();
+        }
+      }
+    },
+    err => {
+      updateElementVisibility('profile-loading', false);
+      displayMessage('profile-message', "Error: " + (err.message || err), false);
+    }
+  );
+}
+
+function fetchSubscriptionStatus() {
+  if (!currentSession) return;
+  
+  const statusEl = getElement('profile-subscription-status');
+  if (statusEl) statusEl.innerHTML = '<em>Loading subscription status...</em>';
+  
+  handleServerRequest(
+    "getUserSubscriptionStatus",
+    currentSession,
+    response => {
+      if (statusEl) {
+        if (response.success && response.status) {
+          let renewsDateString = 'N/A';
+          
+          if (response.renews) {
+            try {
+              renewsDateString = new Date(response.renews).toLocaleDateString('en-GB', {
+                day: '2-digit', 
+                month: 'short', 
+                year: 'numeric'
+              });
+            } catch (e) {
+              console.error("Error formatting renews date:", response.renews, e);
+              renewsDateString = "Invalid Date";
+            }
+          }
+          
+          statusEl.innerHTML = `<strong>Status:</strong> ${response.status} <br><strong>Renews/Ends:</strong> ${renewsDateString}`;
+        } else {
+          statusEl.textContent = response.message || "Could not retrieve subscription status.";
+        }
+      }
+    },
+    err => {
+      if (statusEl) statusEl.textContent = "Error fetching subscription status.";
+      console.error("Error fetching subscription status:", err);
+    }
+  );
+}
+
+function saveSpecializedFocus(phaseToSet) {
+  if (!currentSession) {
+    displayMessage('profile-message', "Session expired. Please log in again.", false);
+    return;
+  }
+  
+  const focusSelect = getElement('specialized-focus-select');
+  if (!focusSelect || !focusSelect.value) {
+    displayMessage('profile-message', "Please select a focus.", false);
+    return;
+  }
+  
+  const focusProgramId = focusSelect.value;
+  displayMessage('profile-message', "Saving focus...", true); // Temp message
+  
+  const requestData = {
+    sessionData: currentSession,
+    phaseToSet: phaseToSet,
+    focusProgramId: focusProgramId
+  };
+  
+  handleServerRequest(
+    "setUserSpecializedPhaseFocus",
+    requestData,
+    response => {
+      displayMessage('profile-message', response.message, response.success);
+      
+      if (response.success) {
+        userProfileDataCache = null; // Invalidate profile cache
+        loadUserProfile(); // Reload profile to show updated choice
+        loadCurrentWorkout(); // Reload workout as it might change
+      }
+    },
+    err => {
+      displayMessage('profile-message', "Error saving focus: " + (err.message || err), false);
+    }
+  );
+}
+
+// --- PROGRAM SELECTION MODAL ---
+function populateProgramSelectionModal() {
+  console.log("populateProgramSelectionModal: Called");
+  
+  const modalContainer = getElement('program-selection-modal');
+  if (!modalContainer) {
+    console.error("populateProgramSelectionModal: #program-selection-modal div NOT FOUND in HTML.");
+    return false;
+  }
+  
+  // Check if content is already there to prevent re-populating if not needed
+  if (modalContainer.querySelector('.modal-content')) {
+    console.log("populateProgramSelectionModal: Modal content already exists.");
+    return true;
+  }
+  
+  try {
+    const modalHTML = `
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 id="program-selection-modal-title">Select Program</h2>
+          <button class="modal-close" onclick="closeProgramModal('program-selection-modal')">×</button>
+        </div>
+        <div class="modal-body">
+          <div id="program-options-schedule" style="display:none;" class="schedule-options">
+            <h4>How to schedule the new program?</h4>
+            <div class="option-cards">
+              <div class="option-card" onclick="document.getElementById('keep-date-option').checked = true; toggleOptionCardSelection(this);">
+                <label>
+                  <input type="radio" name="schedule-option" value="keep-date" id="keep-date-option">
+                  <div>
+                    <h4>Keep Current Event Date</h4>
+                    <p>Adjusts start week of new program to finish by your existing event date (if set).</p>
+                  </div>
+                </label>
+              </div>
+              <div class="option-card selected" onclick="document.getElementById('start-fresh-option').checked = true; toggleOptionCardSelection(this);">
+                <label>
+                  <input type="radio" name="schedule-option" value="start-fresh" id="start-fresh-option" checked>
+                  <div>
+                    <h4>Start Fresh</h4>
+                    <p>Begin new program from Week 1, Day 1. Event date might need adjustment.</p>
+                  </div>
+                </label>
+              </div>
+            </div>
+            <button class="button" style="margin-top:20px; width:100%;" onclick="showProgramListForSelection()">Next: Choose Program</button>
+          </div>
+          <div id="program-options-list" class="programs-grid">
+            <div class="loading"><div class="spinner"></div><p>Loading programs...</p></div>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    modalContainer.innerHTML = modalHTML;
+    console.log("populateProgramSelectionModal: #program-selection-modal POPULATED.");
+    
+    // Add event listeners for option cards
+    const optionCards = modalContainer.querySelectorAll('.option-card');
+    optionCards.forEach(card => {
+      card.addEventListener('click', function() {
+        optionCards.forEach(c => c.classList.remove('selected'));
+        this.classList.add('selected');
+        
+        // Also ensure the radio button inside is checked
+        const radio = this.querySelector('input[type="radio"]');
+        if (radio) radio.checked = true;
+      });
+    });
+    
+    return true;
+  } catch (error) {
+    console.error("Error populating program selection modal:", error);
+    modalContainer.innerHTML = `
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Error</h2>
+          <button class="modal-close" onclick="closeProgramModal('program-selection-modal')">×</button>
+        </div>
+        <div class="modal-body">
+          <p class="error-message">Failed to load program selection. Please try again.</p>
+        </div>
+      </div>
+    `;
+    return false;
+  }
+}
+
+function toggleOptionCardSelection(selectedCard) {
+  document.querySelectorAll('#program-selection-modal .option-card').forEach(c => c.classList.remove('selected'));
+  selectedCard.classList.add('selected');
+}
+
+function closeProgramModal(modalId) {
+  const modal = getElement(modalId);
+  if (modal) modal.style.display = 'none';
+}
+
+function openProgramSelectionModal(action) {
+  currentProgramChangeAction = action;
+  
+  const modal = getElement('program-selection-modal');
+  if (!modal) {
+    console.error("Program selection modal not found");
+    showGeneralError("Error opening program selection. Please try again.");
+    return;
+  }
+  
+  // Ensure modal content is populated
+  if (!modal.querySelector('.modal-content')) {
+    if (!populateProgramSelectionModal()) {
+      showGeneralError("Error preparing program selection. Please try again.");
+      return;
+    }
+  }
+  
+  const titleEl = getElement('program-selection-modal-title');
+  const scheduleOptionsEl = getElement('program-options-schedule');
+  const programListContainerEl = getElement('program-options-list');
+  
+  if (!titleEl || !scheduleOptionsEl || !programListContainerEl) {
+    console.error("Modal elements not found for openProgramSelectionModal");
+    showGeneralError("Error opening program selection. UI elements missing. Please refresh.");
+    return;
+  }
+  
+  titleEl.textContent = (action === 'start') ? "Start New Training Program" : "Change Training Program";
+  
+  const hasEventDate = userProfileDataCache && userProfileDataCache.eventDate;
+  
+  if (action === 'change' && hasEventDate) {
+    // Show schedule options first for program changes with event date
+    scheduleOptionsEl.style.display = 'block';
+    programListContainerEl.style.display = 'none';
+    programListContainerEl.innerHTML = '<div class="loading"><div class="spinner"></div><p>Loading...</p></div>';
+    
+    // Set default option to start fresh
+    const startFreshOption = getElement('start-fresh-option');
+    if (startFreshOption) startFreshOption.checked = true;
+    
+    // Update visual selection for option cards
+    document.querySelectorAll('#program-selection-modal .option-card').forEach(c => c.classList.remove('selected'));
+    if (startFreshOption && startFreshOption.closest('.option-card')) {
+      startFreshOption.closest('.option-card').classList.add('selected');
+    }
+  } else {
+    // Skip schedule options, show program list directly
+    scheduleOptionsEl.style.display = 'none';
+    programListContainerEl.style.display = 'grid';
+    loadAvailableProgramsForModals('program-options-list');
+  }
+  
+  modal.style.display = 'block';
+}
+
+function showProgramListForSelection() {
+  const scheduleOptionsEl = getElement('program-options-schedule');
+  const programListEl = getElement('program-options-list');
+  
+  if (scheduleOptionsEl) scheduleOptionsEl.style.display = 'none';
+  if (programListEl) {
+    programListEl.style.display = 'grid';
+    loadAvailableProgramsForModals('program-options-list');
+  }
+}
+
+function loadAvailableProgramsForModals(containerId = 'program-options-list') {
+  console.log("loadAvailableProgramsForModals: For container:", containerId);
+  
+  const container = getElement(containerId);
+  if (!container) {
+    console.error(`loadAvailableProgramsForModals: Container with ID "${containerId}" not found`);
+    return;
+  }
+  
+  container.innerHTML = '<div class="loading"><div class="spinner"></div><p>Loading...</p></div>';
+  
+  // Use cached data if available
+  if (availableProgramsCache) {
+    renderProgramCards(availableProgramsCache, containerId);
+    return;
+  }
+  
+  // Otherwise fetch from server
+  handleServerRequest(
+    "getAvailableTrainingPrograms",
+    null,
+    programs => {
+      availableProgramsCache = programs;
+      renderProgramCards(programs, containerId);
+    },
+    err => {
+      container.innerHTML = `<p class="message error-message">Error: ${(err.message || err)}</p>`;
+    }
+  );
+}
+
+function renderProgramCards(programs, containerId) {
+  const container = getElement(containerId);
+  if (!container) {
+    console.error(`renderProgramCards: Container with ID "${containerId}" not found`);
+    return;
+  }
+  
+  if (!programs || programs.length === 0) {
+    container.innerHTML = '<p>No programs available.</p>';
+    return;
+  }
+  
+  let html = '';
+  
+  programs.forEach(p => {
+    html += `
+      <div class="program-card">
+        <h4>${escapeHTML(p.name)}</h4>
+        <p class="program-description">${escapeHTML(p.description || 'A comprehensive HYROX program.')}</p>
+        <button class="select-program-btn" onclick="confirmProgramChange('${p.id}')">Select Program</button>
+      </div>
+    `;
+  });
+  
+  container.innerHTML = html;
+}
+
+function confirmProgramChange(newProgramId) {
+  if (!currentSession) {
+    displayMessage('profile-message', "Session expired. Please log in again.", false);
+    return;
+  }
+  
+  let scheduleOpt = 'start-fresh';
+  const scheduleRadio = document.querySelector('input[name="schedule-option"]:checked');
+  
+  if (currentProgramChangeAction === 'change' && scheduleRadio) {
+    scheduleOpt = scheduleRadio.value;
+  }
+  
+  const programName = (availableProgramsCache.find(p => p.id === newProgramId) || {}).name || newProgramId;
+  
+  let confirmMessage = `Switch to "${programName}"? `;
+  
+  if (currentProgramChangeAction === 'change') {
+    confirmMessage += (scheduleOpt === 'start-fresh') 
+      ? "\nProgress will reset to Week 1, Day 1." 
+      : "\nProgress will adjust to your event date.";
+  } else {
+    confirmMessage += "\nThis will start the main program.";
+  }
+  
+  if (!confirm(confirmMessage)) return;
+  
+  const updateData = { 
+    sessionData: currentSession, 
+    programName: newProgramId, 
+    scheduleOption: scheduleOpt, 
+    action: (currentProgramChangeAction === 'start') ? 'start_full_program' : 'change_program' 
+  };
+  
+  updateElementVisibility('profile-loading', true);
+  closeProgramModal('program-selection-modal');
+  
+  handleServerRequest(
+    "changeUserProgramSecure",
+    updateData,
+    response => {
+      updateElementVisibility('profile-loading', false);
+      displayMessage('profile-message', response.message, response.success);
+      
+      if (response.success) {
+        userProfileDataCache = null;
+        loadUserProfile();
+        loadCurrentWorkout();
+        loadWorkoutHistoryForCalendar();
+      }
+    },
+    err => {
+      updateElementVisibility('profile-loading', false);
+      displayMessage('profile-message', "Error: " + (err.message || err), false);
+    }
+  );
+}
+
+// --- IMAGE SHARING ---
+function generateShareImage() {
+  if (!currentWorkoutDetails || !currentWorkoutDetails.workoutText) {
+    alert("No workout content available to share.");
+    return;
+  }
+  
+  displayMessage('workout-message', "Generating image...", true);
+  
+  try {
+    // Create Instagram-friendly share template
+    const shareTemplate = document.createElement('div');
+    shareTemplate.className = 'instagram-share-template';
+    
+    // Set inline styles for the template (Instagram Story inspired)
+    shareTemplate.style.cssText = `
+      width: 1080px;
+      height: 1350px;
+      background: linear-gradient(135deg, #5851DB, #833ab4);
+      color: white;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      padding: 60px;
+      box-sizing: border-box;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      text-align: center;
+    `;
+    
+    // Get current date in readable format
+    const currentDate = new Date().toLocaleDateString('en-US', { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+    
+    // Get workout title from current workout details
+    const workoutTitle = document.getElementById('workout-title').textContent;
+    
+    // Clean workout text (remove excessive whitespace, limit length)
+    let workoutText = currentWorkoutDetails.workoutText;
+    if (workoutText.length > 500) {
+      workoutText = workoutText.substring(0, 497) + '...';
+    }
+    
+    // Create template content
+    shareTemplate.innerHTML = `
+      <div style="margin-bottom: 30px; padding-top: 20px;">
+        <img src="https://i.imgur.com/q22Iowu.png" alt="HybridX Logo" style="height: 120px; margin-bottom: 20px;">
+        <h1 style="font-size: 48px; margin: 10px 0; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">WORKOUT COMPLETED</h1>
+        <p style="font-size: 24px; margin: 0; opacity: 0.9;">${currentDate}</p>
+      </div>
+      
+      <div style="background-color: rgba(255, 255, 255, 0.15); border-radius: 20px; padding: 40px; margin: 20px 0; flex: 1; overflow: hidden; display: flex; flex-direction: column; justify-content: center;">
+        <h2 style="font-size: 36px; margin: 0 0 20px 0; font-weight: 700; color: #fff;">${workoutTitle}</h2>
+        <div style="font-size: 22px; line-height: 1.5; text-align: left; overflow-wrap: break-word; white-space: pre-wrap;">${workoutText}</div>
+      </div>
+      
+      <div style="margin-top: auto; padding: 20px 0;">
+        <div style="font-size: 32px; font-weight: 600; margin-bottom: 10px;">
+          <span style="display: inline-block; padding: 10px 20px; background-color: rgba(255, 255, 255, 0.25); border-radius: 50px;">
+            <i class="fas fa-fire" style="margin-right: 8px;"></i> WORKOUT DONE
+          </span>
+        </div>
+        <p style="font-size: 24px; margin: 10px 0; font-weight: 500;">@HybridXClub</p>
+        <p style="font-size: 16px; margin: 5px 0; opacity: 0.8;">www.hybridx.club</p>
+      </div>
+    `;
+    
+    // Get rating if available
+    const ratingEl = document.querySelector('input[name="workout-rating"]:checked');
+    if (ratingEl) {
+      const ratingValue = ratingEl.value;
+      const ratingText = {
+        1: "Very Hard",
+        2: "Difficult", 
+        3: "Average", 
+        4: "Good", 
+        5: "Great!"
+      }[ratingValue] || `Rated ${ratingValue}/5`;
+      
+      // Add a rating badge
+      const ratingBadge = document.createElement('div');
+      ratingBadge.style.cssText = `
+        position: absolute;
+        top: 60px;
+        right: 60px;
+        background-color: rgba(255, 255, 255, 0.2);
+        color: white;
+        border-radius: 50px;
+        padding: 12px 25px;
+        font-size: 22px;
+        font-weight: 600;
+      `;
+        ratingBadge.innerHTML = `<i class="fas fa-star" style="margin-right: 8px;"></i> I Felt ${ratingText} in this Workout!`;
+      shareTemplate.appendChild(ratingBadge);
+    }
+    
+    // Add the user's notes if available
+    const notesContent = document.getElementById('workout-notes').value;
+    if (notesContent.trim()) {
+      const notesSection = document.createElement('div');
+      notesSection.style.cssText = `
+        background-color: rgba(255, 255, 255, 0.1);
+        border-radius: 15px;
+        padding: 20px;
+        margin: 10px 0 30px 0;
+        text-align: left;
+      `;
+      notesSection.innerHTML = `
+        <h3 style="font-size: 22px; margin: 0 0 10px 0;">My Notes:</h3>
+        <p style="font-size: 18px; margin: 0; line-height: 1.4;">${notesContent}</p>
+      `;
+      
+      // Insert after the workout content
+      const workoutSection = shareTemplate.querySelector('div:nth-child(2)');
+      if (workoutSection && workoutSection.nextSibling) {
+        shareTemplate.insertBefore(notesSection, workoutSection.nextSibling);
+      } else {
+        shareTemplate.appendChild(notesSection);
+      }
+    }
+    
+    // Append to body temporarily, but off-screen
+    shareTemplate.style.position = 'absolute';
+    shareTemplate.style.left = '-9999px';
+    shareTemplate.style.top = '0';
+    document.body.appendChild(shareTemplate);
+    
+    // Convert to image with html2canvas
+    html2canvas(shareTemplate, {
+      scale: 1,
+      useCORS: true,
+      allowTaint: true,
+      logging: false
+    }).then(canvas => {
+      document.body.removeChild(shareTemplate); // Clean up template
+      
+      const imageUrl = canvas.toDataURL('image/png');
+      
+      const previewImg = getElement('share-image-preview');
+      if (previewImg) {
+        previewImg.src = imageUrl;
+        // Set max-height for preview to fit in modal
+        previewImg.style.maxHeight = '70vh';
+        previewImg.style.maxWidth = '100%';
+        previewImg.style.borderRadius = '10px';
+        previewImg.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+      }
+      
+      const downloadBtn = getElement('download-share-image-btn');
+      if (downloadBtn) {
+        downloadBtn.onclick = () => {
+          const a = document.createElement('a');
+          a.href = imageUrl;
+          a.download = `HybridX_Workout_${new Date().toISOString().split('T')[0]}.png`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        };
+      }
+      
+      updateElementVisibility('workout-message', false);
+      updateElementVisibility('share-image-modal', true);
+    }).catch(err => {
+      if (document.body.contains(shareTemplate)) {
+        document.body.removeChild(shareTemplate); // Ensure cleanup on error
+      }
+      displayMessage('workout-message', "Error generating image: " + (err.message || err), false);
+    });
+  } catch (error) {
+    console.error("Error in generateShareImage:", error);
+    displayMessage('workout-message', "Error generating image: " + error.message, false);
+  }
+}
+
+function closeShareModal() {
+  updateElementVisibility('share-image-modal', false);
+}
+
+// Initialize any global event listeners that need to be set right away
+if (typeof window !== 'undefined') {
+  // Global error handler
+  window.onerror = function(message, source, lineno, colno, error) {
+    console.error("Global error:", message, "at", source, ":", lineno, ":", colno);
+    // Only show user errors for critical functions
+    if (source && (source.includes('profile') || source.includes('login'))) {
+      showGeneralError("An error occurred. Please refresh the page and try again.");
+    }
+    return false; // Let the error propagate for console logging
+  };
+}
+
+
+// In Index.html <script>
+
+// --- PROGRAM COMPLETION MODAL LOGIC ---
+
+let availableMaintenanceProgramsCache = null; // Cache for maintenance programs
+
+/**
+ * Checks if the program completion modal should be shown.
+ * Typically called after user profile is loaded or workout is completed.
+ */
+function checkAndShowProgramCompletionModal() {
+  // userProfileDataCache should be populated with the latest user data
+  if (userProfileDataCache && userProfileDataCache.awaitingNextProgramChoice === true) {
+    console.log("User has completed main program, showing completion modal.");
+    getElement('completed-program-name').textContent = userProfileDataCache.programName ?
+        (HYROX_PROGRAMS_CLIENT[userProfileDataCache.programName]?.name || userProfileDataCache.programName) :
+        'Your Program';
+    loadMaintenanceProgramOptions();
+    updateElementVisibility('program-completion-modal', true);
+    updateElementVisibility('completion-loading', false);
+    updateElementContent('completion-message', '');
+  } else {
+    updateElementVisibility('program-completion-modal', false);
+  }
+}
+
+/**
+ * Loads maintenance program options into the modal.
+ */
+function loadMaintenanceProgramOptions() {
+  const container = getElement('maintenance-program-options');
+  if (!container) return;
+  container.innerHTML = '<div class="loading"><div class="spinner"></div><p>Loading options...</p></div>';
+
+  // If cached, use it (or fetch if cache is old/empty)
+  if (availableMaintenanceProgramsCache && availableMaintenanceProgramsCache.length > 0) {
+      renderMaintenanceProgramCards(availableMaintenanceProgramsCache);
+      return;
+  }
+
+  // Fetch maintenance programs from server (a new server function or filter existing one)
+  // Assuming getAvailableTrainingPrograms can be filtered or you have a dedicated one.
+  // For now, let's assume HYROX_PROGRAMS_CLIENT contains them, or you fetch them.
+  // We need a way to identify which programs are "maintenance"
+  // Let's simulate fetching them if they were part of programMetadata
+  // This should ideally call a server function: google.script.run...getMaintenancePrograms()
+
+  // Example: Filter from your existing client-side HYROX_PROGRAMS_CLIENT or a fetched list
+  // This is a placeholder - replace with actual fetching/filtering
+  const allPrograms = Object.entries(HYROX_PROGRAMS_CLIENT).map(([id, data]) => ({ ...data, id }));
+  availableMaintenanceProgramsCache = allPrograms.filter(p =>
+      p.id.startsWith("Maintain") || p.id === "MaintenanceProgram" // Example filter
+  );
+
+  if (availableMaintenanceProgramsCache.length > 0) {
+    renderMaintenanceProgramCards(availableMaintenanceProgramsCache);
+  } else {
+    container.innerHTML = "<p>No maintenance programs currently available.</p>";
+  }
+}
+
+function renderMaintenanceProgramCards(programs) {
+  const container = getElement('maintenance-program-options');
+  if (!container) return;
+  let html = '';
+  programs.forEach(p => {
+    html += `
+      <div class="program-card">
+        <h4>${escapeHTML(p.name)}</h4>
+        <p class="program-description">${escapeHTML(p.description || `A ${p.totalWeeks}-week maintenance cycle.`)}</p>
+        <button class="select-program-btn" onclick="handleSelectMaintenanceProgram('${p.id}')">Select This Maintenance</button>
+      </div>
+    `;
+  });
+  container.innerHTML = html;
+}
+
+/**
+ * Handles the user's choice to start a specific maintenance program.
+ * @param {string} maintenanceProgramId The ID of the chosen maintenance program.
+ */
+function handleSelectMaintenanceProgram(maintenanceProgramId) {
+  if (!currentIdToken || !maintenanceProgramId) {
+    displayMessage('completion-message', "Error: Session or program ID missing.", false);
+    return;
+  }
+  console.log(`User selected maintenance program: ${maintenanceProgramId}`);
+  updateElementVisibility('completion-loading', true);
+  displayMessage('completion-message', '', true);
+
+  const payload = {
+    idToken: currentIdToken,
+    newProgramId: maintenanceProgramId,
+    action: "start_maintenance_program" // New action type for server
+  };
+
+  google.script.run
+    .withSuccessHandler(response => {
+      updateElementVisibility('completion-loading', false);
+      if (response.success) {
+        displayMessage('completion-message', response.message, true);
+        // Clear the completion flag on the client and reload dashboard
+        if (userProfileDataCache) {
+          userProfileDataCache.awaitingNextProgramChoice = false;
+          userProfileDataCache.mainProgramCompleted = false; // Reset this too
+        }
+        // A short delay before hiding modal and reloading
+        setTimeout(() => {
+            updateElementVisibility('program-completion-modal', false);
+            showDashboardUI(); // Reload dashboard data (profile, workout)
+            loadCurrentWorkout();
+            loadWorkoutHistoryForCalendar();
+        }, 2000);
+      } else {
+        displayMessage('completion-message', response.message || "Failed to start maintenance program.", false);
+      }
+    })
+    .withFailureHandler(error => {
+      updateElementVisibility('completion-loading', false);
+      displayMessage('completion-message', "Error: " + error.message, false);
+    })
+    .changeUserProgramSecure(payload); // Reuse or adapt changeUserProgramSecure
+                                      // or create a new server function like startMaintenanceProgramSecure
+}
+
+/**
+ * Handles the user's choice to start a new main program.
+ * This will hide the completion modal and show the standard program selection modal.
+ */
+function handleStartNewMainProgramChoice() {
+  console.log("User chose to start a new main program.");
+  updateElementVisibility('program-completion-modal', false);
+  // This should trigger your existing "change program" or "start new program" modal flow
+  // The 'action' for openProgramSelectionModal would be 'start' or 'change_after_completion'
+  openProgramSelectionModal('start_after_completion'); // Use a specific action if needed
+}
+
+// --- MODIFICATIONS TO EXISTING FUNCTIONS ---
+
+// In your main initialization (DOMContentLoaded) or after login (onAuthStateChanged):
+// After userProfileDataCache is populated:
+// checkAndShowProgramCompletionModal();
+
+// When a workout is completed or skipped, the response from the server might include
+// a flag like `programJustCompleted: true`.
+// In the success handler for completeWorkout or skipWorkout:
+if (response.success && response.programJustCompleted) {
+  // Refresh user profile to get the 'awaitingNextProgramChoice' flag
+  if (currentSession && currentSession.token) {
+    google.script.run
+      .withSuccessHandler(profileResp => {
+        if (profileResp.success) {
+          userProfileDataCache = profileResp.profile;
+          checkAndShowProgramCompletionModal();
+        } else {
+          console.error("Failed to refresh profile:", profileResp.message);
+        }
+      })
+      .withFailureHandler(error => {
+        console.error("Error refreshing profile:", error);
+      })
+      .getUserProfileSecure({idToken: currentSession.token});
+  } else {
+    console.error("No valid session token available for profile refresh");
+  }
+} else if (response.success) {
+  // Just reload current workout normally
+  loadCurrentWorkout();
+  loadWorkoutHistoryForCalendar();
+}
+</script>
+</body>
+</html>

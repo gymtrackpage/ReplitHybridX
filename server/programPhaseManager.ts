@@ -1,5 +1,6 @@
-import { db } from "./db";
+// Program Phase Management System - Based on Google Apps Script implementation
 import { storage } from "./storage";
+import { HYROX_PROGRAMS } from "./programSelection";
 
 export interface ProgramPhaseInfo {
   phase: 'PREP' | 'MAIN' | 'MAINTENANCE';
@@ -9,193 +10,171 @@ export interface ProgramPhaseInfo {
   startDate: Date;
   eventDate?: Date;
   mainProgramStartDate?: Date;
+  virtualStartDate?: Date;
+  eventCompleted?: boolean;
 }
 
-export async function determineUserProgramPhase(userId: string, eventDate: Date | null, selectedProgramId: number): Promise<ProgramPhaseInfo> {
+const DEFAULT_PROGRAM_ID = "IntermediateProgram";
+const MAIN_PROGRAM_TOTAL_WEEKS = 14;
+const PREP_CYCLE_WEEKS = 4;
+const MAINTENANCE_CYCLE_WEEKS = 4;
+
+/**
+ * Calculates the initial program state for a user when they register or change programs/event dates.
+ */
+export async function calculateInitialProgramState(programId: string, eventDate: Date | null): Promise<ProgramPhaseInfo> {
   const currentDate = new Date();
   currentDate.setHours(0, 0, 0, 0);
 
-  // Get the selected main program
-  const mainProgram = await storage.getProgram(selectedProgramId);
-  if (!mainProgram) {
-    throw new Error("Selected program not found");
+  let normalizedEventDate = null;
+  if (eventDate) {
+    normalizedEventDate = new Date(eventDate);
+    normalizedEventDate.setHours(0, 0, 0, 0);
   }
 
-  const mainProgramDuration = mainProgram.duration || 14; // weeks
-  const mainProgramDays = mainProgramDuration * 7;
+  let programPhase: 'PREP' | 'MAIN' | 'MAINTENANCE' = "MAIN";
+  let currentWeek = 0;
+  let currentDay = 0;
+  let startDate = new Date(currentDate);
+  let virtualStartDate = new Date(currentDate);
+  let mainProgramStartDate = null;
+  let eventCompleted = false;
 
-  // No event date - start main program immediately
-  if (!eventDate) {
-    return {
-      phase: 'MAIN',
-      currentProgramId: selectedProgramId,
-      currentWeek: 1,
-      currentDay: 1,
-      startDate: currentDate
-    };
-  }
+  const selectedProgramDetails = HYROX_PROGRAMS[programId] || HYROX_PROGRAMS[DEFAULT_PROGRAM_ID];
+  const programTotalWeeks = selectedProgramDetails.totalWeeks || MAIN_PROGRAM_TOTAL_WEEKS;
 
-  const eventDateTime = new Date(eventDate);
-  eventDateTime.setHours(0, 0, 0, 0);
-  
-  const daysUntilEvent = Math.floor((eventDateTime.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
-
-  // Event has passed - use maintenance program
-  if (daysUntilEvent < 0) {
-    const maintenanceProgram = await getRecommendedMaintenanceProgram(userId);
-    return {
-      phase: 'MAINTENANCE',
-      currentProgramId: maintenanceProgram.id,
-      currentWeek: 1,
-      currentDay: 1,
-      startDate: currentDate,
-      eventDate: eventDateTime
-    };
-  }
-
-  // Event is within main program duration - start main program at appropriate point
-  if (daysUntilEvent <= mainProgramDays) {
-    const daysIntoProgram = mainProgramDays - daysUntilEvent;
-    const currentWeek = Math.floor(daysIntoProgram / 7) + 1;
-    const currentDay = (daysIntoProgram % 7) + 1;
+  if (normalizedEventDate) {
+    const daysUntilEvent = Math.floor((normalizedEventDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
     
-    const programStartDate = new Date(currentDate);
-    programStartDate.setDate(currentDate.getDate() - daysIntoProgram);
-
-    return {
-      phase: 'MAIN',
-      currentProgramId: selectedProgramId,
-      currentWeek: Math.max(1, currentWeek),
-      currentDay: Math.max(1, currentDay),
-      startDate: programStartDate,
-      eventDate: eventDateTime
-    };
+    if (daysUntilEvent < 0) {
+      // Event has passed
+      eventCompleted = true;
+      programPhase = "MAINTENANCE";
+      const daysSinceEvent = Math.abs(daysUntilEvent);
+      const weeksSinceEvent = Math.floor(daysSinceEvent / 7);
+      
+      currentWeek = weeksSinceEvent % MAINTENANCE_CYCLE_WEEKS;
+      currentDay = daysSinceEvent % 7;
+      
+      const weeksBackFromEvent = Math.floor(weeksSinceEvent / MAINTENANCE_CYCLE_WEEKS) * MAINTENANCE_CYCLE_WEEKS;
+      startDate = new Date(normalizedEventDate.getTime() + (weeksBackFromEvent * 7 * 24 * 60 * 60 * 1000));
+      
+    } else if (daysUntilEvent < programTotalWeeks * 7) {
+      // Within main program timeframe
+      programPhase = "MAIN";
+      mainProgramStartDate = new Date(normalizedEventDate.getTime() - (programTotalWeeks * 7 * 24 * 60 * 60 * 1000));
+      
+      const daysSinceMainStart = Math.floor((currentDate.getTime() - mainProgramStartDate.getTime()) / (1000 * 60 * 60 * 24));
+      currentWeek = Math.floor(daysSinceMainStart / 7);
+      currentDay = daysSinceMainStart % 7;
+      
+      startDate = new Date(mainProgramStartDate);
+      virtualStartDate = new Date(mainProgramStartDate);
+      
+    } else {
+      // Need prep phase
+      programPhase = "PREP";
+      const totalPrepWeeks = Math.ceil((daysUntilEvent - (programTotalWeeks * 7)) / 7);
+      const completePrepCycles = Math.floor(totalPrepWeeks / PREP_CYCLE_WEEKS);
+      
+      currentWeek = totalPrepWeeks % PREP_CYCLE_WEEKS;
+      currentDay = daysUntilEvent % 7;
+      
+      mainProgramStartDate = new Date(normalizedEventDate.getTime() - (programTotalWeeks * 7 * 24 * 60 * 60 * 1000));
+      startDate = new Date(currentDate.getTime() - (currentWeek * 7 + currentDay) * 24 * 60 * 60 * 1000);
+      virtualStartDate = new Date(mainProgramStartDate.getTime() - (totalPrepWeeks * 7 * 24 * 60 * 60 * 1000));
+    }
   }
-
-  // Event is far away - start with prep program
-  const prepProgram = await getRecommendedPrepProgram(userId, mainProgram);
-  const mainProgramStartDate = new Date(eventDateTime);
-  mainProgramStartDate.setDate(eventDateTime.getDate() - mainProgramDays);
 
   return {
-    phase: 'PREP',
-    currentProgramId: prepProgram.id,
-    currentWeek: 1,
-    currentDay: 1,
-    startDate: currentDate,
-    eventDate: eventDateTime,
-    mainProgramStartDate
+    phase: programPhase,
+    currentProgramId: await getProgramIdByName(programId),
+    currentWeek,
+    currentDay,
+    startDate,
+    eventDate: normalizedEventDate,
+    mainProgramStartDate,
+    virtualStartDate,
+    eventCompleted
   };
 }
 
-async function getRecommendedPrepProgram(userId: string, mainProgram: any) {
+async function getProgramIdByName(programName: string): Promise<number> {
   const programs = await storage.getPrograms();
-  
-  // Try to match prep program to main program type
-  let prepProgram = programs.find(p => 
-    p.name?.toLowerCase().includes('prep') && 
-    p.name?.toLowerCase().includes('hyrox')
-  );
-
-  // Fallback to any prep program
-  if (!prepProgram) {
-    prepProgram = programs.find(p => p.name?.toLowerCase().includes('prep'));
-  }
-
-  // Fallback to a basic program
-  if (!prepProgram) {
-    prepProgram = programs.find(p => p.name?.toLowerCase().includes('beginner'));
-  }
-
-  if (!prepProgram) {
-    throw new Error("No suitable prep program found");
-  }
-
-  return prepProgram;
+  const program = programs.find(p => p.name.includes(programName) || p.id === parseInt(programName));
+  return program?.id || 1; // Default to first program
 }
 
-async function getRecommendedMaintenanceProgram(userId: string) {
-  const programs = await storage.getPrograms();
-  
-  // Find maintenance program
-  let maintenanceProgram = programs.find(p => 
-    p.name?.toLowerCase().includes('maintain') && 
-    p.name?.toLowerCase().includes('hyrox')
-  );
-
-  // Fallback to any maintenance program
-  if (!maintenanceProgram) {
-    maintenanceProgram = programs.find(p => p.name?.toLowerCase().includes('maintain'));
-  }
-
-  // Fallback to a basic program
-  if (!maintenanceProgram) {
-    maintenanceProgram = programs.find(p => p.name?.toLowerCase().includes('beginner'));
-  }
-
-  if (!maintenanceProgram) {
-    throw new Error("No suitable maintenance program found");
-  }
-
-  return maintenanceProgram;
-}
-
-export async function checkForPhaseTransition(userId: string): Promise<{ shouldTransition: boolean; newPhase?: ProgramPhaseInfo }> {
+/**
+ * Determines the recommended prep program based on the main program
+ */
+async function getRecommendedPrepProgram(userId: string, mainProgram: any): Promise<string> {
   const user = await storage.getUser(userId);
-  if (!user) {
-    return { shouldTransition: false };
+  if (!user) return "BeginnerProgram";
+
+  // Logic based on main program difficulty and user profile
+  if (mainProgram.difficulty === "advanced") {
+    return "IntermediateProgram";
+  } else if (mainProgram.difficulty === "intermediate") {
+    return "BeginnerProgram";
   }
+  return "BeginnerProgram";
+}
 
-  const currentDate = new Date();
-  currentDate.setHours(0, 0, 0, 0);
+/**
+ * Gets the recommended maintenance program
+ */
+async function getRecommendedMaintenanceProgram(userId: string): Promise<string> {
+  return "MaintenanceProgram";
+}
 
-  // Check if user has an event date and current program info
-  if (!user.hyroxEventDate || !user.currentProgramId) {
-    return { shouldTransition: false };
-  }
-
+/**
+ * Checks if a user should transition to a new phase
+ */
+export async function checkForPhaseTransition(userId: string): Promise<{ shouldTransition: boolean; newPhase?: ProgramPhaseInfo }> {
   const progress = await storage.getUserProgress(userId);
   if (!progress) {
     return { shouldTransition: false };
   }
 
-  const currentProgram = await storage.getProgram(user.currentProgramId);
-  if (!currentProgram) {
-    return { shouldTransition: false };
-  }
+  const currentDate = new Date();
+  currentDate.setHours(0, 0, 0, 0);
 
-  const eventDate = new Date(user.hyroxEventDate);
-  eventDate.setHours(0, 0, 0, 0);
+  const startDate = new Date(progress.startDate);
+  const daysSinceStart = Math.floor((currentDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+  const currentWeek = Math.floor(daysSinceStart / 7);
 
-  // Check if we need to transition from PREP to MAIN
-  if (currentProgram.programType === 'prep') {
-    const mainProgramStartDate = new Date(eventDate);
-    mainProgramStartDate.setDate(eventDate.getDate() - (14 * 7)); // 14 weeks before event
+  // Check if we need to transition phases based on event date and current progress
+  if (progress.eventDate) {
+    const eventDate = new Date(progress.eventDate);
+    const daysUntilEvent = Math.floor((eventDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
 
-    if (currentDate >= mainProgramStartDate) {
-      // Find the user's selected main program
-      const programs = await storage.getPrograms();
-      const mainProgram = programs.find(p => p.programType === 'main' && p.difficulty === user.fitnessLevel?.toLowerCase());
-      
+    // Transition from PREP to MAIN (14 weeks before event)
+    if (progress.phase === 'PREP' && daysUntilEvent <= MAIN_PROGRAM_TOTAL_WEEKS * 7) {
+      const mainProgram = await storage.getProgram(progress.programId);
       if (mainProgram) {
-        const newPhase = await determineUserProgramPhase(userId, eventDate, mainProgram.id);
+        const newPhase = await calculateInitialProgramState(mainProgram.name, eventDate);
         return { shouldTransition: true, newPhase };
       }
     }
-  }
 
-  // Check if we need to transition from MAIN to MAINTENANCE
-  if (currentProgram.programType === 'main') {
-    // Check if event date has passed
-    if (currentDate > eventDate) {
-      const newPhase = await determineUserProgramPhase(userId, eventDate, user.currentProgramId);
+    // Transition from MAIN to MAINTENANCE (after event)
+    if (progress.phase === 'MAIN' && daysUntilEvent < 0) {
+      const newPhase = await calculateInitialProgramState("MaintenanceProgram", eventDate);
       return { shouldTransition: true, newPhase };
     }
+  }
 
-    // Check if program duration is complete
-    const programDuration = currentProgram.duration || 14;
-    if (progress.currentWeek > programDuration) {
-      const newPhase = await determineUserProgramPhase(userId, eventDate, user.currentProgramId);
+  // Check if current program cycle is complete
+  const currentProgram = await storage.getProgram(progress.programId);
+  if (currentProgram && currentWeek >= currentProgram.totalWeeks) {
+    if (progress.phase === 'PREP') {
+      // Start a new prep cycle
+      const newPhase = await calculateInitialProgramState(currentProgram.name, progress.eventDate);
+      return { shouldTransition: true, newPhase };
+    } else if (progress.phase === 'MAINTENANCE') {
+      // Start a new maintenance cycle
+      const newPhase = await calculateInitialProgramState("MaintenanceProgram", progress.eventDate);
       return { shouldTransition: true, newPhase };
     }
   }
@@ -203,41 +182,35 @@ export async function checkForPhaseTransition(userId: string): Promise<{ shouldT
   return { shouldTransition: false };
 }
 
-export async function transitionUserToPhase(userId: string, phaseInfo: ProgramPhaseInfo) {
-  try {
-    // Update user's current program
-    await storage.updateUserProgram(userId, phaseInfo.currentProgramId);
-
-    // Update or create progress tracking
-    const existingProgress = await storage.getUserProgress(userId);
-    if (existingProgress) {
-      await storage.updateUserProgress(userId, {
-        programId: phaseInfo.currentProgramId,
-        currentWeek: phaseInfo.currentWeek,
-        currentDay: phaseInfo.currentDay,
-        completedWorkouts: 0, // Reset for new phase
-        totalWorkouts: await calculateTotalWorkouts(phaseInfo.currentProgramId),
-      });
-    } else {
-      await storage.createUserProgress({
-        userId,
-        programId: phaseInfo.currentProgramId,
-        currentWeek: phaseInfo.currentWeek,
-        currentDay: phaseInfo.currentDay,
-        completedWorkouts: 0,
-        totalWorkouts: await calculateTotalWorkouts(phaseInfo.currentProgramId),
-      });
-    }
-
-    console.log(`User ${userId} transitioned to ${phaseInfo.phase} phase with program ${phaseInfo.currentProgramId}`);
-    return true;
-  } catch (error) {
-    console.error("Error transitioning user to new phase:", error);
-    return false;
-  }
+/**
+ * Transitions a user to a new phase
+ */
+export async function transitionUserToPhase(userId: string, phaseInfo: ProgramPhaseInfo): Promise<void> {
+  await storage.updateUserProgress(userId, {
+    programId: phaseInfo.currentProgramId,
+    currentWeek: phaseInfo.currentWeek,
+    currentDay: phaseInfo.currentDay,
+    startDate: phaseInfo.startDate,
+    phase: phaseInfo.phase,
+    eventDate: phaseInfo.eventDate,
+    mainProgramStartDate: phaseInfo.mainProgramStartDate
+  });
 }
 
+/**
+ * Calculates total workouts in a program
+ */
 async function calculateTotalWorkouts(programId: number): Promise<number> {
   const workouts = await storage.getWorkoutsByProgram(programId);
   return workouts.length;
+}
+
+/**
+ * Determines the current program phase for a user
+ */
+export async function determineUserProgramPhase(userId: string, eventDate: Date | null, selectedProgramId: number): Promise<ProgramPhaseInfo> {
+  const program = await storage.getProgram(selectedProgramId);
+  const programName = program?.name || "IntermediateProgram";
+  
+  return await calculateInitialProgramState(programName, eventDate);
 }

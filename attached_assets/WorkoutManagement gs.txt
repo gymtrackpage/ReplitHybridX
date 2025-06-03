@@ -1,0 +1,556 @@
+// WorkoutManagement.gs
+
+/**
+ * Retrieves the current workout for a user based on their progress, program phase,
+ * and specialized phase focus. Also handles automatic phase transitions.
+ * @param {object} sessionData Object containing {userId, token}.
+ * @return {object} { success: boolean, message?: string, workoutText?: string, name?: string, 
+ *                    programId?: string, // The actual program ID/sheet name used for this workout
+ *                    programNameDisplay?: string, // The user's main selected program name for display
+ *                    weekNum?: number, dayNum?: number, programPhase?: string, 
+ *                    displayWeek?: number, refreshedToken?: string }
+ */
+function getWorkoutSecure(sessionData) {
+  try {
+    const validation = validateClientSessionToken(sessionData.token, sessionData.userId); // From Auth.gs
+    if (!validation.success) {
+      return { success: false, message: validation.message || "Session validation failed." };
+    }
+    
+    const userId = validation.userId;
+    let userData = getUserData(userId); // From UserManagement.gs
+    if (!userData) {
+      return { success: false, message: "User data not found." };
+    }
+
+    // Check and update program phase before fetching workout
+    // checkAndUpdateProgramPhase is in ProgramManagement.gs
+    const phaseUpdateResult = checkAndUpdateProgramPhase(userId, userData); 
+    if (phaseUpdateResult.updated) {
+      userData = getUserData(userId); // Re-fetch user data if phase changed
+      if (!userData) {
+        return { success: false, message: "User data error after phase update."
+         };
+      }
+      Logger.log(`Phase for ${userId} updated to ${userData.programPhase} before fetching workout.`);
+    }
+
+    const userName = userData.name;
+    const currentActualWeek = userData.currentWeek; // 0-indexed actual week in current phase
+    const currentActualDay = userData.currentDay;   // 0-indexed actual day in current week
+    const programPhase = userData.programPhase;
+    const userMainProgramId = userData.programName; // User's selected main program (e.g., "IntermediateProgram")
+    const specializedFocus = userData.SpecializedPhaseFocus || ""; // e.g., "PrepStrength", "MaintainRunning"
+
+    let programIdToUse = userMainProgramId; // Default to user's main program sheet
+    let displayWeek = currentActualWeek;    // Default display week is the actual week
+    let cycleLengthWeeks = MAIN_PROGRAM_WEEKS_CONST; // Default for main program
+
+    if (programPhase === "PREP") {
+      cycleLengthWeeks = PREP_CYCLE_WEEKS_CONST; // Defined in Code.gs
+      if (specializedFocus && (specializedFocus.startsWith("Prep") || ["PrepStrength", "PrepRunning", "PrepHyrox"].includes(specializedFocus))) {
+        programIdToUse = specializedFocus;
+        Logger.log(`PREP phase for ${userId}: Using specialized focus sheet "${programIdToUse}".`);
+      } else {
+        // Fallback for PREP if no specialized focus is set:
+        // Option 1: Use a generic "GenericPrepProgram" sheet
+        // programIdToUse = "GenericPrepProgram"; 
+        // Option 2: Use early weeks of their main selected program (current common pattern)
+        programIdToUse = userMainProgramId; 
+        Logger.log(`PREP phase for ${userId}: No specialized focus, using early weeks of main program "${programIdToUse}".`);
+      }
+      displayWeek = currentActualWeek % cycleLengthWeeks;
+    } else if (programPhase === "MAINTENANCE") {
+      cycleLengthWeeks = MAINTENANCE_CYCLE_WEEKS_CONST; // Defined in Code.gs
+      if (specializedFocus && (specializedFocus.startsWith("Maintain") || ["MaintainStrength", "MaintainRunning", "MaintainHyrox"].includes(specializedFocus))) {
+        programIdToUse = specializedFocus;
+        Logger.log(`MAINTENANCE phase for ${userId}: Using specialized focus sheet "${programIdToUse}".`);
+      } else {
+        programIdToUse = "MaintenanceProgram"; // Default generic maintenance sheet
+        Logger.log(`MAINTENANCE phase for ${userId}: No specialized focus, using default "MaintenanceProgram" sheet.`);
+      }
+      displayWeek = currentActualWeek % cycleLengthWeeks;
+    }
+    // For MAIN phase, programIdToUse is already userMainProgramId, and displayWeek is currentActualWeek.
+
+    if (!programIdToUse) {
+      Logger.log(`No programIdToUse could be determined for ${userId}, Phase: ${programPhase}, MainProg: ${userMainProgramId}, Focus: ${specializedFocus}`);
+      return { success: false, message: "No training program could be identified for the current phase."};
+    }
+
+    Logger.log(`getWorkoutSecure for ${userId}: Phase="${programPhase}", UserMainProg="${userMainProgramId}", Focus="${specializedFocus}", UsingSheet="${programIdToUse}", ActualW=${currentActualWeek}D=${currentActualDay}, DisplayW=${displayWeek}`);
+
+    const workoutSheetData = getWorkoutSheetDataByName(programIdToUse); // From this file (WorkoutManagement.gs)
+    if (!workoutSheetData) {
+      return { 
+        success: false, 
+        message: `Workout program sheet '${programIdToUse}' not found. Contact support.`,
+        name: userName, programId: programIdToUse, programNameDisplay: userMainProgramId, 
+        weekNum: currentActualWeek, dayNum: currentActualDay, programPhase: programPhase, displayWeek: displayWeek,
+        refreshedToken: validation.refreshedToken
+      };
+    }
+
+    let rowIndex;
+    if (programPhase === "PREP" || programPhase === "MAINTENANCE") {
+      // For cyclic phases, rowIndex is based on the displayWeek (which is week_in_cycle, 0-indexed)
+      rowIndex = displayWeek + 1; // +1 for header row
+    } else { // MAIN program
+      rowIndex = currentActualWeek + 1; // +1 for header row
+    }
+    const colIndex = currentActualDay + 1;  // +1 for week label column in sheet
+
+    // Logger.log(`Fetching workout from ${programIdToUse}: Sheet Row ${rowIndex} Col ${colIndex}`);
+
+    if (currentActualWeek >= cycleLengthWeeks && (programPhase === "PREP" || programPhase === "MAINTENANCE")) {
+        // This indicates they've completed a full cycle of PREP/MAINTENANCE
+        // The checkAndUpdateProgramPhase should handle transitions, but this is a safeguard for workout fetching
+        Logger.log(`User ${userId} in ${programPhase} completed cycle week ${currentActualWeek}. Content will repeat or phase should change.`);
+        // Content will naturally repeat due to modulo for rowIndex if phase hasn't changed.
+    }
+    
+    // Check if actual weeks for MAIN phase exceed total weeks (e.g., 14 weeks for main program)
+    if (programPhase === "MAIN" && currentActualWeek >= MAIN_PROGRAM_WEEKS_CONST) {
+        Logger.log(`User ${userId} in MAIN phase has completed all ${MAIN_PROGRAM_WEEKS_CONST} weeks. Should transition to MAINTENANCE.`);
+         return { 
+            success: true, 
+            message: "Congratulations! You've completed the main program. Transitioning to maintenance or select a new goal.", 
+            workoutText: null, 
+            name: userName, programId: programIdToUse, programNameDisplay: userMainProgramId,
+            weekNum: currentActualWeek, dayNum: currentActualDay, programPhase: programPhase, displayWeek: displayWeek,
+            refreshedToken: validation.refreshedToken
+        };
+    }
+
+
+    if (workoutSheetData.length <= rowIndex || !workoutSheetData[rowIndex] || workoutSheetData[rowIndex].length <= colIndex) {
+      Logger.log(`No workout content found at R${rowIndex}C${colIndex} in sheet "${programIdToUse}". Program phase may have ended or data missing.`);
+      return { 
+        success: true, 
+        message: "No more workouts scheduled in the current program/phase. Check your profile or contact support.", 
+        workoutText: null, 
+        name: userName, programId: programIdToUse, programNameDisplay: userMainProgramId,
+        weekNum: currentActualWeek, dayNum: currentActualDay, programPhase: programPhase, displayWeek: displayWeek,
+        refreshedToken: validation.refreshedToken
+      };
+    }
+    
+    const workoutText = String(workoutSheetData[rowIndex][colIndex] || "Rest Day or Content Not Specified.");
+    
+    return {
+      success: true,
+      name: userName, // User's actual name
+      programId: programIdToUse, // The sheet name the workout was fetched from
+      programNameDisplay: userMainProgramId, // The name of the user's main selected program for consistent display
+      weekNum: currentActualWeek,    // Actual 0-indexed week in the current phase
+      dayNum: currentActualDay,     // Actual 0-indexed day in the current week
+      workoutText: workoutText,
+      programPhase: programPhase,
+      displayWeek: displayWeek,       // 0-indexed week for UI display (e.g., week_in_4_week_cycle)
+      refreshedToken: validation.refreshedToken
+    };
+
+  } catch (error) {
+    Logger.log("Error in getWorkoutSecure: " + error.toString() + "\nStack: " + error.stack);
+    return { success: false, message: "Server error retrieving workout: " + error.message };
+  }
+}
+
+/**
+ * Marks a workout as complete, logs feedback, and advances user progress.
+ * @param {object} sessionData Object containing {userId, token}.
+ * @param {string} comment User's comments on the workout.
+ * @param {number|string} rating User's rating for the workout.
+ * @return {object} { success: boolean, message?: string, nextWorkout?: { week, day, programPhase }, refreshedToken?: string }
+ */
+function completeWorkoutSecure(sessionData, comment, rating) {
+  try {
+    Logger.log(`completeWorkoutSecure: User ${sessionData.userId}, Rating: ${rating}, Comment: ${comment ? comment.substring(0,20) : 'N/A'}...`);
+    const validation = validateClientSessionToken(sessionData.token, sessionData.userId);
+    if (!validation.success) {
+      return { success: false, message: validation.message || "Session validation failed." };
+    }
+
+    const userId = validation.userId;
+    const userData = getUserData(userId);
+    if (!userData) {
+      return { success: false, message: "User not found." };
+    }
+
+    // Log the workout
+    const userSpreadsheet = getUserDataSpreadsheet();
+    const logSheet = getOrCreateSheet(userSpreadsheet, WORKOUT_LOG_SHEET_NAME, [
+      "UserID", "Name", "Date", "ProgramID", "ProgramPhase", "ActualWeek", "ActualDay", 
+      "DisplayWeek", "DisplayDay", "Comments", "Rating", "Skipped"
+    ]);
+
+    let displayWeekForLog = userData.currentWeek;
+    if (userData.programPhase === "PREP" || userData.programPhase === "MAINTENANCE") {
+        displayWeekForLog = userData.currentWeek % 4;
+    }
+
+    logSheet.appendRow([
+      userId,
+      userData.name,
+      new Date(), // Completion date
+      userData.programName, // Program ID
+      userData.programPhase,
+      userData.currentWeek,    // Actual week index (0-based)
+      userData.currentDay,     // Actual day index (0-based)
+      displayWeekForLog,       // Display week for UI consistency (0-based)
+      userData.currentDay,     // Display day (0-based, same as actual)
+      comment || "",
+      rating ? Number(rating) : null,
+      false // Skipped = false
+    ]);
+    Logger.log(`Workout logged for ${userId}`);
+
+    // Advance user progress
+    const advanceResult = advanceUserProgress(userId, userData);
+
+    // Check for phase transitions after advancing
+    const updatedUserData = getUserData(userId); // Get fresh data after advance
+    const phaseCheckResult = checkAndUpdateProgramPhase(userId, updatedUserData);
+    
+    let finalUserData = updatedUserData;
+    if (phaseCheckResult.updated) {
+        finalUserData = getUserData(userId); // Get the very latest data if phase changed
+    }
+
+
+    return {
+      success: true,
+      message: "Workout completed and logged!",
+      nextWorkout: { // Provide info about the next workout state
+        week: finalUserData.currentWeek,
+        day: finalUserData.currentDay,
+        programPhase: finalUserData.programPhase
+      },
+      refreshedToken: validation.refreshedToken
+    };
+
+  } catch (error) {
+    Logger.log("Error in completeWorkoutSecure: " + error.toString() + " Stack: " + error.stack);
+    return { success: false, message: "Server error completing workout: " + error.message };
+  }
+}
+
+
+/**
+ * Marks a workout as skipped, logs it, and advances user progress.
+ * @param {object} requestData Object containing { sessionData: {userId, token}, week, day, programPhase }.
+ * @return {object} { success: boolean, message?: string, nextWorkout?: object, refreshedToken?: string }
+ */
+function skipWorkoutSecure(requestData) {
+  try {
+    const sessionData = requestData.sessionData;
+    Logger.log(`skipWorkoutSecure: User ${sessionData.userId} skipping W${requestData.week}D${requestData.day} of phase ${requestData.programPhase}`);
+    const validation = validateClientSessionToken(sessionData.token, sessionData.userId);
+    if (!validation.success) {
+      return { success: false, message: validation.message || "Session validation failed." };
+    }
+
+    const userId = validation.userId;
+    const userData = getUserData(userId);
+    if (!userData) {
+      return { success: false, message: "User not found." };
+    }
+    
+    // Ensure the workout being skipped is the user's *current* workout.
+    // Users should only be able to skip their active/current workout.
+    // The requestData.week, day, programPhase should match userData.currentWeek, etc.
+    if (requestData.week !== userData.currentWeek || 
+        requestData.day !== userData.currentDay ||
+        (requestData.programPhase && requestData.programPhase !== userData.programPhase) ) {
+        Logger.log(`Mismatch skipping workout: Request W${requestData.week}D${requestData.day}P${requestData.programPhase} vs User W${userData.currentWeek}D${userData.currentDay}P${userData.programPhase}`);
+        return { success: false, message: "Cannot skip this workout. It's not your current workout." };
+    }
+
+    const userSpreadsheet = getUserDataSpreadsheet();
+    const logSheet = getOrCreateSheet(userSpreadsheet, WORKOUT_LOG_SHEET_NAME); // Headers defined in completeWorkoutSecure
+
+    let displayWeekForLog = userData.currentWeek;
+    if (userData.programPhase === "PREP" || userData.programPhase === "MAINTENANCE") {
+        displayWeekForLog = userData.currentWeek % 4;
+    }
+
+    logSheet.appendRow([
+      userId,
+      userData.name,
+      new Date(), // Skipped date
+      userData.programName,
+      userData.programPhase,
+      userData.currentWeek,
+      userData.currentDay,
+      displayWeekForLog,
+      userData.currentDay,
+      "Workout Skipped", // Comment
+      null, // Rating
+      true  // Skipped = true
+    ]);
+    Logger.log(`Workout skipped and logged for ${userId}`);
+
+    // Advance user progress (same as completing)
+    const advanceResult = advanceUserProgress(userId, userData);
+
+    // Check for phase transitions after advancing
+    const updatedUserData = getUserData(userId);
+    const phaseCheckResult = checkAndUpdateProgramPhase(userId, updatedUserData);
+    
+    let finalUserData = updatedUserData;
+    if (phaseCheckResult.updated) {
+        finalUserData = getUserData(userId);
+    }
+    
+    return {
+      success: true,
+      message: "Workout skipped. Your schedule has been updated.",
+      nextWorkout: {
+        week: finalUserData.currentWeek,
+        day: finalUserData.currentDay,
+        programPhase: finalUserData.programPhase
+      },
+      refreshedToken: validation.refreshedToken
+    };
+
+  } catch (error) {
+    Logger.log("Error in skipWorkoutSecure: " + error.toString() + " Stack: " + error.stack);
+    return { success: false, message: "Server error skipping workout: " + error.message };
+  }
+}
+
+/**
+ * Advances the user's progress to the next day/week.
+ * @param {string} userId The user's ID.
+ * @param {object} currentUserData The current user data object (to avoid re-fetching immediately).
+ * @return {object} { success: boolean, newWeek: number, newDay: number }
+ */
+function advanceUserProgress(userId, currentUserData) {
+  const userSpreadsheet = getUserDataSpreadsheet();
+  const userSheet = getOrCreateSheet(userSpreadsheet, USER_SHEET_NAME);
+  
+  let newDay = currentUserData.currentDay + 1;
+  let newWeek = currentUserData.currentWeek;
+  const programDaysPerWeek = 7; // Assume 7 days unless program specifices otherwise
+
+  if (newDay >= programDaysPerWeek) {
+    newDay = 0; // Reset to day 0 for the new week
+    newWeek++;
+  }
+
+  userSheet.getRange(currentUserData.userRow, 2).setValue(newWeek);   // CurrentWeek in Col B
+  userSheet.getRange(currentUserData.userRow, 3).setValue(newDay);    // CurrentDay in Col C
+  userSheet.getRange(currentUserData.userRow, 6).setValue(new Date()); // LastCompleted in Col F
+  
+  Logger.log(`Advanced progress for ${userId} to W${newWeek}D${newDay}`);
+  return { success: true, newWeek: newWeek, newDay: newDay };
+}
+
+
+/**
+ * Retrieves workout history for a user, including completed and skipped.
+ * @param {object} sessionData Object containing {userId, token}.
+ * @return {object} { success: boolean, message?: string, completedWorkouts?: Array, refreshedToken?: string }
+ */
+function getWorkoutHistorySecure(sessionData) {
+  try {
+    const validation = validateClientSessionToken(sessionData.token, sessionData.userId);
+    if (!validation.success) {
+      return { success: false, message: validation.message || "Session validation failed." };
+    }
+    const userId = validation.userId;
+
+    const userSpreadsheet = getUserDataSpreadsheet();
+    const logSheet = getOrCreateSheet(userSpreadsheet, WORKOUT_LOG_SHEET_NAME);
+    const logData = logSheet.getDataRange().getValues();
+    const history = [];
+
+    // UserID, Name, Date, ProgramID, ProgramPhase, ActualWeek, ActualDay, DisplayWeek, DisplayDay, Comments, Rating, Skipped
+    for (let i = 1; i < logData.length; i++) {
+      if (logData[i][0] === userId) { // UserID match
+        history.push({
+          date: logData[i][2] ? new Date(logData[i][2]).toISOString() : null,
+          programId: String(logData[i][3] || ""),
+          programPhase: String(logData[i][4] || "MAIN"),
+          // Actual week/day are stored 0-indexed, client might expect 1-indexed for display sometimes
+          // but for consistency in data transfer, let's keep them 0-indexed
+          week: Number(logData[i][7] || 0), // DisplayWeek (0-indexed)
+          day: Number(logData[i][8] || 0),  // DisplayDay (0-indexed)
+          notes: String(logData[i][9] || ""),
+          rating: logData[i][10] ? Number(logData[i][10]) : null,
+          skipped: logData[i][11] === true,
+          // For lightbox display, might need original workout text. 
+          // This requires joining with workout program sheets, which can be slow.
+          // For now, history only contains log data. Client can fetch workout text separately if needed.
+        });
+      }
+    }
+    // Logger.log(`getWorkoutHistorySecure: Found ${history.length} log entries for ${userId}`);
+    return { success: true, completedWorkouts: history, refreshedToken: validation.refreshedToken };
+
+  } catch (error) {
+    Logger.log("Error in getWorkoutHistorySecure: " + error.toString() + " Stack: " + error.stack);
+    return { success: false, message: "Server error fetching workout history: " + error.message };
+  }
+}
+
+
+/**
+ * Retrieves specific workout text for a past or future workout, without full user context.
+ * @param {object} requestData { sessionData: {userId, token}, week (0-indexed), day (0-indexed), programPhase }
+ * @return {object} { success: boolean, message?: string, workoutText?: string, refreshedToken?: string }
+ */
+function getWorkoutTextSecure(requestData) {
+  try {
+    const sessionData = requestData.sessionData;
+    const validation = validateClientSessionToken(sessionData.token, sessionData.userId);
+    if (!validation.success) {
+      return { success: false, message: validation.message || "Session validation failed." };
+    }
+    
+    const userId = validation.userId; // User whose program context to use
+    const targetWeek = Number(requestData.week);
+    const targetDay = Number(requestData.day);
+    const targetProgramPhase = String(requestData.programPhase || "MAIN");
+
+    const userData = getUserData(userId);
+    if (!userData) {
+        return { success: false, message: "User data not found to determine program." };
+    }
+
+    let programIdToFetch = userData.programName; // Base program ID
+    if (targetProgramPhase === "MAINTENANCE") {
+        programIdToFetch = "MaintenanceProgram";
+    }
+    // If targetProgramPhase is PREP, it usually uses the main program sheet's early weeks.
+    // The logic below handles the rowIndex for PREP using currentProgramId.
+
+    if (!programIdToFetch) {
+      return { success: false, message: "No program ID associated with user or phase." };
+    }
+
+    const workoutSheetData = getWorkoutSheetDataByName(programIdToFetch);
+    if (!workoutSheetData) {
+      return { success: false, message: `Workout program sheet '${programIdToFetch}' not found.` };
+    }
+
+    let rowIndex;
+    if (targetProgramPhase === "PREP" || targetProgramPhase === "MAINTENANCE") {
+      rowIndex = (targetWeek % 4) + 1; // +1 for header, repeats every 4 weeks
+    } else { // MAIN program
+      rowIndex = targetWeek + 1; // +1 for header row
+    }
+    const colIndex = targetDay + 1;  // +1 for week label column
+
+    if (workoutSheetData.length <= rowIndex || (workoutSheetData[rowIndex] && workoutSheetData[rowIndex].length <= colIndex)) {
+      return { success: true, workoutText: "No workout found for the specified day.", refreshedToken: validation.refreshedToken };
+    }
+    
+    const workoutText = workoutSheetData[rowIndex][colIndex] || "No content specified.";
+    return { success: true, workoutText: workoutText, refreshedToken: validation.refreshedToken };
+
+  } catch (error) {
+    Logger.log("Error in getWorkoutTextSecure: " + error.toString() + " Stack: " + error.stack);
+    return { success: false, message: "Server error getting workout text: " + error.message };
+  }
+}
+
+
+/**
+ * Allows a user to set their current workout to a future day within the *same week*,
+ * marking intervening days as skipped.
+ * @param {object} requestData { sessionData, targetWeek, targetDay, programPhase }
+ * @return {object} { success: boolean, message?: string, newWorkout?: object, refreshedToken?: string }
+ */
+function setCurrentWorkoutSecure(requestData) {
+  try {
+    const sessionData = requestData.sessionData;
+    const validation = validateClientSessionToken(sessionData.token, sessionData.userId);
+    if (!validation.success) {
+      return { success: false, message: validation.message || "Session validation failed." };
+    }
+
+    const userId = validation.userId;
+    const targetWeek = Number(requestData.targetWeek);
+    const targetDay = Number(requestData.targetDay);
+    // const targetProgramPhase = String(requestData.programPhase); // Phase shouldn't change with this action
+
+    const userData = getUserData(userId);
+    if (!userData) {
+      return { success: false, message: "User not found." };
+    }
+
+    if (targetWeek !== userData.currentWeek) {
+      return { success: false, message: "Can only skip to a future day within the current week." };
+    }
+    if (targetDay <= userData.currentDay) {
+      return { success: false, message: "Can only skip to a future day." };
+    }
+    
+    const userSpreadsheet = getUserDataSpreadsheet();
+    const userSheet = getOrCreateSheet(userSpreadsheet, USER_SHEET_NAME);
+    const logSheet = getOrCreateSheet(userSpreadsheet, WORKOUT_LOG_SHEET_NAME);
+
+    // Log intervening days as skipped
+    for (let dayToSkip = userData.currentDay; dayToSkip < targetDay; dayToSkip++) {
+      let displayWeekForLog = userData.currentWeek;
+      if (userData.programPhase === "PREP" || userData.programPhase === "MAINTENANCE") {
+          displayWeekForLog = userData.currentWeek % 4;
+      }
+      logSheet.appendRow([
+        userId, userData.name, new Date(), userData.programName, userData.programPhase,
+        userData.currentWeek, dayToSkip, displayWeekForLog, dayToSkip,
+        `Skipped to advance to Day ${targetDay + 1}`, null, true
+      ]);
+    }
+    Logger.log(`Skipped days from D${userData.currentDay + 1} to D${targetDay} for ${userId}`);
+
+    // Update user's current position
+    userSheet.getRange(userData.userRow, 2).setValue(targetWeek);   // CurrentWeek
+    userSheet.getRange(userData.userRow, 3).setValue(targetDay);    // CurrentDay
+    userSheet.getRange(userData.userRow, 6).setValue(new Date());   // LastCompleted (effectively last action date)
+    
+    Logger.log(`Set current workout for ${userId} to W${targetWeek}D${targetDay}`);
+
+    return {
+      success: true,
+      message: `Schedule updated. Your current workout is now Week ${targetWeek + 1}, Day ${targetDay + 1}.`,
+      newWorkout: {
+        week: targetWeek,
+        day: targetDay,
+        programPhase: userData.programPhase
+      },
+      refreshedToken: validation.refreshedToken
+    };
+
+  } catch (error) {
+    Logger.log("Error in setCurrentWorkoutSecure: " + error.toString() + " Stack: " + error.stack);
+    return { success: false, message: "Server error setting current workout: " + error.message };
+  }
+}
+
+/**
+ * Helper to get workout sheet data by its name, with caching.
+ * @param {string} programSheetName The name of the sheet (Program ID).
+ * @return {Array<Array<string>>|null} 2D array of workout data or null if not found.
+ */
+function getWorkoutSheetDataByName(programSheetName) {
+  const cacheKey = `workoutSheetData_${programSheetName}`; // Unique cache key
+
+  // Define the data supplier function. This function will only be called if data is not in cache.
+  const dataSupplier = function() {
+    Logger.log(`Data supplier called for: ${programSheetName}`);
+    const spreadsheet = getMasterWorkoutSs(); // From Code.gs
+    const sheet = spreadsheet.getSheetByName(programSheetName);
+
+    if (!sheet) {
+      Logger.log(`Workout sheet "${programSheetName}" not found in spreadsheet ID: ${MASTER_WORKOUT_SPREADSHEET_ID}`);
+      return null; // Supplier returns null if data can't be fetched
+    }
+    return sheet.getDataRange().getValues();
+  };
+
+  // Use getFromCacheOrFetch. For program templates, getScriptCache() is usually better.
+  // The CACHE_EXPIRATION_SECONDS will be used from Code.gs by default.
+  return getFromCacheOrFetch(cacheKey, dataSupplier, CACHE_EXPIRATION_SECONDS, CacheService.getScriptCache());
+}

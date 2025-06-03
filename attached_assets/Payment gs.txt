@@ -1,0 +1,697 @@
+// Payment.gs
+
+// Assumes STRIPE_SECRET_KEY and STRIPE_PRICE_ID_CONST are defined in Code.gs or fetched from Script Properties
+// const S_KEY = PropertiesService.getScriptProperties().getProperty('STRIPE_SECRET_KEY');
+// const PRICE_ID = STRIPE_PRICE_ID_CONST; // Defined in Code.gs
+
+/**
+ * Creates or retrieves a Stripe Customer.
+ * @param {string} email The user's email.
+ * @param {string} name The user's name.
+ * @param {string} userId The internal UserID (will be stored in metadata).
+ * @return {object} { success: boolean, customerId?: string, message?: string }
+ */
+function getOrCreateStripeCustomer(email, name, userId) {
+  const S_KEY = PropertiesService.getScriptProperties().getProperty('STRIPE_SECRET_KEY');
+  if (!S_KEY) {
+    Logger.log("Stripe secret key not configured in getOrCreateStripeCustomer.");
+    return { success: false, message: "Stripe secret key not configured." };
+  }
+
+  try {
+    const stringUserId = String(userId || ""); 
+
+    const listCustomersUrl = `https://api.stripe.com/v1/customers?email=${encodeURIComponent(email)}&limit=1`;
+    const existingCustomersResponse = UrlFetchApp.fetch(listCustomersUrl, {
+      method: 'get',
+      headers: { 'Authorization': `Bearer ${S_KEY}` },
+      muteHttpExceptions: true
+    });
+    const existingCustomers = JSON.parse(existingCustomersResponse.getContentText());
+
+    if (existingCustomersResponse.getResponseCode() === 200 && existingCustomers.data && existingCustomers.data.length > 0) {
+      const existingCustomerId = existingCustomers.data[0].id;
+      Logger.log(`Stripe customer found for email ${email}: ${existingCustomerId}`);
+      // Optionally update customer's name or metadata if it has changed
+      // This ensures the metadata is up-to-date if a user re-registers or data changes.
+      const updatePayload = {
+        name: name,
+        description: `HybridX User: ${name} (ID: ${stringUserId})`,
+        'metadata[hybridx_user_id]': stringUserId,
+        'metadata[registration_source]': "HybridX Platform (Updated)" // Or some other indicator
+      };
+      UrlFetchApp.fetch(`https://api.stripe.com/v1/customers/${existingCustomerId}`, {
+        method: 'post',
+        headers: { 'Authorization': `Bearer ${S_KEY}`, 'Content-Type': 'application/x-www-form-urlencoded'},
+        payload: updatePayload,
+        muteHttpExceptions: true // Log errors but don't necessarily fail the whole process if update fails
+      });
+      Logger.log(`Attempted to update existing customer ${existingCustomerId}`);
+      return { success: true, customerId: existingCustomerId };
+    } else if (existingCustomersResponse.getResponseCode() !== 200 && !(existingCustomers.error && existingCustomers.data && existingCustomers.data.length === 0)) {
+      // Log significant error during customer lookup, but still try to create one.
+      Logger.log(`Error fetching existing Stripe customers (${existingCustomersResponse.getResponseCode()}): ${JSON.stringify(existingCustomers.error)}`);
+    }
+
+
+    // Create new customer
+    const customerPayload = {
+      email: email,
+      name: name,
+      description: `HybridX User: ${name} (ID: ${stringUserId})`,
+      // --- METADATA CORRECTION for x-www-form-urlencoded ---
+      'metadata[hybridx_user_id]': stringUserId,
+      'metadata[registration_source]': "HybridX Platform"
+    };
+    Logger.log("Creating Stripe customer with corrected payload: " + JSON.stringify(customerPayload));
+
+    const customerResponse = UrlFetchApp.fetch('https://api.stripe.com/v1/customers', {
+      method: 'post',
+      headers: {
+        'Authorization': `Bearer ${S_KEY}`,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      payload: customerPayload,
+      muteHttpExceptions: true
+    });
+    const customer = JSON.parse(customerResponse.getContentText());
+
+    if (customerResponse.getResponseCode() >= 400) {
+      Logger.log(`Error creating Stripe customer (${customerResponse.getResponseCode()}): ${JSON.stringify(customer.error)}`);
+      // Log the full response text for detailed Stripe error message
+      // Logger.log("Full Stripe error response for customer creation: " + customerResponse.getContentText());
+      return { success: false, message: `Stripe customer creation failed: ${customer.error ? customer.error.message : 'Unknown Stripe error'}` };
+    }
+    
+    Logger.log(`Stripe customer created: ${customer.id} for ${email}`);
+    return { success: true, customerId: customer.id };
+
+  } catch (error) {
+    Logger.log("Exception in getOrCreateStripeCustomer: " + error.toString() + "\nStack: " + error.stack);
+    return { success: false, message: "Server error managing Stripe customer: " + error.message };
+  }
+}
+
+// In Payment.gs
+// ... (other functions like getOrCreateStripeCustomer, createStripePaymentIntent, etc.) ...
+
+/**
+ * Gets the user's current subscription status and renewal/end date from the 'Subscriptions' sheet.
+ * This sheet is assumed to be kept up-to-date by Stripe webhooks.
+ * @param {object} sessionData Object containing {userId, token}.
+ * @return {object} { success: boolean, status?: string, renews?: string (ISO date), message?: string, refreshedToken?: string }
+ */
+function getUserSubscriptionStatus(sessionData) {
+  try {
+    const validation = validateClientSessionToken(sessionData.token, sessionData.userId); // From Auth.gs
+    if (!validation.success) {
+      Logger.log(`getUserSubscriptionStatus: Session validation failed for ${sessionData.userId} - ${validation.message}`);
+      return { success: false, message: validation.message || "Session validation failed." };
+    }
+    const userId = validation.userId;
+    Logger.log(`getUserSubscriptionStatus: Validated session for ${userId}. Fetching subscription status.`);
+
+    const userSpreadsheet = getUserDataSs(); // From Code.gs
+    
+    // --- Step 1: Find the Stripe Subscription ID for the user ---
+    let stripeSubscriptionId = null;
+
+    // Attempt 1: From Credentials sheet (Column G for Stripe Subscription ID)
+    const credsSheet = getOrCreateSheet(userSpreadsheet, CREDENTIALS_SHEET_NAME, ["Username", "PasswordHash", "Salt", "UserID", "Email", "StripeCustomerID", "SubscriptionID"]); // Ensure headers are defined
+    const userCredRecord = findRowByValue(credsSheet, 4, userId); // UserID is in Column D (index 3 in array)
+
+    if (userCredRecord && userCredRecord.rowData[6]) { // Stripe Subscription ID in Column G (index 6 in array)
+      stripeSubscriptionId = String(userCredRecord.rowData[6]).trim();
+      Logger.log(`getUserSubscriptionStatus: Found Stripe Sub ID ${stripeSubscriptionId} in Credentials for user ${userId}.`);
+    }
+
+    // Attempt 2: Fallback to Subscriptions sheet if not found in Credentials
+    if (!stripeSubscriptionId) {
+      const subsSheet = getOrCreateSheet(userSpreadsheet, SUBSCRIPTIONS_SHEET_NAME, ["UserID", "StripeCustomerID", "SubscriptionID", "Status", "CreatedDate", "CurrentPeriodEnd", "PriceID", "CancelledAt"]);
+      const subRecordByUserId = findRowByValue(subsSheet, 1, userId); // UserID is in Column A (index 0 in array)
+      if (subRecordByUserId && subRecordByUserId.rowData[2]) { // SubscriptionID in Column C (index 2 in array)
+         stripeSubscriptionId = String(subRecordByUserId.rowData[2]).trim();
+         Logger.log(`getUserSubscriptionStatus: Found Stripe Sub ID ${stripeSubscriptionId} in Subscriptions sheet for user ${userId}.`);
+      }
+    }
+    
+    if (!stripeSubscriptionId) {
+      Logger.log(`getUserSubscriptionStatus: No Stripe Subscription ID found for user ${userId} in either Credentials or Subscriptions sheet.`);
+      // It's not an error if they simply don't have a subscription.
+      return { 
+        success: true, // Request was successful, user just isn't subscribed
+        status: "Not Subscribed", 
+        renews: null, 
+        refreshedToken: validation.refreshedToken 
+      };
+    }
+
+    // --- Step 2: Fetch the latest subscription details from your 'Subscriptions' sheet ---
+    // This sheet should be kept up-to-date by Stripe webhooks.
+    const subsSheet = getOrCreateSheet(userSpreadsheet, SUBSCRIPTIONS_SHEET_NAME); // Headers already defined above
+    const subRecord = findRowByValue(subsSheet, 3, stripeSubscriptionId); // SubscriptionID is in Column C (index 2 in array)
+
+    if (subRecord) {
+      const status = String(subRecord.rowData[3] || "unknown").trim(); // Status in Col D (index 3)
+      const periodEndValue = subRecord.rowData[5]; // CurrentPeriodEnd in Col F (index 5) - this should be a Date object or valid date string/timestamp
+      let renewsISO = null;
+
+      if (periodEndValue) {
+        try {
+            // Ensure periodEndValue is treated as a Date object correctly
+            const periodEndDate = (periodEndValue instanceof Date) ? periodEndValue : new Date(periodEndValue);
+            if (!isNaN(periodEndDate.getTime())) { // Check if it's a valid date
+                renewsISO = periodEndDate.toISOString();
+            } else {
+                Logger.log(`getUserSubscriptionStatus: Invalid date value for periodEndTimestamp for sub ${stripeSubscriptionId}: "${periodEndValue}"`);
+            }
+        } catch (dateErr) {
+            Logger.log(`getUserSubscriptionStatus: Error parsing periodEndTimestamp for sub ${stripeSubscriptionId}: "${periodEndValue}". Error: ${dateErr}`);
+        }
+      } else {
+          Logger.log(`getUserSubscriptionStatus: Missing periodEndTimestamp for sub ${stripeSubscriptionId}.`);
+      }
+      
+      Logger.log(`getUserSubscriptionStatus for ${userId} (SubID: ${stripeSubscriptionId}): Status="${status}", RenewsISO="${renewsISO}"`);
+      return { 
+        success: true, 
+        status: status, 
+        renews: renewsISO, // Send ISO string or null
+        refreshedToken: validation.refreshedToken 
+      };
+    } else {
+      Logger.log(`getUserSubscriptionStatus: Subscription record not found in Subscriptions sheet for SubID ${stripeSubscriptionId} (User: ${userId}). This might indicate an old or un-synced subscription.`);
+      // Fallback: You could try fetching directly from Stripe API here as a last resort if you suspect stale data.
+      // However, relying on the webhook-updated sheet is generally more efficient.
+      // const stripeAPIDetails = adminGetStripeSubscriptionDetails_(stripeSubscriptionId); // Assuming such a function exists and is callable
+      // if (stripeAPIDetails.success) {
+      //   return { success: true, status: stripeAPIDetails.subscriptionData.status, renews: new Date(stripeAPIDetails.subscriptionData.current_period_end * 1000).toISOString(), refreshedToken: validation.refreshedToken };
+      // }
+      return { 
+        success: true, // The function ran, but no local record for this subID
+        status: "Unknown (No local record)", 
+        renews: null, 
+        refreshedToken: validation.refreshedToken 
+      };
+    }
+
+  } catch (error) {
+    Logger.log("Error in getUserSubscriptionStatus: " + error.toString() + "\nStack: " + error.stack);
+    return { success: false, message: "Server error fetching subscription status: " + error.message };
+  }
+}
+
+
+/**
+* Creates a Stripe Payment Intent.
+ * @param {object} paymentData { email, fullname, username (used as internal userId for metadata) }
+ * @return {object} { success: boolean, clientSecret?: string, customerId?: string, paymentIntentId?: string, message?: string }
+ */
+function createStripePaymentIntent(paymentData) {
+  const S_KEY = PropertiesService.getScriptProperties().getProperty('STRIPE_SECRET_KEY');
+  if (!S_KEY) {
+    Logger.log("Stripe secret key not configured in createStripePaymentIntent.");
+    return { success: false, message: "Stripe secret key not configured." };
+  }
+
+  try {
+    if (!paymentData || !paymentData.email || !paymentData.fullname || !paymentData.username) {
+        Logger.log("Missing data for Payment Intent creation: " + JSON.stringify(paymentData));
+        return { success: false, message: "User details missing for payment setup."};
+    }
+    Logger.log(`Creating payment intent for user: ${paymentData.username}, email: ${paymentData.email}`);
+
+    const customerResult = getOrCreateStripeCustomer(paymentData.email, paymentData.fullname, paymentData.username);
+    if (!customerResult.success) {
+      return customerResult; 
+    }
+    const customerId = customerResult.customerId;
+
+    // Correctly format metadata for x-www-form-urlencoded
+    const paymentParams = {
+      amount: '500', 
+      currency: 'gbp',
+      customer: customerId,
+      description: 'HybridX Training Monthly Subscription',
+      'automatic_payment_methods[enabled]': 'true', // Keep this if you want Stripe to choose payment methods
+      setup_future_usage: 'off_session',
+      // --- METADATA CORRECTION ---
+      'metadata[hybridx_user_id]': String(paymentData.username || ""),
+      'metadata[email]': String(paymentData.email || ""),
+      'metadata[product_name]': "HybridX Monthly Subscription"
+      // If you had more metadata keys, they would follow the same pattern:
+      // 'metadata[another_key]': "another_value"
+    };
+    Logger.log("Payment intent parameters (after metadata correction): " + JSON.stringify(paymentParams));
+
+    const paymentIntentResponse = UrlFetchApp.fetch('https://api.stripe.com/v1/payment_intents', {
+      method: 'post',
+      headers: { 'Authorization': `Bearer ${S_KEY}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+      payload: paymentParams,
+      muteHttpExceptions: true
+    });
+    const paymentIntent = JSON.parse(paymentIntentResponse.getContentText());
+
+    if (paymentIntentResponse.getResponseCode() >= 400) {
+      Logger.log(`Payment intent creation failed (${paymentIntentResponse.getResponseCode()}): ${JSON.stringify(paymentIntent.error)}`);
+      // Log the full response text for more detail from Stripe if needed
+      // Logger.log("Full Stripe error response: " + paymentIntentResponse.getContentText());
+      return { success: false, message: `Payment intent creation failed: ${paymentIntent.error ? paymentIntent.error.message : 'Unknown Stripe error'}` };
+    }
+    
+    Logger.log(`Payment intent created: ${paymentIntent.id} for customer ${customerId}`);
+    return {
+      success: true,
+      clientSecret: paymentIntent.client_secret,
+      customerId: customerId,
+      paymentIntentId: paymentIntent.id
+    };
+  } catch (error) {
+    Logger.log("Exception in createStripePaymentIntent: " + error.toString() + "\nStack: " + error.stack);
+    return { success: false, message: "Server error creating payment: " + error.message };
+  }
+}
+
+/**
+ * Verifies a Stripe Payment Intent status server-side.
+ * @param {string} paymentIntentId The ID of the Payment Intent.
+ * @return {object} { success: boolean, status?: string, customerId?: string, paymentMethodId?: string, message?: string }
+ */
+function verifyStripePaymentIntent(paymentIntentId) {
+  const S_KEY = PropertiesService.getScriptProperties().getProperty('STRIPE_SECRET_KEY');
+  if (!S_KEY) return { success: false, message: "Stripe secret key not configured." };
+
+  try {
+    const response = UrlFetchApp.fetch(`https://api.stripe.com/v1/payment_intents/${paymentIntentId}`, {
+      method: 'get',
+      headers: { 'Authorization': `Bearer ${S_KEY}` },
+      muteHttpExceptions: true
+    });
+    const paymentIntent = JSON.parse(response.getContentText());
+
+    if (response.getResponseCode() >= 400) {
+      Logger.log(`Error verifying Payment Intent ${paymentIntentId}: ${paymentIntent.error.message}`);
+      return { success: false, message: `Payment verification failed: ${paymentIntent.error.message}` };
+    }
+    
+    Logger.log(`Payment Intent ${paymentIntentId} status: ${paymentIntent.status}`);
+    return { 
+        success: true, 
+        status: paymentIntent.status, 
+        customerId: paymentIntent.customer,
+        paymentMethodId: paymentIntent.payment_method // Important for creating subscription
+    };
+  } catch (error) {
+    Logger.log(`Error verifying Payment Intent ${paymentIntentId}: ${error.toString()}`);
+    return { success: false, message: "Server error verifying payment: " + error.message };
+  }
+}
+
+// In Payment.gs
+
+/**
+ * Creates a Stripe Subscription server-side after a successful PaymentIntent.
+ * @param {string} customerId Stripe Customer ID.
+ * @param {string} priceId Stripe Price ID for the subscription.
+ * @param {string} paymentMethodId Stripe Payment Method ID from the successful PaymentIntent.
+ * @return {object} { success: boolean, subscriptionId?: string, status?: string, current_period_end?: number, message?: string }
+ */
+function createStripeSubscriptionServerSide(customerId, priceId, paymentMethodId) {
+  const S_KEY = PropertiesService.getScriptProperties().getProperty('STRIPE_SECRET_KEY');
+  if (!S_KEY) {
+    Logger.log("Stripe secret key not configured in createStripeSubscriptionServerSide.");
+    return { success: false, message: "Stripe secret key not configured." };
+  }
+
+  if (!customerId || !priceId || !paymentMethodId) {
+    Logger.log(`Missing parameters for subscription creation: CustID: ${customerId}, PriceID: ${priceId}, PM_ID: ${paymentMethodId}`);
+    return { success: false, message: "Cannot create subscription: essential payment details missing." };
+  }
+
+  try {
+    // Construct the payload for creating the subscription
+    const subscriptionPayload = {
+      customer: customerId,
+      'items[0][price]': priceId,
+      default_payment_method: paymentMethodId, // Use the payment method from the successful PI
+      // expand: ['latest_invoice.payment_intent'] // Useful if you need the first invoice's PI client_secret
+                                                 // for immediate SCA handling, but usually not needed if PI already succeeded.
+    };
+    Logger.log("Creating Stripe subscription with payload: " + JSON.stringify(subscriptionPayload));
+
+    const subscriptionResponse = UrlFetchApp.fetch('https://api.stripe.com/v1/subscriptions', {
+      method: 'post',
+      headers: { 'Authorization': `Bearer ${S_KEY}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+      payload: subscriptionPayload,
+      muteHttpExceptions: true
+    });
+    const subscription = JSON.parse(subscriptionResponse.getContentText());
+
+    if (subscriptionResponse.getResponseCode() >= 400) {
+      Logger.log(`Error creating Stripe subscription (${subscriptionResponse.getResponseCode()}): ${JSON.stringify(subscription.error)}`);
+      // Logger.log("Full Stripe error response for subscription: " + subscriptionResponse.getContentText());
+      return { success: false, message: `Stripe subscription creation failed: ${subscription.error ? subscription.error.message : 'Unknown Stripe error'}` };
+    }
+    
+    Logger.log(`Stripe subscription created: ${subscription.id} for customer ${customerId}. Status: ${subscription.status}`);
+    return { 
+      success: true, 
+      subscriptionId: subscription.id, 
+      status: subscription.status, 
+      current_period_end: subscription.current_period_end // Unix timestamp
+    };
+  } catch (error) {
+    Logger.log("Exception in createStripeSubscriptionServerSide: " + error.toString() + "\nStack: " + error.stack);
+    return { success: false, message: "Server error creating subscription: " + error.message };
+  }
+}
+
+/**
+ * Stores subscription details in the 'Subscriptions' sheet.
+ * @param {string} userId Internal UserID.
+ * @param {string} stripeCustomerId Stripe Customer ID.
+ * @param {string} stripeSubscriptionId Stripe Subscription ID.
+ * @param {string} status Subscription status (e.g., 'active', 'trialing').
+ * @param {Date} currentPeriodEnd Date when the current subscription period ends.
+ */
+function storeSubscriptionDetails(userId, stripeCustomerId, stripeSubscriptionId, status, currentPeriodEnd) {
+  try {
+    const userSpreadsheet = getUserDataSpreadsheet();
+    const subSheet = getOrCreateSheet(userSpreadsheet, SUBSCRIPTIONS_SHEET_NAME, [
+      "UserID", "StripeCustomerID", "SubscriptionID", "Status", "CreatedDate", "CurrentPeriodEnd", "PriceID", "CancelledAt"
+    ]);
+
+    // Check if subscription already exists to avoid duplicates, update if necessary
+    const existingSub = findRowByValue(subSheet, 3, stripeSubscriptionId); // SubscriptionID in Col C
+    if (existingSub) {
+        subSheet.getRange(existingSub.rowIndex, 1).setValue(userId);
+        subSheet.getRange(existingSub.rowIndex, 2).setValue(stripeCustomerId);
+        subSheet.getRange(existingSub.rowIndex, 4).setValue(status);
+        subSheet.getRange(existingSub.rowIndex, 6).setValue(currentPeriodEnd); // CurrentPeriodEnd in Col F
+        Logger.log(`Updated existing subscription record for ${stripeSubscriptionId}`);
+    } else {
+        subSheet.appendRow([
+          userId,
+          stripeCustomerId,
+          stripeSubscriptionId,
+          status,
+          new Date(), // CreatedDate
+          currentPeriodEnd,
+          STRIPE_PRICE_ID_CONST, // Assumes one main price ID
+          "" // CancelledAt
+        ]);
+        Logger.log(`Stored new subscription record for ${stripeSubscriptionId}`);
+    }
+  } catch (error) {
+    Logger.log("Error storing subscription data: " + error.toString());
+  }
+}
+
+/**
+ * Updates user access status in the 'UserAccess' sheet.
+ * @param {string} userId The user's ID.
+ * @param {boolean} hasAccess True if user should have access, false otherwise.
+ * @param {string} reason A brief reason for the access change (e.g., "Subscribed", "Cancelled").
+ */
+function updateUserAccess(userId, hasAccess, reason = "") {
+  try {
+    const userSpreadsheet = getUserDataSpreadsheet();
+    const accessSheet = getOrCreateSheet(userSpreadsheet, USER_ACCESS_SHEET_NAME, 
+      ['UserID', 'HasAccess', 'LastUpdated', 'Reason']
+    );
+
+    const userAccessRecord = findRowByValue(accessSheet, 1, userId); // UserID in Col A
+
+    if (userAccessRecord) {
+      accessSheet.getRange(userAccessRecord.rowIndex, 2).setValue(hasAccess);
+      accessSheet.getRange(userAccessRecord.rowIndex, 3).setValue(new Date());
+      accessSheet.getRange(userAccessRecord.rowIndex, 4).setValue(reason);
+    } else {
+      accessSheet.appendRow([userId, hasAccess, new Date(), reason]);
+    }
+    Logger.log(`User access for ${userId} set to ${hasAccess}. Reason: ${reason}`);
+  } catch (error) {
+    Logger.log("Error updating user access: " + error.toString());
+  }
+}
+
+/**
+ * Checks user access status.
+ * @param {string} userId The user's ID.
+ * @return {object} { hasAccess: boolean, message?: string, reason?: string }
+ */
+function checkUserAccess(userId) {
+  try {
+    const userSpreadsheet = getUserDataSpreadsheet();
+    const accessSheet = getOrCreateSheet(userSpreadsheet, USER_ACCESS_SHEET_NAME);
+    const userAccessRecord = findRowByValue(accessSheet, 1, userId);
+
+    if (userAccessRecord && userAccessRecord.rowData[1] === true) { // hasAccess in Col B
+      return { hasAccess: true, reason: userAccessRecord.rowData[3] }; // Reason in Col D
+    } else if (userAccessRecord) {
+      return { hasAccess: false, message: "Access denied. Please check your subscription.", reason: userAccessRecord.rowData[3] };
+    }
+    // Default to no access if no record found, could also imply an error or new user state
+    return { hasAccess: false, message: "Access status not determined. Please contact support.", reason: "No access record" };
+  } catch (error) {
+    Logger.log("Error checking user access: " + error.toString());
+    return { hasAccess: false, message: "Error checking access: " + error.message, reason: "Error" };
+  }
+}
+
+/**
+ * Handles Stripe webhooks.
+ * @param {object} event The Stripe event object.
+ * @return {GoogleAppsScript.Content.TextOutput} JSON response for Stripe.
+ */
+function handleStripeWebhook(event) {
+  // IMPORTANT: Implement webhook signature verification in a production environment!
+  // This is simplified for Apps Script.
+  Logger.log(`Webhook event received: ${event.type}, ID: ${event.id}`);
+
+  let message = "Webhook processed.";
+  let userId; // Internal UserID
+  let stripeCustomerId = event.data.object.customer;
+
+  // Try to find our internal UserID from Stripe Customer ID
+  if (stripeCustomerId) {
+    const userSpreadsheet = getUserDataSpreadsheet();
+    const credsSheet = getOrCreateSheet(userSpreadsheet, CREDENTIALS_SHEET_NAME);
+    const userRecord = findRowByValue(credsSheet, 6, stripeCustomerId); // StripeCustomerID in Col F
+    if (userRecord) {
+        userId = userRecord.rowData[3]; // UserID in Col D
+    } else {
+        Logger.log(`Webhook: Could not find internal UserID for Stripe Customer ${stripeCustomerId}`);
+        // Could also try finding by email if available in event.data.object.email
+    }
+  }
+
+
+  switch (event.type) {
+    case 'checkout.session.completed':
+      // This event occurs when a one-time payment (like first payment for a PI subscription) is made.
+      // The subscription itself is usually created by our backend after this.
+      // If the PaymentIntent was for subscription setup, the subscription might be in event.data.object.subscription
+      const session = event.data.object;
+      stripeCustomerId = session.customer;
+      const subscriptionIdFromCheckout = session.subscription; // If subscription was created by Checkout session
+
+      if (subscriptionIdFromCheckout) {
+          // Fetch the subscription to get its details and update our records
+          const S_KEY = PropertiesService.getScriptProperties().getProperty('STRIPE_SECRET_KEY');
+          const subDetailsResponse = UrlFetchApp.fetch(`https://api.stripe.com/v1/subscriptions/${subscriptionIdFromCheckout}`, {
+            method: 'get', headers: { 'Authorization': `Bearer ${S_KEY}` }
+          });
+          const subDetails = JSON.parse(subDetailsResponse.getContentText());
+          
+          if (userId && subDetails) {
+            storeSubscriptionDetails(userId, stripeCustomerId, subDetails.id, subDetails.status, new Date(subDetails.current_period_end * 1000));
+            updateUserAccess(userId, subDetails.status === 'active' || subDetails.status === 'trialing', "Subscription via Checkout");
+            Logger.log(`Updated subscription ${subDetails.id} for user ${userId} via checkout.session.completed.`);
+          }
+      } else {
+          Logger.log(`Checkout session ${session.id} completed for customer ${stripeCustomerId}, but no direct subscription ID found in session. Manual subscription creation flow expected.`);
+          // If using Payment Intents for first payment then creating subscription:
+          // The Auth.gs registration flow should handle creating subscription after PI success.
+      }
+      break;
+
+    case 'customer.subscription.created':
+    case 'customer.subscription.updated':
+    case 'customer.subscription.resumed': // Stripe v3 terminology
+      const subscriptionUpdated = event.data.object;
+      stripeCustomerId = subscriptionUpdated.customer;
+      // Re-fetch userId if not already found
+      if (!userId && stripeCustomerId) {
+          // ... (logic to find userId from stripeCustomerId) ...
+      }
+      if (userId) {
+        storeSubscriptionDetails(userId, stripeCustomerId, subscriptionUpdated.id, subscriptionUpdated.status, new Date(subscriptionUpdated.current_period_end * 1000));
+        updateUserAccess(userId, subscriptionUpdated.status === 'active' || subscriptionUpdated.status === 'trialing', `Subscription ${event.type}`);
+        Logger.log(`Subscription ${subscriptionUpdated.id} for user ${userId} status: ${subscriptionUpdated.status}`);
+      }
+      break;
+
+    case 'customer.subscription.deleted': // Occurs at end of billing period if cancelled
+    case 'customer.subscription.paused':  // Stripe v3 terminology
+      const subscriptionDeleted = event.data.object;
+      stripeCustomerId = subscriptionDeleted.customer;
+       if (!userId && stripeCustomerId) { /* ... find userId ... */ }
+      if (userId) {
+        storeSubscriptionDetails(userId, stripeCustomerId, subscriptionDeleted.id, subscriptionDeleted.status, new Date(subscriptionDeleted.current_period_end * 1000));
+        updateUserAccess(userId, false, `Subscription ${subscriptionDeleted.status}`);
+        Logger.log(`Subscription ${subscriptionDeleted.id} for user ${userId} ended/paused. Status: ${subscriptionDeleted.status}`);
+      }
+      break;
+
+    case 'invoice.payment_succeeded':
+      // Good for confirming recurring payments. Update current_period_end.
+      const invoicePaid = event.data.object;
+      stripeCustomerId = invoicePaid.customer;
+      const subscriptionIdPaid = invoicePaid.subscription;
+      if (!userId && stripeCustomerId) { /* ... find userId ... */ }
+
+      if (userId && subscriptionIdPaid && invoicePaid.lines && invoicePaid.lines.data.length > 0) {
+        const periodEnd = invoicePaid.lines.data[0].period.end;
+        storeSubscriptionDetails(userId, stripeCustomerId, subscriptionIdPaid, 'active', new Date(periodEnd * 1000));
+        updateUserAccess(userId, true, "Invoice paid");
+        Logger.log(`Invoice payment succeeded for subscription ${subscriptionIdPaid}, user ${userId}. New period end: ${new Date(periodEnd * 1000)}`);
+      }
+      break;
+
+    case 'invoice.payment_failed':
+      const invoiceFailed = event.data.object;
+      stripeCustomerId = invoiceFailed.customer;
+      const subscriptionIdFailed = invoiceFailed.subscription;
+       if (!userId && stripeCustomerId) { /* ... find userId ... */ }
+      if (userId) {
+        updateUserAccess(userId, false, "Payment failed");
+        // Optionally send email to user
+        const userEmail = invoiceFailed.customer_email;
+        if (userEmail) {
+           MailApp.sendEmail(userEmail, "HybridX Payment Failed", `Your HybridX subscription payment failed. Please update your payment method: ${getScriptUrl()}?page=payment&subscription=${subscriptionIdFailed}`);
+        }
+        Logger.log(`Invoice payment failed for subscription ${subscriptionIdFailed}, user ${userId}.`);
+      }
+      break;
+
+    default:
+      Logger.log(`Unhandled Stripe event type: ${event.type}`);
+      message = `Unhandled event type: ${event.type}`;
+  }
+
+  return ContentService.createTextOutput(JSON.stringify({ received: true, message: message }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+
+/**
+ * Creates a Stripe Setup Intent client secret for updating a payment method.
+ * This is used on the `Payment.html` page for existing subscriptions.
+ * @param {string} subscriptionId The HybridX (Stripe) subscription ID.
+ * @return {object} { success: boolean, clientSecret?: string, message?: string }
+ */
+function getPaymentUpdateIntentClientSecret(subscriptionId) {
+  const S_KEY = PropertiesService.getScriptProperties().getProperty('STRIPE_SECRET_KEY');
+  if (!S_KEY) return { success: false, message: "Stripe secret key not configured." };
+
+  try {
+    // 1. Get the Stripe Customer ID associated with this subscriptionId from your 'Subscriptions' sheet
+    const userSpreadsheet = getUserDataSpreadsheet();
+    const subSheet = getOrCreateSheet(userSpreadsheet, SUBSCRIPTIONS_SHEET_NAME);
+    const subRecord = findRowByValue(subSheet, 3, subscriptionId); // SubscriptionID in Col C
+
+    if (!subRecord) {
+      return { success: false, message: "Subscription not found in our records." };
+    }
+    const stripeCustomerId = subRecord.rowData[1]; // StripeCustomerID in Col B
+
+    if (!stripeCustomerId) {
+      return { success: false, message: "Stripe customer ID not associated with this subscription." };
+    }
+
+    // 2. Create a SetupIntent for that customer
+    const setupIntentResponse = UrlFetchApp.fetch('https://api.stripe.com/v1/setup_intents', {
+      method: 'post',
+      headers: { 'Authorization': `Bearer ${S_KEY}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+      payload: {
+        customer: stripeCustomerId,
+        payment_method_types: ['card'], // Or other types you support
+        usage: 'off_session' // Or 'on_session' if appropriate
+      },
+      muteHttpExceptions: true
+    });
+    const setupIntent = JSON.parse(setupIntentResponse.getContentText());
+
+    if (setupIntentResponse.getResponseCode() >= 400) {
+      Logger.log(`Error creating SetupIntent for customer ${stripeCustomerId}: ${setupIntent.error.message}`);
+      return { success: false, message: `Error preparing payment update: ${setupIntent.error.message}` };
+    }
+
+    Logger.log(`SetupIntent created for customer ${stripeCustomerId}: ${setupIntent.id}`);
+    return { success: true, clientSecret: setupIntent.client_secret };
+
+  } catch (error) {
+    Logger.log("Error in getPaymentUpdateIntentClientSecret: " + error.toString());
+    return { success: false, message: "Server error preparing payment form: " + error.message };
+  }
+}
+
+/**
+ * Updates the default payment method for a subscription after a SetupIntent is successful.
+ * @param {string} subscriptionId The Stripe Subscription ID.
+ * @param {string} setupIntentId The ID of the successful SetupIntent.
+ * @return {object} { success: boolean, message?: string }
+ */
+function updateSubscriptionPaymentMethod(subscriptionId, setupIntentId) {
+  const S_KEY = PropertiesService.getScriptProperties().getProperty('STRIPE_SECRET_KEY');
+  if (!S_KEY) return { success: false, message: "Stripe secret key not configured." };
+
+  try {
+    // 1. Retrieve the SetupIntent to get the payment_method ID
+    const setupIntentResponse = UrlFetchApp.fetch(`https://api.stripe.com/v1/setup_intents/${setupIntentId}`, {
+      method: 'get',
+      headers: { 'Authorization': `Bearer ${S_KEY}` },
+      muteHttpExceptions: true
+    });
+    const setupIntent = JSON.parse(setupIntentResponse.getContentText());
+
+    if (setupIntentResponse.getResponseCode() >= 400 || setupIntent.status !== 'succeeded') {
+      Logger.log(`SetupIntent ${setupIntentId} not successful or not found. Status: ${setupIntent.status}`);
+      return { success: false, message: `Payment method setup failed verification. Status: ${setupIntent.status || 'Error'}` };
+    }
+    const paymentMethodId = setupIntent.payment_method;
+
+    // 2. Update the subscription with the new default payment method
+    const subscriptionUpdateResponse = UrlFetchApp.fetch(`https://api.stripe.com/v1/subscriptions/${subscriptionId}`, {
+      method: 'post',
+      headers: { 'Authorization': `Bearer ${S_KEY}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+      payload: { default_payment_method: paymentMethodId },
+      muteHttpExceptions: true
+    });
+    const updatedSubscription = JSON.parse(subscriptionUpdateResponse.getContentText());
+
+    if (subscriptionUpdateResponse.getResponseCode() >= 400) {
+      Logger.log(`Error updating subscription ${subscriptionId} default payment method: ${updatedSubscription.error.message}`);
+      return { success: false, message: `Failed to update subscription: ${updatedSubscription.error.message}` };
+    }
+    
+    // 3. Update our internal records (status, current_period_end might change if retrying payment)
+    const userSpreadsheet = getUserDataSpreadsheet();
+    const subSheet = getOrCreateSheet(userSpreadsheet, SUBSCRIPTIONS_SHEET_NAME);
+    const subRecord = findRowByValue(subSheet, 3, subscriptionId);
+    if(subRecord) {
+        subSheet.getRange(subRecord.rowIndex, 4).setValue(updatedSubscription.status); // Status in Col D
+        subSheet.getRange(subRecord.rowIndex, 6).setValue(new Date(updatedSubscription.current_period_end * 1000)); // Col F
+        const userId = subRecord.rowData[0]; // UserID in Col A
+        updateUserAccess(userId, updatedSubscription.status === 'active' || updatedSubscription.status === 'trialing', "Payment method updated");
+    }
+
+    Logger.log(`Subscription ${subscriptionId} default payment method updated to ${paymentMethodId}. Status: ${updatedSubscription.status}`);
+    return { success: true, message: "Payment method updated successfully." };
+
+  } catch (error) {
+    Logger.log("Error in updateSubscriptionPaymentMethod: " + error.toString());
+    return { success: false, message: "Server error updating payment method: " + error.message };
+  }
+}
