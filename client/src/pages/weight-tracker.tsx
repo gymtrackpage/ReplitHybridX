@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Scale, TrendingDown, TrendingUp, Plus, Target, Dumbbell } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
 import { WeightEntry } from "@shared/schema";
@@ -154,10 +155,14 @@ export default function WeightTracker() {
               />
               <Label htmlFor="unit-toggle" className="text-sm font-medium">kg</Label>
             </div>
-            <Button onClick={() => setIsAddingEntry(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Entry
-            </Button>
+            <Dialog open={isAddingEntry} onOpenChange={setIsAddingEntry}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Entry
+                </Button>
+              </DialogTrigger>
+            </Dialog>
           </div>
         </div>
 
@@ -216,65 +221,62 @@ export default function WeightTracker() {
           </Card>
         </div>
 
-        {/* Add Entry Form */}
-        {isAddingEntry && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Add Weight Entry</CardTitle>
-              <CardDescription>Record your current weight and any notes</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="weight">Weight ({displayUnit})</Label>
-                    <Input
-                      id="weight"
-                      type="number"
-                      step="0.1"
-                      placeholder={`Enter weight in ${displayUnit}`}
-                      value={newEntry.weight}
-                      onChange={(e) => setNewEntry({ ...newEntry, weight: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="date">Date</Label>
-                    <Input
-                      id="date"
-                      type="date"
-                      value={newEntry.date}
-                      onChange={(e) => setNewEntry({ ...newEntry, date: e.target.value })}
-                      required
-                    />
-                  </div>
-                </div>
+        {/* Add Entry Dialog */}
+        <Dialog open={isAddingEntry} onOpenChange={setIsAddingEntry}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Add Weight Entry</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="notes">Notes (optional)</Label>
-                  <Textarea
-                    id="notes"
-                    placeholder="Any additional notes about your weight measurement..."
-                    value={newEntry.notes}
-                    onChange={(e) => setNewEntry({ ...newEntry, notes: e.target.value })}
-                    rows={3}
+                  <Label htmlFor="weight">Weight ({displayUnit})</Label>
+                  <Input
+                    id="weight"
+                    type="number"
+                    step="0.1"
+                    placeholder={`Enter weight in ${displayUnit}`}
+                    value={newEntry.weight}
+                    onChange={(e) => setNewEntry({ ...newEntry, weight: e.target.value })}
+                    required
                   />
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button type="submit" disabled={addEntryMutation.isPending}>
-                    {addEntryMutation.isPending ? "Adding..." : "Add Entry"}
-                  </Button>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={() => setIsAddingEntry(false)}
-                  >
-                    Cancel
-                  </Button>
+                <div className="space-y-2">
+                  <Label htmlFor="date">Date</Label>
+                  <Input
+                    id="date"
+                    type="date"
+                    value={newEntry.date}
+                    onChange={(e) => setNewEntry({ ...newEntry, date: e.target.value })}
+                    required
+                  />
                 </div>
-              </form>
-            </CardContent>
-          </Card>
-        )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="notes">Notes (optional)</Label>
+                <Textarea
+                  id="notes"
+                  placeholder="Any additional notes about your weight measurement..."
+                  value={newEntry.notes}
+                  onChange={(e) => setNewEntry({ ...newEntry, notes: e.target.value })}
+                  rows={3}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Button type="submit" disabled={addEntryMutation.isPending} className="flex-1">
+                  {addEntryMutation.isPending ? "Adding..." : "Add Entry"}
+                </Button>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setIsAddingEntry(false)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
 
         {/* Weight History */}
         <Card>
