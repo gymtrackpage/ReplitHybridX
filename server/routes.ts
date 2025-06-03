@@ -800,6 +800,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Workout completion with progression logic
+  app.post("/api/workout-completions", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { workoutId, rating, notes, skipped = false } = req.body;
+
+      // Get current progress to determine next day
+      const progress = await storage.getUserProgress(userId);
+      if (!progress) {
+        return res.status(404).json({ message: "User progress not found" });
+      }
+
+      // Create workout completion record
+      const completion = await storage.createWorkoutCompletion({
+        userId,
+        workoutId,
+        rating: rating || null,
+        notes: notes || null,
+        skipped,
+        completedAt: new Date()
+      });
+
+      // Calculate next day/week progression
+      const currentDay = progress.currentDay || 1;
+      const currentWeek = progress.currentWeek || 1;
+      let nextDay = currentDay + 1;
+      let nextWeek = currentWeek;
+
+      // Check if we need to advance to next week (assuming 7 days per week)
+      if (nextDay > 7) {
+        nextDay = 1;
+        nextWeek = currentWeek + 1;
+      }
+
+      // Update user progress with next day/week
+      const updatedProgress = await storage.updateUserProgress(userId, {
+        currentDay: nextDay,
+        currentWeek: nextWeek,
+        completedWorkouts: skipped ? progress.completedWorkouts : (progress.completedWorkouts || 0) + 1,
+        lastWorkoutDate: new Date().toISOString().split('T')[0] as any,
+      });
+
+      // Update user's total workout count and streak (only if not skipped)
+      if (!skipped) {
+        const user = await storage.getUser(userId);
+        if (user) {
+          await storage.updateUserProfile(userId, {
+            totalWorkouts: (user.totalWorkouts || 0) + 1,
+            streak: (user.streak || 0) + 1
+          });
+        }
+      }
+
+      res.json({
+        completion,
+        progress: updatedProgress,
+        nextDay,
+        nextWeek,
+        message: skipped ? "Workout skipped - moved to next day" : "Workout completed - moved to next day"
+      });
+    } catch (error: any) {
+      console.error("Error completing workout:", error);
+      res.status(500).json({ message: "Failed to complete workout" });
+    }
+  });
+
   // Weight tracking system
   app.get("/api/weight-entries", isAuthenticated, async (req: any, res) => {
     try {
@@ -815,12 +881,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/weight-entries", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { weight, date, notes } = req.body;
+      const { weight, recordedAt, notes } = req.body;
 
       const entry = await storage.createWeightEntry({
         userId,
         weight,
-        date: date ? new Date(date) : new Date(),
+        recordedAt: recordedAt ? new Date(recordedAt) : new Date(),
         notes
       });
 

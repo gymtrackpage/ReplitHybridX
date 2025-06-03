@@ -102,6 +102,8 @@ export const workoutCompletions = pgTable("workout_completions", {
   completedAt: timestamp("completed_at").defaultNow(),
   duration: integer("duration"), // actual duration in minutes
   notes: text("notes"),
+  rating: integer("rating"), // 1-5 rating scale
+  skipped: boolean("skipped").default(false), // track if workout was skipped
   exerciseData: jsonb("exercise_data"), // completed sets, reps, weights
 });
 
