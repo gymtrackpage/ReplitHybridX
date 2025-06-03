@@ -115,20 +115,20 @@ export default function Calendar() {
 
   const getStatusColor = (status: string): string => {
     switch (status) {
-      case 'completed': return 'bg-green-500 text-white';
-      case 'skipped': return 'bg-yellow-500 text-black';
-      case 'overdue': return 'bg-red-500 text-white';
-      case 'pending': return 'bg-blue-500 text-white';
-      default: return 'bg-gray-500 text-white';
+      case 'completed': return 'bg-green-100 border-green-200';
+      case 'skipped': return 'bg-amber-100 border-amber-200';
+      case 'overdue': return 'bg-red-100 border-red-200';
+      case 'pending': return 'bg-blue-50 border-blue-100';
+      default: return 'bg-gray-50 border-gray-100';
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'completed': return <CheckCircle className="h-3 w-3" />;
-      case 'skipped': return <SkipForward className="h-3 w-3" />;
-      case 'overdue': return <Clock className="h-3 w-3" />;
-      case 'pending': return <CalendarIcon className="h-3 w-3" />;
+      case 'completed': return <CheckCircle className="h-4 w-4 text-green-600" />;
+      case 'skipped': return <SkipForward className="h-4 w-4 text-amber-600" />;
+      case 'overdue': return <Clock className="h-4 w-4 text-red-600" />;
+      case 'pending': return null; // No icon for pending/future workouts
       default: return null;
     }
   };
@@ -238,17 +238,22 @@ export default function Calendar() {
                   <div
                     key={workout.id}
                     onClick={() => handleWorkoutClick(workout)}
-                    className={`text-xs p-1 rounded cursor-pointer hover:opacity-80 transition-opacity ${getStatusColor(workout.status)}`}
+                    className={`p-2 rounded-lg cursor-pointer hover:opacity-80 transition-opacity border ${getStatusColor(workout.status)}`}
                   >
-                    <div className="flex items-center gap-1 overflow-hidden">
-                      {getStatusIcon(workout.status)}
-                      <span className="truncate">{workout.name.slice(0, 15)}</span>
+                    <div className="flex items-center justify-center">
+                      {getStatusIcon(workout.status) || (
+                        <div className="w-4 h-4 bg-blue-200 rounded-full"></div>
+                      )}
+                    </div>
+                    {/* Hide workout name on mobile for cleaner look */}
+                    <div className="hidden sm:block mt-1 text-xs text-center truncate">
+                      {workout.name.slice(0, 12)}
                     </div>
                   </div>
                 ))}
                 {dayWorkouts.length > 3 && (
-                  <div className="text-xs text-gray-500 text-center">
-                    +{dayWorkouts.length - 3} more
+                  <div className="text-xs text-gray-500 text-center mt-1">
+                    +{dayWorkouts.length - 3}
                   </div>
                 )}
               </div>
