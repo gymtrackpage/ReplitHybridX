@@ -3,12 +3,13 @@ import { loadStripe } from '@stripe/stripe-js';
 import { useEffect, useState } from 'react';
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Crown } from "lucide-react";
-import Navigation from "@/components/Navigation";
-import { useAuth } from "@/hooks/useAuth";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Check, Crown, Zap } from "lucide-react";
 
+// Make sure to call `loadStripe` outside of a component's render to avoid
+// recreating the `Stripe` object on every render.
 if (!import.meta.env.VITE_STRIPE_PUBLIC_KEY) {
   throw new Error('Missing required Stripe key: VITE_STRIPE_PUBLIC_KEY');
 }
@@ -18,21 +19,21 @@ const SubscribeForm = () => {
   const stripe = useStripe();
   const elements = useElements();
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
 
     if (!stripe || !elements) {
-      setIsLoading(false);
       return;
     }
+
+    setIsProcessing(true);
 
     const { error } = await stripe.confirmPayment({
       elements,
       confirmParams: {
-        return_url: window.location.origin,
+        return_url: `${window.location.origin}/dashboard`,
       },
     });
 
@@ -45,22 +46,19 @@ const SubscribeForm = () => {
     } else {
       toast({
         title: "Payment Successful",
-        description: "You are now subscribed to Hybrid X Premium!",
+        description: "Welcome to Hybrid X Premium! You now have access to all training programs.",
       });
     }
 
-    setIsLoading(false);
+    setIsProcessing(false);
   };
 
   return (
-    <Card className="max-w-md mx-auto">
-      <CardHeader className="text-center">
-        <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mx-auto mb-4">
-          <Crown className="h-6 w-6 text-primary" />
-        </div>
-        <CardTitle>Upgrade to Premium</CardTitle>
-        <CardDescription>
-          Get access to unlimited workouts and premium features
+    <Card className="w-full max-w-md mx-auto">
+      <CardHeader>
+        <CardTitle className="text-center">Complete Your Subscription</CardTitle>
+        <CardDescription className="text-center">
+          Start your HYROX training journey today
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -69,9 +67,9 @@ const SubscribeForm = () => {
           <Button 
             type="submit" 
             className="w-full" 
-            disabled={!stripe || isLoading}
+            disabled={!stripe || isProcessing}
           >
-            {isLoading ? "Processing..." : "Subscribe - $29.99/month"}
+            {isProcessing ? "Processing..." : "Subscribe Now"}
           </Button>
         </form>
       </CardContent>
@@ -80,52 +78,114 @@ const SubscribeForm = () => {
 };
 
 export default function Subscribe() {
-  const { user } = useAuth();
   const [clientSecret, setClientSecret] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-  const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    apiRequest("POST", "/api/create-subscription")
+    // Create subscription as soon as the page loads
+    apiRequest("POST", "/api/create-subscription", {})
       .then((res) => res.json())
       .then((data) => {
         setClientSecret(data.clientSecret);
-        setIsLoading(false);
+        setLoading(false);
       })
       .catch((error) => {
-        console.error("Error creating subscription:", error);
-        toast({
-          title: "Error",
-          description: "Failed to initialize payment. Please try again.",
-          variant: "destructive",
-        });
-        setIsLoading(false);
+        console.error("Subscription creation error:", error);
+        setLoading(false);
       });
-  }, [toast]);
+  }, []);
 
-  if (isLoading) {
+  if (loading) {
     return (
-      <div className="min-h-screen bg-background">
-        <Navigation user={user} />
-        <div className="flex items-center justify-center pt-20">
-          <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+        <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" aria-label="Loading"/>
       </div>
     );
   }
 
   if (!clientSecret) {
     return (
-      <div className="min-h-screen bg-background">
-        <Navigation user={user} />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold text-foreground mb-4">Payment Error</h1>
-            <p className="text-muted-foreground mb-6">
-              Unable to initialize payment. Please try again.
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
+        <div className="max-w-4xl mx-auto pt-20">
+          <div className="text-center mb-8">
+            <Crown className="h-16 w-16 text-primary mx-auto mb-4" />
+            <h1 className="text-4xl font-bold mb-4">Hybrid X Premium</h1>
+            <p className="text-xl text-muted-foreground">
+              Unlock your HYROX potential with our premium training programs
             </p>
-            <Button onClick={() => window.location.reload()}>
-              Retry
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-8">
+            {/* Pricing Card */}
+            <Card className="relative overflow-hidden">
+              <div className="absolute top-0 right-0 bg-primary text-primary-foreground px-3 py-1 text-sm font-medium">
+                Best Value
+              </div>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Zap className="h-5 w-5 text-primary" />
+                  Premium Membership
+                </CardTitle>
+                <div className="space-y-2">
+                  <div className="text-3xl font-bold">$29.99<span className="text-sm font-normal text-muted-foreground">/month</span></div>
+                  <CardDescription>Everything you need to excel at HYROX</CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-3">
+                  {[
+                    "Access to all 6+ specialized programs",
+                    "Personalized program recommendations",
+                    "Advanced progress tracking & analytics",
+                    "Phase-based training progression",
+                    "Expert-designed workout plans",
+                    "Mobile-optimized training companion",
+                    "Priority customer support"
+                  ].map((feature) => (
+                    <div key={feature} className="flex items-center gap-2">
+                      <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
+                      <span className="text-sm">{feature}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Programs Overview */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Available Programs</CardTitle>
+                <CardDescription>
+                  Choose from our comprehensive library of HYROX-specific training programs
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {[
+                  { name: "Beginner Program", level: "Beginner", weeks: "14 weeks" },
+                  { name: "Intermediate Program", level: "Intermediate", weeks: "14 weeks" },
+                  { name: "Advanced Program", level: "Advanced", weeks: "14 weeks" },
+                  { name: "Strength Program", level: "Specialized", weeks: "14 weeks" },
+                  { name: "Runner Program", level: "Specialized", weeks: "14 weeks" },
+                  { name: "Doubles Program", level: "Team", weeks: "14 weeks" }
+                ].map((program) => (
+                  <div key={program.name} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div>
+                      <div className="font-medium">{program.name}</div>
+                      <div className="text-sm text-muted-foreground">{program.weeks}</div>
+                    </div>
+                    <Badge variant="secondary">{program.level}</Badge>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="text-center mt-8">
+            <p className="text-sm text-muted-foreground mb-4">
+              Payment processing is currently being set up. Please check back soon or contact support for access.
+            </p>
+            <Button variant="outline" onClick={() => window.location.href = "/dashboard"}>
+              Return to Dashboard
             </Button>
           </div>
         </div>
@@ -133,15 +193,15 @@ export default function Subscribe() {
     );
   }
 
+  // Make SURE to wrap the form in <Elements> which provides the stripe context.
   return (
-    <div className="min-h-screen bg-background">
-      <Navigation user={user} />
-      
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
+      <div className="max-w-2xl mx-auto pt-20">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2">Subscribe to Premium</h1>
+          <Crown className="h-12 w-12 text-primary mx-auto mb-4" />
+          <h1 className="text-3xl font-bold mb-2">Subscribe to Hybrid X Premium</h1>
           <p className="text-muted-foreground">
-            Unlock unlimited access to all training programs and premium features
+            Get unlimited access to all HYROX training programs
           </p>
         </div>
 
@@ -149,37 +209,11 @@ export default function Subscribe() {
           <SubscribeForm />
         </Elements>
 
-        {/* Premium Features */}
-        <div className="max-w-2xl mx-auto mt-12">
-          <h2 className="text-2xl font-bold text-center mb-8">Premium Features</h2>
-          <div className="grid md:grid-cols-2 gap-6">
-            <div className="text-center p-6 rounded-lg border bg-card">
-              <h3 className="font-semibold mb-2">Unlimited Programs</h3>
-              <p className="text-sm text-muted-foreground">
-                Access to all training programs and new releases
-              </p>
-            </div>
-            <div className="text-center p-6 rounded-lg border bg-card">
-              <h3 className="font-semibold mb-2">Progress Analytics</h3>
-              <p className="text-sm text-muted-foreground">
-                Detailed progress tracking and performance insights
-              </p>
-            </div>
-            <div className="text-center p-6 rounded-lg border bg-card">
-              <h3 className="font-semibold mb-2">Nutrition Guidance</h3>
-              <p className="text-sm text-muted-foreground">
-                Personalized meal plans and nutrition advice
-              </p>
-            </div>
-            <div className="text-center p-6 rounded-lg border bg-card">
-              <h3 className="font-semibold mb-2">Priority Support</h3>
-              <p className="text-sm text-muted-foreground">
-                Direct access to trainers and priority customer support
-              </p>
-            </div>
-          </div>
+        <div className="text-center mt-6 text-sm text-muted-foreground">
+          <p>Secure payment processing by Stripe</p>
+          <p className="mt-2">Cancel anytime. No long-term commitments.</p>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

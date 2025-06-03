@@ -11,6 +11,7 @@ import Subscribe from "@/pages/subscribe";
 import EnhancedAssessment from "@/pages/enhanced-assessment";
 import Calendar from "@/pages/calendar";
 import Profile from "@/pages/profile";
+import WeightTracker from "@/pages/weight-tracker";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -34,6 +35,7 @@ function Router() {
           <Route path="/dashboard" component={Dashboard} />
           <Route path="/calendar" component={Calendar} />
           <Route path="/profile" component={Profile} />
+          <Route path="/weight-tracker" component={WeightTracker} />
           <Route path="/admin" component={Admin} />
           <Route path="/subscribe" component={Subscribe} />
           <Route path="/assessment" component={EnhancedAssessment} />
