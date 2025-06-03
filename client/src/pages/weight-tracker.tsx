@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
 import { Scale, TrendingDown, TrendingUp, Plus, Target, Dumbbell } from "lucide-react";
+import BottomNav from "@/components/BottomNav";
 import { WeightEntry } from "@shared/schema";
 import { format } from "date-fns";
 
@@ -358,6 +359,11 @@ export default function WeightTracker() {
           </CardContent>
         </Card>
       </div>
+      
+      {/* Bottom spacing to prevent content from being hidden behind bottom nav */}
+      <div className="h-16"></div>
+      
+      <BottomNav />
     </div>
   );
 }

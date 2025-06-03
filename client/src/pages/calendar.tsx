@@ -348,6 +348,11 @@ export default function Calendar() {
           )}
         </DialogContent>
       </Dialog>
+      
+      {/* Bottom spacing to prevent content from being hidden behind bottom nav */}
+      <div className="h-16"></div>
+      
+      <BottomNav />
       </div>
     </div>
   );
