@@ -133,6 +133,16 @@ export default function Calendar() {
     }
   };
 
+  const getStatusTextColor = (status: string): string => {
+    switch (status) {
+      case 'completed': return 'text-green-800';
+      case 'skipped': return 'text-amber-800';
+      case 'overdue': return 'text-red-800';
+      case 'pending': return 'text-blue-800';
+      default: return 'text-gray-800';
+    }
+  };
+
   const handleWorkoutClick = (workout: CalendarWorkout) => {
     setSelectedWorkout(workout);
     setIsDetailModalOpen(true);
@@ -280,7 +290,7 @@ export default function Calendar() {
                 <div>
                   <label className="text-sm font-semibold text-gray-600">Status</label>
                   <div className="flex items-center gap-2 mt-1">
-                    <Badge className={`${getStatusColor(selectedWorkout.status)} text-xs`}>
+                    <Badge className={`${getStatusColor(selectedWorkout.status)} ${getStatusTextColor(selectedWorkout.status)} text-xs border`}>
                       {getStatusIcon(selectedWorkout.status)}
                       <span className="ml-1 capitalize">{selectedWorkout.status}</span>
                     </Badge>
