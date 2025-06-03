@@ -190,13 +190,13 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <main className="px-4 py-6">
+      <main className="px-4 py-6 pb-20 max-w-full overflow-hidden">
         {/* Today's Workout Card */}
-        <Card className="bg-white rounded-2xl shadow-sm border-0 mb-6">
+        <Card className="bg-white rounded-2xl shadow-sm border-0 mb-6 w-full max-w-full">
           <CardHeader className="pb-4">
-            <CardTitle className="text-2xl font-bold text-yellow-600 mb-4">Today's Workout</CardTitle>
+            <CardTitle className="text-xl sm:text-2xl font-bold text-yellow-600 mb-4 break-words">Today's Workout</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="max-w-full overflow-hidden">
             {todaysWorkout ? (
               <div>
                 <div className="bg-gray-100 rounded-lg p-4 mb-6">

@@ -165,49 +165,49 @@ export default function Calendar() {
   }
 
   return (
-    <div className="container mx-auto p-6">
+    <div className="w-full max-w-full overflow-hidden px-4 pb-20">
       <div className="mb-6">
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-3xl font-bold">Workout Calendar</h1>
-          <div className="flex items-center gap-4">
-            <Button variant="outline" onClick={() => navigateMonth('prev')}>
+          <h1 className="text-2xl sm:text-3xl font-bold truncate">Workout Calendar</h1>
+          <div className="flex items-center gap-2 sm:gap-4">
+            <Button variant="outline" size="sm" onClick={() => navigateMonth('prev')}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <h2 className="text-xl font-semibold min-w-[200px] text-center">
-              {format(currentDate, 'MMMM yyyy')}
+            <h2 className="text-sm sm:text-xl font-semibold text-center min-w-[120px] sm:min-w-[200px]">
+              {format(currentDate, 'MMM yyyy')}
             </h2>
-            <Button variant="outline" onClick={() => navigateMonth('next')}>
+            <Button variant="outline" size="sm" onClick={() => navigateMonth('next')}>
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
         </div>
 
         {/* Legend */}
-        <div className="flex flex-wrap gap-4 mb-6">
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:gap-4 mb-6 text-xs sm:text-sm">
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-green-500 rounded"></div>
-            <span className="text-sm">Completed</span>
+            <div className="w-3 h-3 sm:w-4 sm:h-4 bg-green-500 rounded"></div>
+            <span>Completed</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-yellow-500 rounded"></div>
-            <span className="text-sm">Skipped</span>
+            <div className="w-3 h-3 sm:w-4 sm:h-4 bg-yellow-500 rounded"></div>
+            <span>Skipped</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-blue-500 rounded"></div>
-            <span className="text-sm">Pending</span>
+            <div className="w-3 h-3 sm:w-4 sm:h-4 bg-blue-500 rounded"></div>
+            <span>Pending</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-red-500 rounded"></div>
-            <span className="text-sm">Overdue</span>
+            <div className="w-3 h-3 sm:w-4 sm:h-4 bg-red-500 rounded"></div>
+            <span>Overdue</span>
           </div>
         </div>
       </div>
 
       {/* Calendar Grid */}
-      <div className="grid grid-cols-7 gap-2">
+      <div className="grid grid-cols-7 gap-1 overflow-hidden">
         {/* Day headers */}
         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-          <div key={day} className="p-2 text-center font-semibold text-gray-600 border-b">
+          <div key={day} className="p-1 sm:p-2 text-center font-semibold text-gray-600 border-b text-xs sm:text-sm">
             {day}
           </div>
         ))}
@@ -220,27 +220,32 @@ export default function Calendar() {
           return (
             <div
               key={day.toISOString()}
-              className={`min-h-[120px] p-2 border border-gray-200 ${
+              className={`min-h-[80px] sm:min-h-[120px] p-1 sm:p-2 border border-gray-200 overflow-hidden ${
                 isCurrentDay ? 'bg-blue-50 border-blue-300' : 'bg-white'
               } hover:bg-gray-50 transition-colors`}
             >
-              <div className={`text-sm mb-2 ${isCurrentDay ? 'font-bold text-blue-600' : 'text-gray-600'}`}>
+              <div className={`text-xs sm:text-sm mb-1 sm:mb-2 ${isCurrentDay ? 'font-bold text-blue-600' : 'text-gray-600'}`}>
                 {format(day, 'd')}
               </div>
 
-              <div className="space-y-1">
-                {dayWorkouts.map(workout => (
+              <div className="space-y-1 overflow-hidden">
+                {dayWorkouts.slice(0, 3).map(workout => (
                   <div
                     key={workout.id}
                     onClick={() => handleWorkoutClick(workout)}
                     className={`text-xs p-1 rounded cursor-pointer hover:opacity-80 transition-opacity ${getStatusColor(workout.status)}`}
                   >
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 overflow-hidden">
                       {getStatusIcon(workout.status)}
-                      <span className="truncate">{workout.name}</span>
+                      <span className="truncate">{workout.name.slice(0, 15)}</span>
                     </div>
                   </div>
                 ))}
+                {dayWorkouts.length > 3 && (
+                  <div className="text-xs text-gray-500 text-center">
+                    +{dayWorkouts.length - 3} more
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -249,23 +254,23 @@ export default function Calendar() {
 
       {/* Workout Detail Modal */}
       <Dialog open={isDetailModalOpen} onOpenChange={setIsDetailModalOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{selectedWorkout?.name}</DialogTitle>
+            <DialogTitle className="text-lg sm:text-xl pr-8 truncate">{selectedWorkout?.name}</DialogTitle>
           </DialogHeader>
 
           {selectedWorkout && (
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               {/* Workout Info */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-semibold text-gray-600">Date</label>
-                  <p className="text-lg">{format(selectedWorkout.scheduledDate, 'EEEE, MMMM d, yyyy')}</p>
+                  <p className="text-sm sm:text-lg">{format(selectedWorkout.scheduledDate, 'MMM d, yyyy')}</p>
                 </div>
                 <div>
                   <label className="text-sm font-semibold text-gray-600">Status</label>
                   <div className="flex items-center gap-2 mt-1">
-                    <Badge className={getStatusColor(selectedWorkout.status)}>
+                    <Badge className={`${getStatusColor(selectedWorkout.status)} text-xs`}>
                       {getStatusIcon(selectedWorkout.status)}
                       <span className="ml-1 capitalize">{selectedWorkout.status}</span>
                     </Badge>
@@ -275,17 +280,17 @@ export default function Calendar() {
 
               <div>
                 <label className="text-sm font-semibold text-gray-600">Week {selectedWorkout.week}, Day {selectedWorkout.day}</label>
-                <p className="text-lg font-medium">{selectedWorkout.name}</p>
+                <p className="text-sm sm:text-lg font-medium break-words">{selectedWorkout.name}</p>
               </div>
 
               <div>
                 <label className="text-sm font-semibold text-gray-600">Description</label>
-                <p className="mt-1 text-gray-700">{selectedWorkout.description}</p>
+                <p className="mt-1 text-sm sm:text-base text-gray-700 break-words">{selectedWorkout.description}</p>
               </div>
 
               <div>
                 <label className="text-sm font-semibold text-gray-600">Duration</label>
-                <p className="text-lg">{selectedWorkout.duration} minutes</p>
+                <p className="text-sm sm:text-lg">{selectedWorkout.duration} minutes</p>
               </div>
 
               {/* Completion Details */}
