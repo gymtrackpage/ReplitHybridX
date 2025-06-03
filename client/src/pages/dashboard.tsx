@@ -160,33 +160,31 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <Navigation user={user} />
-      
-      {/* Navigation Tabs */}
+      {/* Header with Logo */}
       <div className="bg-white px-4 py-3 border-b border-gray-200">
-        <div className="flex space-x-1 overflow-x-auto">
-          <Button variant="ghost" className="flex items-center space-x-2 bg-gray-100 text-gray-900 rounded-lg px-4 py-2">
-            <Dumbbell className="h-4 w-4" />
-            <span className="font-medium">Today's Workout</span>
-          </Button>
-          <Link href="/calendar">
-            <Button variant="ghost" className="flex items-center space-x-2 text-gray-600 px-4 py-2">
-              <Calendar className="h-4 w-4" />
-              <span>Calendar</span>
-            </Button>
-          </Link>
-          <Link href="/profile">
-            <Button variant="ghost" className="flex items-center space-x-2 text-gray-600 px-4 py-2">
-              <User className="h-4 w-4" />
-              <span>My Profile</span>
-            </Button>
-          </Link>
-          <Link href="/assessment">
-            <Button variant="ghost" className="flex items-center space-x-2 text-gray-600 px-4 py-2">
-              <ClipboardList className="h-4 w-4" />
-              <span>Assessment</span>
-            </Button>
-          </Link>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="bg-gradient-to-r from-orange-500 to-red-600 rounded-lg p-2">
+              <Dumbbell className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-lg font-bold text-gray-900">Hybrid X</h1>
+              <p className="text-xs text-gray-500">Training Platform</p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2">
+            {user?.profileImageUrl && (
+              <img 
+                src={user.profileImageUrl} 
+                alt="Profile" 
+                className="w-8 h-8 rounded-full object-cover"
+              />
+            )}
+            <div className="text-right">
+              <p className="text-sm font-medium text-gray-900">{user?.firstName || 'User'}</p>
+              <p className="text-xs text-gray-500">Athlete</p>
+            </div>
+          </div>
         </div>
       </div>
 

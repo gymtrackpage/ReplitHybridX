@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
-import { Scale, TrendingDown, TrendingUp, Plus, Target } from "lucide-react";
+import { Scale, TrendingDown, TrendingUp, Plus, Target, Dumbbell } from "lucide-react";
 import { WeightEntry } from "@shared/schema";
 import { format } from "date-fns";
 
@@ -119,13 +119,28 @@ export default function WeightTracker() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4">
-      <div className="max-w-6xl mx-auto space-y-6">
-        {/* Header */}
+    <div className="min-h-screen bg-gray-100">
+      {/* Header with Logo */}
+      <div className="bg-white px-4 py-3 border-b border-gray-200">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="bg-gradient-to-r from-orange-500 to-red-600 rounded-lg p-2">
+              <Dumbbell className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-lg font-bold text-gray-900">Hybrid X</h1>
+              <p className="text-xs text-gray-500">Training Platform</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-6xl mx-auto space-y-6 p-4 pb-20">
+        {/* Page Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Weight Tracker</h1>
-            <p className="text-gray-600 dark:text-gray-300">Monitor your progress towards your fitness goals</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Weight Tracker</h1>
+            <p className="text-gray-600">Monitor your progress towards your fitness goals</p>
           </div>
           <div className="flex items-center gap-4">
             {/* Unit Toggle */}
