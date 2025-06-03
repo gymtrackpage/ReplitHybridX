@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Switch } from "@/components/ui/switch";
 import { Scale, TrendingDown, TrendingUp, Plus, Target } from "lucide-react";
 import { WeightEntry } from "@shared/schema";
 import { format } from "date-fns";
@@ -16,6 +17,7 @@ import { format } from "date-fns";
 export default function WeightTracker() {
   const { toast } = useToast();
   const [isAddingEntry, setIsAddingEntry] = useState(false);
+  const [displayUnit, setDisplayUnit] = useState<'lbs' | 'kg'>('lbs'); // Toggle between lbs and kg
   const [newEntry, setNewEntry] = useState({
     weight: "",
     date: new Date().toISOString().split('T')[0],
@@ -26,12 +28,34 @@ export default function WeightTracker() {
     queryKey: ["/api/weight-entries"],
   });
 
+  // Conversion functions
+  const lbsToKg = (lbs: number) => lbs * 0.453592;
+  const kgToLbs = (kg: number) => kg * 2.20462;
+
+  // Convert weight based on display unit (weights are stored in lbs in database)
+  const convertWeight = (weight: number, toUnit: 'lbs' | 'kg') => {
+    if (toUnit === 'kg') {
+      return lbsToKg(weight);
+    }
+    return weight; // Already in lbs
+  };
+
+  // Convert weight input for storage (always store as lbs)
+  const convertInputWeight = (weight: number, fromUnit: 'lbs' | 'kg') => {
+    if (fromUnit === 'kg') {
+      return kgToLbs(weight);
+    }
+    return weight; // Already in lbs
+  };
+
   const addEntryMutation = useMutation({
     mutationFn: async (entry: typeof newEntry) => {
+      const inputWeight = parseFloat(entry.weight);
+      const storageWeight = convertInputWeight(inputWeight, displayUnit);
       const response = await apiRequest("POST", "/api/weight-entries", {
-        weight: parseFloat(entry.weight),
+        weight: storageWeight,
         recordedAt: entry.date,
-        notes: entry.notes.trim() || null
+        unit: displayUnit
       });
       return response.json();
     },
@@ -71,10 +95,15 @@ export default function WeightTracker() {
     new Date(b.recordedAt || '').getTime() - new Date(a.recordedAt || '').getTime()
   );
   
-  const currentWeight = sortedEntries[0] ? parseFloat(sortedEntries[0].weight) : 0;
-  const previousWeight = sortedEntries[1] ? parseFloat(sortedEntries[1].weight) : currentWeight;
+  const currentWeightLbs = sortedEntries[0] ? parseFloat(sortedEntries[0].weight) : 0;
+  const previousWeightLbs = sortedEntries[1] ? parseFloat(sortedEntries[1].weight) : currentWeightLbs;
+  const startWeightLbs = sortedEntries[sortedEntries.length - 1] ? parseFloat(sortedEntries[sortedEntries.length - 1].weight) : currentWeightLbs;
+  
+  // Convert to display unit
+  const currentWeight = convertWeight(currentWeightLbs, displayUnit);
+  const previousWeight = convertWeight(previousWeightLbs, displayUnit);
+  const startWeight = convertWeight(startWeightLbs, displayUnit);
   const weightChange = currentWeight - previousWeight;
-  const startWeight = sortedEntries[sortedEntries.length - 1] ? parseFloat(sortedEntries[sortedEntries.length - 1].weight) : currentWeight;
   const totalChange = currentWeight - startWeight;
 
   const getTrendIcon = (change: number) => {
@@ -84,8 +113,8 @@ export default function WeightTracker() {
   };
 
   const getTrendBadge = (change: number) => {
-    if (change > 0) return <Badge variant="destructive">+{change.toFixed(1)} lbs</Badge>;
-    if (change < 0) return <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">{change.toFixed(1)} lbs</Badge>;
+    if (change > 0) return <Badge variant="destructive">+{change.toFixed(1)} {displayUnit}</Badge>;
+    if (change < 0) return <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">{change.toFixed(1)} {displayUnit}</Badge>;
     return <Badge variant="secondary">No change</Badge>;
   };
 
@@ -98,10 +127,22 @@ export default function WeightTracker() {
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Weight Tracker</h1>
             <p className="text-gray-600 dark:text-gray-300">Monitor your progress towards your fitness goals</p>
           </div>
-          <Button onClick={() => setIsAddingEntry(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Entry
-          </Button>
+          <div className="flex items-center gap-4">
+            {/* Unit Toggle */}
+            <div className="flex items-center space-x-2">
+              <Label htmlFor="unit-toggle" className="text-sm font-medium">lbs</Label>
+              <Switch
+                id="unit-toggle"
+                checked={displayUnit === 'kg'}
+                onCheckedChange={(checked) => setDisplayUnit(checked ? 'kg' : 'lbs')}
+              />
+              <Label htmlFor="unit-toggle" className="text-sm font-medium">kg</Label>
+            </div>
+            <Button onClick={() => setIsAddingEntry(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Entry
+            </Button>
+          </div>
         </div>
 
         {/* Stats Cards */}
@@ -112,7 +153,7 @@ export default function WeightTracker() {
               <Scale className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{currentWeight.toFixed(1)} lbs</div>
+              <div className="text-2xl font-bold">{currentWeight.toFixed(1)} {displayUnit}</div>
               <p className="text-xs text-muted-foreground">
                 Latest recorded weight
               </p>
@@ -125,7 +166,7 @@ export default function WeightTracker() {
               {getTrendIcon(weightChange)}
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{Math.abs(weightChange).toFixed(1)} lbs</div>
+              <div className="text-2xl font-bold">{Math.abs(weightChange).toFixed(1)} {displayUnit}</div>
               <div className="flex items-center gap-2 mt-1">
                 {getTrendBadge(weightChange)}
               </div>
