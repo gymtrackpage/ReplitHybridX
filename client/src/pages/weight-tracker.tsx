@@ -91,9 +91,9 @@ export default function WeightTracker() {
   };
 
   // Calculate stats
-  const sortedEntries = [...weightEntries].sort((a: WeightEntry, b: WeightEntry) => 
+  const sortedEntries = Array.isArray(weightEntries) ? [...weightEntries].sort((a: WeightEntry, b: WeightEntry) => 
     new Date(b.recordedAt || '').getTime() - new Date(a.recordedAt || '').getTime()
-  );
+  ) : [];
   
   const currentWeightLbs = sortedEntries[0] ? parseFloat(sortedEntries[0].weight) : 0;
   const previousWeightLbs = sortedEntries[1] ? parseFloat(sortedEntries[1].weight) : currentWeightLbs;
@@ -179,7 +179,7 @@ export default function WeightTracker() {
               {getTrendIcon(totalChange)}
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{Math.abs(totalChange).toFixed(1)} lbs</div>
+              <div className="text-2xl font-bold">{Math.abs(totalChange).toFixed(1)} {displayUnit}</div>
               <div className="flex items-center gap-2 mt-1">
                 {getTrendBadge(totalChange)}
               </div>
@@ -192,7 +192,7 @@ export default function WeightTracker() {
               <Target className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{weightEntries.length}</div>
+              <div className="text-2xl font-bold">{Array.isArray(weightEntries) ? weightEntries.length : 0}</div>
               <p className="text-xs text-muted-foreground">
                 Weight recordings
               </p>
@@ -211,12 +211,12 @@ export default function WeightTracker() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="weight">Weight (lbs)</Label>
+                    <Label htmlFor="weight">Weight ({displayUnit})</Label>
                     <Input
                       id="weight"
                       type="number"
                       step="0.1"
-                      placeholder="Enter weight"
+                      placeholder={`Enter weight in ${displayUnit}`}
                       value={newEntry.weight}
                       onChange={(e) => setNewEntry({ ...newEntry, weight: e.target.value })}
                       required
@@ -273,7 +273,7 @@ export default function WeightTracker() {
               <div className="flex items-center justify-center py-8">
                 <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
               </div>
-            ) : weightEntries.length === 0 ? (
+            ) : !Array.isArray(weightEntries) || weightEntries.length === 0 ? (
               <div className="text-center py-8">
                 <Scale className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                 <h3 className="text-lg font-medium mb-2">No weight entries yet</h3>
@@ -295,9 +295,13 @@ export default function WeightTracker() {
                 </TableHeader>
                 <TableBody>
                   {sortedEntries.map((entry: WeightEntry, index: number) => {
-                    const currentWeight = parseFloat(entry.weight);
+                    const currentWeightLbs = parseFloat(entry.weight);
                     const previousEntry = sortedEntries[index + 1];
-                    const previousWeight = previousEntry ? parseFloat(previousEntry.weight) : currentWeight;
+                    const previousWeightLbs = previousEntry ? parseFloat(previousEntry.weight) : currentWeightLbs;
+                    
+                    // Convert to display unit
+                    const currentWeight = convertWeight(currentWeightLbs, displayUnit);
+                    const previousWeight = convertWeight(previousWeightLbs, displayUnit);
                     const change = previousEntry ? currentWeight - previousWeight : 0;
                     
                     return (
@@ -308,7 +312,7 @@ export default function WeightTracker() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <div className="font-medium">{currentWeight.toFixed(1)} lbs</div>
+                          <div className="font-medium">{currentWeight.toFixed(1)} {displayUnit}</div>
                         </TableCell>
                         <TableCell>
                           {index < sortedEntries.length - 1 ? (
