@@ -940,3 +940,157 @@ function WorkoutForm({ initialData, programId, onSubmit, isLoading }: WorkoutFor
     </form>
   );
 }
+
+interface ProgramUploadFormProps {
+  onSubmit: (data: any) => void;
+  isLoading: boolean;
+}
+
+function ProgramUploadForm({ onSubmit, isLoading }: ProgramUploadFormProps) {
+  const [formData, setFormData] = useState({
+    name: "",
+    description: "",
+    difficulty: "Beginner",
+    duration: 12,
+    frequency: 4,
+    category: "Hyrox",
+    file: null as File | null
+  });
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const fileType = file.type;
+      const fileName = file.name.toLowerCase();
+      
+      if (fileType === 'text/csv' || 
+          fileName.endsWith('.csv') || 
+          fileType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+          fileName.endsWith('.xlsx')) {
+        setFormData(prev => ({ ...prev, file }));
+      } else {
+        alert('Please select a CSV or XLSX file');
+        e.target.value = '';
+      }
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.file) {
+      alert('Please select a file to upload');
+      return;
+    }
+    onSubmit(formData);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <Label htmlFor="programName">Program Name</Label>
+        <Input
+          id="programName"
+          value={formData.name}
+          onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+          placeholder="e.g., Advanced Hyrox Program"
+          required
+        />
+      </div>
+      
+      <div>
+        <Label htmlFor="programDescription">Description</Label>
+        <Textarea
+          id="programDescription"
+          value={formData.description}
+          onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+          placeholder="Detailed program description..."
+          rows={3}
+          required
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="difficulty">Difficulty</Label>
+          <select
+            id="difficulty"
+            value={formData.difficulty}
+            onChange={(e) => setFormData(prev => ({ ...prev, difficulty: e.target.value }))}
+            className="w-full p-2 border border-gray-300 rounded-md"
+            required
+          >
+            <option value="Beginner">Beginner</option>
+            <option value="Intermediate">Intermediate</option>
+            <option value="Advanced">Advanced</option>
+          </select>
+        </div>
+        
+        <div>
+          <Label htmlFor="category">Category</Label>
+          <select
+            id="category"
+            value={formData.category}
+            onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
+            className="w-full p-2 border border-gray-300 rounded-md"
+            required
+          >
+            <option value="Hyrox">Hyrox</option>
+            <option value="Strength">Strength</option>
+            <option value="Endurance">Endurance</option>
+            <option value="CrossTraining">Cross Training</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="duration">Duration (weeks)</Label>
+          <Input
+            id="duration"
+            type="number"
+            min="1"
+            max="52"
+            value={formData.duration}
+            onChange={(e) => setFormData(prev => ({ ...prev, duration: parseInt(e.target.value) }))}
+            required
+          />
+        </div>
+
+        <div>
+          <Label htmlFor="frequency">Frequency (days/week)</Label>
+          <Input
+            id="frequency"
+            type="number"
+            min="1"
+            max="7"
+            value={formData.frequency}
+            onChange={(e) => setFormData(prev => ({ ...prev, frequency: parseInt(e.target.value) }))}
+            required
+          />
+        </div>
+      </div>
+
+      <div>
+        <Label htmlFor="file">CSV/XLSX File</Label>
+        <Input
+          id="file"
+          type="file"
+          accept=".csv,.xlsx"
+          className="cursor-pointer"
+          onChange={handleFileChange}
+          required
+        />
+        <p className="text-xs text-gray-500 mt-1">
+          Upload CSV or XLSX file with columns: week, day, name, description, duration, exercises
+        </p>
+      </div>
+
+      <div className="flex gap-2">
+        <Button type="submit" disabled={isLoading || !formData.file} className="flex-1">
+          <Upload className="h-4 w-4 mr-2" />
+          {isLoading ? "Uploading..." : "Upload Program"}
+        </Button>
+      </div>
+    </form>
+  );
+}
