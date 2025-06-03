@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import BottomNav from "@/components/BottomNav";
+import Header from "@/components/Header";
 import { CheckCircle, Clock, SkipForward, Star, Calendar as CalendarIcon, ChevronLeft, ChevronRight, Dumbbell } from "lucide-react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameDay, parseISO, isToday, isBefore, isAfter } from "date-fns";
 
