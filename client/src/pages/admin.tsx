@@ -26,7 +26,12 @@ import {
   Save,
   X,
   Shield,
-  AlertTriangle
+  AlertTriangle,
+  ChevronDown,
+  ChevronRight,
+  Clock,
+  Target,
+  Activity
 } from "lucide-react";
 
 interface Program {
@@ -68,8 +73,10 @@ export default function AdminPanel() {
   const [isCreateProgramOpen, setIsCreateProgramOpen] = useState(false);
   const [isEditProgramOpen, setIsEditProgramOpen] = useState(false);
   const [isCreateWorkoutOpen, setIsCreateWorkoutOpen] = useState(false);
+  const [isEditWorkoutOpen, setIsEditWorkoutOpen] = useState(false);
   const [selectedProgram, setSelectedProgram] = useState<Program | null>(null);
   const [selectedWorkout, setSelectedWorkout] = useState<Workout | null>(null);
+  const [expandedPrograms, setExpandedPrograms] = useState<Set<number>>(new Set());
 
   // Redirect if not authenticated or not admin
   useEffect(() => {
@@ -213,6 +220,98 @@ export default function AdminPanel() {
     },
   });
 
+  // Workout mutations
+  const createWorkoutMutation = useMutation({
+    mutationFn: async ({ programId, ...workoutData }: any) => {
+      return await apiRequest("POST", `/api/admin/programs/${programId}/workouts`, workoutData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/programs"] });
+      setIsCreateWorkoutOpen(false);
+      setSelectedProgram(null);
+      toast({ title: "Success", description: "Workout created successfully" });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "Admin access required",
+          variant: "destructive",
+        });
+        return;
+      }
+      toast({
+        title: "Error",
+        description: "Failed to create workout",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateWorkoutMutation = useMutation({
+    mutationFn: async ({ id, ...data }: any) => {
+      return await apiRequest("PUT", `/api/admin/workouts/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/programs"] });
+      setIsEditWorkoutOpen(false);
+      setSelectedWorkout(null);
+      toast({ title: "Success", description: "Workout updated successfully" });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "Admin access required",
+          variant: "destructive",
+        });
+        return;
+      }
+      toast({
+        title: "Error",
+        description: "Failed to update workout",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteWorkoutMutation = useMutation({
+    mutationFn: async (workoutId: number) => {
+      return await apiRequest("DELETE", `/api/admin/workouts/${workoutId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/programs"] });
+      toast({ title: "Success", description: "Workout deleted successfully" });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "Admin access required",
+          variant: "destructive",
+        });
+        return;
+      }
+      toast({
+        title: "Error",
+        description: "Failed to delete workout",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const toggleProgramExpansion = (programId: number) => {
+    setExpandedPrograms(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(programId)) {
+        newSet.delete(programId);
+      } else {
+        newSet.add(programId);
+      }
+      return newSet;
+    });
+  };
+
   if (authLoading || !isAuthenticated || !user?.isAdmin) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -286,52 +385,164 @@ export default function AdminPanel() {
               </div>
             ) : (
               <div className="grid gap-4">
-                {programs?.map((program: Program) => (
-                  <Card key={program.id} className="bg-white">
-                    <CardHeader>
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <CardTitle className="text-lg">{program.name}</CardTitle>
-                          <p className="text-sm text-gray-600 mt-1">{program.description}</p>
+                {programs?.map((program: Program) => {
+                  const isExpanded = expandedPrograms.has(program.id);
+                  return (
+                    <Card key={program.id} className="bg-white">
+                      <CardHeader>
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => toggleProgramExpansion(program.id)}
+                                className="p-0 h-auto"
+                              >
+                                {isExpanded ? (
+                                  <ChevronDown className="h-4 w-4" />
+                                ) : (
+                                  <ChevronRight className="h-4 w-4" />
+                                )}
+                              </Button>
+                              <CardTitle className="text-lg">{program.name}</CardTitle>
+                            </div>
+                            <p className="text-sm text-gray-600 mt-1 ml-6">{program.description}</p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedProgram(program);
+                                setIsCreateWorkoutOpen(true);
+                              }}
+                              title="Add Workout"
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedProgram(program);
+                                setIsEditProgramOpen(true);
+                              }}
+                              title="Edit Program"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                if (confirm("Are you sure you want to delete this program and all its workouts?")) {
+                                  deleteProgramMutation.mutate(program.id);
+                                }
+                              }}
+                              title="Delete Program"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedProgram(program);
-                              setIsEditProgramOpen(true);
-                            }}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              if (confirm("Are you sure you want to delete this program?")) {
-                                deleteProgramMutation.mutate(program.id);
-                              }
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex gap-4 text-sm text-gray-600 mb-4">
+                          <Badge variant="outline">{program.difficulty}</Badge>
+                          <span>{program.duration} weeks</span>
+                          <span>{program.frequency}x/week</span>
+                          <span>{program.category}</span>
+                          <span>Workouts: {program.workouts?.length || 0}</span>
                         </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex gap-4 text-sm text-gray-600 mb-4">
-                        <Badge variant="outline">{program.difficulty}</Badge>
-                        <span>{program.duration} weeks</span>
-                        <span>{program.frequency}x/week</span>
-                        <span>{program.category}</span>
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        Workouts: {program.workouts?.length || 0}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+
+                        {/* Expanded Workout List */}
+                        {isExpanded && (
+                          <div className="mt-4 border-t pt-4">
+                            <div className="flex justify-between items-center mb-3">
+                              <h4 className="font-medium text-gray-900">Workouts</h4>
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedProgram(program);
+                                  setIsCreateWorkoutOpen(true);
+                                }}
+                                className="flex items-center gap-1"
+                              >
+                                <Plus className="h-3 w-3" />
+                                Add Workout
+                              </Button>
+                            </div>
+                            
+                            {program.workouts && program.workouts.length > 0 ? (
+                              <div className="space-y-2">
+                                {program.workouts
+                                  .sort((a, b) => a.week - b.week || a.day - b.day)
+                                  .map((workout) => (
+                                    <div
+                                      key={workout.id}
+                                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                                    >
+                                      <div className="flex-1">
+                                        <div className="flex items-center gap-3">
+                                          <Badge variant="secondary" className="text-xs">
+                                            W{workout.week}D{workout.day}
+                                          </Badge>
+                                          <span className="font-medium text-sm">{workout.name}</span>
+                                        </div>
+                                        <p className="text-xs text-gray-600 mt-1 line-clamp-2">
+                                          {workout.description}
+                                        </p>
+                                        <div className="flex gap-3 text-xs text-gray-500 mt-1">
+                                          <span className="flex items-center gap-1">
+                                            <Clock className="h-3 w-3" />
+                                            {workout.duration}min
+                                          </span>
+                                          <span className="flex items-center gap-1">
+                                            <Activity className="h-3 w-3" />
+                                            {workout.exercises?.length || 0} exercises
+                                          </span>
+                                        </div>
+                                      </div>
+                                      <div className="flex gap-1">
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => {
+                                            setSelectedWorkout(workout);
+                                            setIsEditWorkoutOpen(true);
+                                          }}
+                                          className="h-8 w-8 p-0"
+                                        >
+                                          <Edit className="h-3 w-3" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => {
+                                            if (confirm("Are you sure you want to delete this workout?")) {
+                                              deleteWorkoutMutation.mutate(workout.id);
+                                            }
+                                          }}
+                                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                                        >
+                                          <Trash2 className="h-3 w-3" />
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ))}
+                              </div>
+                            ) : (
+                              <div className="text-center py-4 text-gray-500 text-sm">
+                                No workouts in this program yet
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             )}
           </TabsContent>
@@ -421,6 +632,40 @@ export default function AdminPanel() {
                 initialData={selectedProgram}
                 onSubmit={(data) => updateProgramMutation.mutate({ id: selectedProgram.id, ...data })}
                 isLoading={updateProgramMutation.isPending}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Create Workout Dialog */}
+        <Dialog open={isCreateWorkoutOpen} onOpenChange={setIsCreateWorkoutOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>
+                Add Workout to {selectedProgram?.name}
+              </DialogTitle>
+            </DialogHeader>
+            {selectedProgram && (
+              <WorkoutForm
+                programId={selectedProgram.id}
+                onSubmit={(data) => createWorkoutMutation.mutate({ programId: selectedProgram.id, ...data })}
+                isLoading={createWorkoutMutation.isPending}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Workout Dialog */}
+        <Dialog open={isEditWorkoutOpen} onOpenChange={setIsEditWorkoutOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Edit Workout</DialogTitle>
+            </DialogHeader>
+            {selectedWorkout && (
+              <WorkoutForm
+                initialData={selectedWorkout}
+                onSubmit={(data) => updateWorkoutMutation.mutate({ id: selectedWorkout.id, ...data })}
+                isLoading={updateWorkoutMutation.isPending}
               />
             )}
           </DialogContent>
@@ -535,6 +780,150 @@ function ProgramForm({ initialData, onSubmit, isLoading }: ProgramFormProps) {
         <Button type="submit" disabled={isLoading} className="flex-1">
           <Save className="h-4 w-4 mr-2" />
           {isLoading ? "Saving..." : "Save Program"}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+interface WorkoutFormProps {
+  initialData?: Workout;
+  programId?: number;
+  onSubmit: (data: any) => void;
+  isLoading: boolean;
+}
+
+function WorkoutForm({ initialData, programId, onSubmit, isLoading }: WorkoutFormProps) {
+  const [formData, setFormData] = useState({
+    name: initialData?.name || "",
+    description: initialData?.description || "",
+    week: initialData?.week || 1,
+    day: initialData?.day || 1,
+    duration: initialData?.duration || 45,
+    exercises: initialData?.exercises || []
+  });
+
+  const [exerciseText, setExerciseText] = useState(
+    initialData?.exercises ? JSON.stringify(initialData.exercises, null, 2) : '[]'
+  );
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    let exercises = [];
+    try {
+      exercises = JSON.parse(exerciseText);
+    } catch (error) {
+      // If JSON parsing fails, create a simple exercise array from the text
+      exercises = [{ name: exerciseText, sets: 3, reps: 10 }];
+    }
+    
+    onSubmit({
+      ...formData,
+      exercises,
+      programId
+    });
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <Label htmlFor="workoutName">Workout Name</Label>
+        <Input
+          id="workoutName"
+          value={formData.name}
+          onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+          placeholder="e.g., Upper Body Strength"
+          required
+        />
+      </div>
+      
+      <div>
+        <Label htmlFor="workoutDescription">Description</Label>
+        <Textarea
+          id="workoutDescription"
+          value={formData.description}
+          onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+          placeholder="Detailed workout description..."
+          rows={3}
+          required
+        />
+      </div>
+
+      <div className="grid grid-cols-3 gap-4">
+        <div>
+          <Label htmlFor="week">Week</Label>
+          <Input
+            id="week"
+            type="number"
+            min="1"
+            max="52"
+            value={formData.week}
+            onChange={(e) => setFormData(prev => ({ ...prev, week: parseInt(e.target.value) }))}
+            required
+          />
+        </div>
+        
+        <div>
+          <Label htmlFor="day">Day</Label>
+          <Input
+            id="day"
+            type="number"
+            min="1"
+            max="7"
+            value={formData.day}
+            onChange={(e) => setFormData(prev => ({ ...prev, day: parseInt(e.target.value) }))}
+            required
+          />
+        </div>
+
+        <div>
+          <Label htmlFor="workoutDuration">Duration (min)</Label>
+          <Input
+            id="workoutDuration"
+            type="number"
+            min="15"
+            max="180"
+            value={formData.duration}
+            onChange={(e) => setFormData(prev => ({ ...prev, duration: parseInt(e.target.value) }))}
+            required
+          />
+        </div>
+      </div>
+
+      <div>
+        <Label htmlFor="exercises">Exercises (JSON format)</Label>
+        <Textarea
+          id="exercises"
+          value={exerciseText}
+          onChange={(e) => setExerciseText(e.target.value)}
+          placeholder={`Example:
+[
+  {
+    "name": "Push-ups",
+    "sets": 3,
+    "reps": 12,
+    "weight": "bodyweight"
+  },
+  {
+    "name": "Squats", 
+    "sets": 4,
+    "reps": 15,
+    "duration": "60s rest"
+  }
+]`}
+          rows={8}
+          className="font-mono text-sm"
+        />
+        <p className="text-xs text-gray-500 mt-1">
+          Enter exercises as JSON array or simple text. Invalid JSON will be converted to a single exercise.
+        </p>
+      </div>
+
+      <div className="flex gap-2">
+        <Button type="submit" disabled={isLoading} className="flex-1">
+          <Save className="h-4 w-4 mr-2" />
+          {isLoading ? "Saving..." : "Save Workout"}
         </Button>
       </div>
     </form>
