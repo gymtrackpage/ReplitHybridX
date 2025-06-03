@@ -12,6 +12,7 @@ import EnhancedAssessment from "@/pages/enhanced-assessment";
 import Calendar from "@/pages/calendar";
 import Profile from "@/pages/profile";
 import WeightTracker from "@/pages/weight-tracker";
+import Programs from "@/pages/programs";
 import NotFound from "@/pages/not-found";
 
 function Router() {

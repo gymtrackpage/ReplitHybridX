@@ -211,6 +211,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Change program endpoint with date rescheduling
+  app.put('/api/change-program', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { programId, eventDate } = req.body;
+
+      // Get the new program details
+      const program = await storage.getProgram(programId);
+      if (!program) {
+        return res.status(404).json({ message: "Program not found" });
+      }
+
+      // Update user's current program
+      await storage.updateUserProgram(userId, programId);
+
+      // Calculate new program schedule if event date is provided
+      let startDate = new Date();
+      let totalWorkouts = program.duration * (program.frequency || 4);
+      
+      if (eventDate) {
+        const event = new Date(eventDate);
+        const programDurationMs = program.duration * 7 * 24 * 60 * 60 * 1000; // weeks in milliseconds
+        startDate = new Date(event.getTime() - programDurationMs);
+        
+        // If calculated start date is in the past, start today
+        if (startDate < new Date()) {
+          startDate = new Date();
+        }
+      }
+
+      // Get existing progress or create new one
+      const existingProgress = await storage.getUserProgress(userId);
+      
+      if (existingProgress) {
+        // Update existing progress with new program
+        await storage.updateUserProgress(userId, {
+          programId: programId,
+          currentWeek: 1,
+          currentDay: 1,
+          startDate: startDate.toISOString(),
+          eventDate: eventDate ? new Date(eventDate).toISOString() : null,
+          totalWorkouts: totalWorkouts,
+          completedWorkouts: 0
+        });
+      } else {
+        // Create new progress tracking
+        await storage.createUserProgress({
+          userId,
+          programId,
+          currentWeek: 1,
+          currentDay: 1,
+          startDate: startDate.toISOString(),
+          eventDate: eventDate ? new Date(eventDate).toISOString() : null,
+          completedWorkouts: 0,
+          totalWorkouts: totalWorkouts
+        });
+      }
+
+      // Update user profile with new event date if provided
+      if (eventDate) {
+        await storage.updateUserProfile(userId, {
+          hyroxEventDate: new Date(eventDate),
+          updatedAt: new Date()
+        });
+      }
+
+      // Get updated user data to return
+      const updatedUser = await storage.getUser(userId);
+      
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error changing program:", error);
+      res.status(500).json({ message: "Failed to change program" });
+    }
+  });
+
   // Workout routes
   app.get('/api/workouts/:id', async (req, res) => {
     try {
