@@ -138,7 +138,27 @@ export default function Dashboard() {
   if (!user || !dashboardData) {
     return (
       <div className="min-h-screen bg-background">
-        <Navigation user={user} />
+        {/* Header */}
+        <div className="bg-white border-b border-gray-200 sticky top-0 z-50">
+          <div className="px-4 py-3">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg flex items-center justify-center">
+                  <Dumbbell className="h-4 w-4 text-white" />
+                </div>
+                <div className="flex flex-col">
+                  <div className="text-lg font-semibold text-gray-900">Hybrid X</div>
+                  <div className="text-sm text-gray-600">Welcome</div>
+                </div>
+              </div>
+              
+              <Button variant="ghost" size="sm" onClick={() => window.location.href = "/api/logout"}>
+                <User className="h-5 w-5 text-gray-600" />
+              </Button>
+            </div>
+          </div>
+        </div>
+        
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center">
             <h1 className="text-2xl font-bold text-foreground mb-4">Welcome to Hybrid X!</h1>
@@ -150,6 +170,9 @@ export default function Dashboard() {
             </Button>
           </div>
         </div>
+        
+        <div className="h-16"></div>
+        <BottomNav />
       </div>
     );
   }
