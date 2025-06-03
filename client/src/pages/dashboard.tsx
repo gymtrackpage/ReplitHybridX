@@ -196,13 +196,69 @@ export default function Dashboard() {
             {todaysWorkout ? (
               <div>
                 <div className="bg-gray-100 rounded-lg p-4 mb-6">
-                  <p className="text-gray-700 font-medium mb-2">{todaysWorkout.name}</p>
-                  <p className="text-gray-500 text-sm">
-                    Workout program sheet
-                  </p>
-                  <p className="text-gray-500 text-sm">
-                    'MaintenanceProgram' not found. Contact support.
-                  </p>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-lg font-bold text-gray-900">{todaysWorkout.name}</h3>
+                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                      <span>Week {todaysWorkout.week}</span>
+                      <span>•</span>
+                      <span>Day {todaysWorkout.day}</span>
+                    </div>
+                  </div>
+                  
+                  {todaysWorkout.description && (
+                    <p className="text-gray-700 text-sm mb-4 leading-relaxed">
+                      {todaysWorkout.description}
+                    </p>
+                  )}
+                  
+                  <div className="flex items-center gap-4 text-sm text-gray-500">
+                    <div className="flex items-center gap-1">
+                      <Clock className="h-4 w-4" />
+                      <span>{todaysWorkout.duration} min</span>
+                    </div>
+                    {todaysWorkout.exercises && todaysWorkout.exercises.length > 0 && (
+                      <div className="flex items-center gap-1">
+                        <Dumbbell className="h-4 w-4" />
+                        <span>{todaysWorkout.exercises.length} exercises</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Exercise List */}
+                  {todaysWorkout.exercises && todaysWorkout.exercises.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-gray-200">
+                      <h4 className="text-sm font-semibold text-gray-900 mb-3">Exercises:</h4>
+                      <div className="space-y-2">
+                        {todaysWorkout.exercises.slice(0, 5).map((exercise: any, index: number) => (
+                          <div key={index} className="flex items-start justify-between p-2 bg-white rounded border">
+                            <div className="flex-1">
+                              <p className="text-sm font-medium text-gray-900">
+                                {exercise.name || exercise.exercise || `Exercise ${index + 1}`}
+                              </p>
+                              {(exercise.sets || exercise.reps || exercise.duration || exercise.distance) && (
+                                <p className="text-xs text-gray-600 mt-1">
+                                  {exercise.sets && `${exercise.sets} sets`}
+                                  {exercise.sets && exercise.reps && ' × '}
+                                  {exercise.reps && `${exercise.reps} reps`}
+                                  {exercise.duration && ` • ${exercise.duration}`}
+                                  {exercise.distance && ` • ${exercise.distance}`}
+                                  {exercise.weight && ` • ${exercise.weight}`}
+                                </p>
+                              )}
+                              {exercise.description && exercise.description !== exercise.name && (
+                                <p className="text-xs text-gray-500 mt-1">{exercise.description}</p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                        {todaysWorkout.exercises.length > 5 && (
+                          <p className="text-xs text-gray-500 text-center py-2">
+                            +{todaysWorkout.exercises.length - 5} more exercises
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* How did this workout feel? */}
