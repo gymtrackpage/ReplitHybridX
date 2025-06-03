@@ -168,20 +168,7 @@ export default function Calendar() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* Header with Logo */}
-      <div className="bg-white px-4 py-3 border-b border-gray-200">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="bg-gradient-to-r from-orange-500 to-red-600 rounded-lg p-2">
-              <Dumbbell className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-lg font-bold text-gray-900">Hybrid X</h1>
-              <p className="text-xs text-gray-500">Training Platform</p>
-            </div>
-          </div>
-        </div>
-      </div>
+      <Header title="Calendar" />
 
       <div className="w-full max-w-full overflow-hidden px-4 pb-20">
         <div className="mb-6 mt-6">
