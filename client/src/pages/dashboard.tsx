@@ -4,7 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState } from "react";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import Navigation from "@/components/Navigation";
+import BottomNav from "@/components/BottomNav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -326,6 +326,11 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </main>
+      
+      {/* Bottom spacing to prevent content from being hidden behind bottom nav */}
+      <div className="h-16"></div>
+      
+      <BottomNav />
     </div>
   );
 }
