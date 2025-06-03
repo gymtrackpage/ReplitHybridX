@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
-import { Home, Calendar, Scale, User as UserIcon, Shield } from "lucide-react";
+import { Home, Calendar, Scale, User as UserIcon, Shield, Target } from "lucide-react";
 
 export default function BottomNav() {
   const [location] = useLocation();
@@ -10,6 +10,7 @@ export default function BottomNav() {
   const navItems = [
     { path: "/", icon: Home, label: "Home" },
     { path: "/calendar", icon: Calendar, label: "Calendar" },
+    { path: "/programs", icon: Target, label: "Programs" },
     { path: "/weight-tracker", icon: Scale, label: "Weight" },
     { path: "/profile", icon: UserIcon, label: "Profile" },
   ];
@@ -19,7 +20,7 @@ export default function BottomNav() {
     navItems.push({ path: "/admin", icon: Shield, label: "Admin" });
   }
 
-  const gridCols = user?.isAdmin ? "grid-cols-5" : "grid-cols-4";
+  const gridCols = user?.isAdmin ? "grid-cols-6" : "grid-cols-5";
 
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50">

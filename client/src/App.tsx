@@ -37,6 +37,7 @@ function Router() {
           <Route path="/calendar" component={Calendar} />
           <Route path="/profile" component={Profile} />
           <Route path="/weight-tracker" component={WeightTracker} />
+          <Route path="/programs" component={Programs} />
           <Route path="/admin" component={Admin} />
           <Route path="/subscribe" component={Subscribe} />
           <Route path="/assessment" component={EnhancedAssessment} />
