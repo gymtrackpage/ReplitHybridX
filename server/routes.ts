@@ -6,7 +6,7 @@ import { selectHyroxProgram, HYROX_PROGRAMS } from "./programSelection";
 import { loadProgramsFromCSV, calculateProgramSchedule } from "./programLoader";
 import { determineUserProgramPhase, transitionUserToPhase, checkForPhaseTransition } from "./programPhaseManager";
 import { seedHyroxPrograms } from "./seedData";
-import { loadAllHyroxPrograms } from "./comprehensiveCSVLoader";
+import { loadBasicHyroxPrograms } from "./simpleWorkoutLoader";
 import Stripe from "stripe";
 import { insertProgramSchema, insertWorkoutSchema, insertAssessmentSchema, insertWeightEntrySchema } from "@shared/schema";
 
@@ -24,7 +24,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/init-programs', isAuthenticated, async (req: any, res) => {
     try {
       console.log("Loading all HYROX programs and workouts...");
-      await loadAllHyroxPrograms();
+      await loadBasicHyroxPrograms();
       const programs = await storage.getPrograms();
       let totalWorkouts = 0;
       for (const program of programs) {
@@ -43,13 +43,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Initialize programs and workouts if not already loaded
+  // Initialize programs and workouts only if needed
   try {
     const existingPrograms = await storage.getPrograms();
-    if (existingPrograms.length === 0 || !existingPrograms.some(p => p.name === "Beginner Program")) {
-      console.log("Loading all HYROX programs and detailed workouts...");
-      await loadAllHyroxPrograms();
-      console.log("All programs and workouts initialized successfully");
+    if (existingPrograms.length < 6) {
+      console.log("Loading HYROX programs...");
+      await loadBasicHyroxPrograms();
+      console.log("Programs loaded successfully");
+    } else {
+      console.log(`Found ${existingPrograms.length} existing programs`);
     }
   } catch (error) {
     console.error("Error initializing programs:", error);
