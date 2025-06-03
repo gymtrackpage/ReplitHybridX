@@ -93,9 +93,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/dashboard', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      console.log("Dashboard request for user:", userId);
+      
       const user = await storage.getUser(userId);
+      console.log("User found:", !!user);
+      
       const progress = await storage.getUserProgress(userId);
+      console.log("Progress found:", !!progress, progress ? `Program ID: ${progress.programId}` : 'No progress');
+      
       const todaysWorkout = await storage.getTodaysWorkout(userId);
+      console.log("Today's workout found:", !!todaysWorkout);
+      
       const weeklyCompletions = await storage.getWeeklyCompletions(userId);
       const weightEntries = await storage.getUserWeightEntries(userId);
 
