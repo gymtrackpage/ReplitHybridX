@@ -1,9 +1,11 @@
 import { Button } from "@/components/ui/button";
 import { Link, useLocation } from "wouter";
-import { Home, Calendar, Scale, User as UserIcon } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { Home, Calendar, Scale, User as UserIcon, Shield } from "lucide-react";
 
 export default function BottomNav() {
   const [location] = useLocation();
+  const { user } = useAuth();
 
   const navItems = [
     { path: "/", icon: Home, label: "Home" },
@@ -12,9 +14,16 @@ export default function BottomNav() {
     { path: "/profile", icon: UserIcon, label: "Profile" },
   ];
 
+  // Add admin button if user is admin
+  if (user?.isAdmin) {
+    navItems.push({ path: "/admin", icon: Shield, label: "Admin" });
+  }
+
+  const gridCols = user?.isAdmin ? "grid-cols-5" : "grid-cols-4";
+
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50">
-      <div className="grid grid-cols-4 gap-1 px-2 py-2">
+      <div className={`grid ${gridCols} gap-1 px-2 py-2`}>
         {navItems.map(({ path, icon: Icon, label }) => {
           const isActive = location === path || (path !== "/" && location.startsWith(path));
           return (

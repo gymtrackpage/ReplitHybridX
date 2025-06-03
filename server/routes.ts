@@ -16,6 +16,30 @@ if (!process.env.STRIPE_SECRET_KEY) {
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
+// Admin middleware
+const requireAdmin = async (req: any, res: any, next: any) => {
+  try {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    
+    const userId = req.user?.claims?.sub;
+    if (!userId) {
+      return res.status(401).json({ message: "User ID not found" });
+    }
+    
+    const user = await storage.getUser(userId);
+    if (!user || !user.isAdmin) {
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    
+    next();
+  } catch (error) {
+    console.error("Admin middleware error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
@@ -894,6 +918,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Weight entry creation error:", error);
       res.status(500).json({ message: "Error creating weight entry" });
+    }
+  });
+
+  // Admin routes for program management
+  app.get('/api/admin/programs', requireAdmin, async (req: any, res) => {
+    try {
+      const programs = await storage.getPrograms();
+      const programsWithWorkouts = await Promise.all(
+        programs.map(async (program) => {
+          const workouts = await storage.getWorkoutsByProgram(program.id);
+          return { ...program, workouts };
+        })
+      );
+      res.json(programsWithWorkouts);
+    } catch (error) {
+      console.error("Error fetching admin programs:", error);
+      res.status(500).json({ message: "Failed to fetch programs" });
+    }
+  });
+
+  app.post('/api/admin/programs', requireAdmin, async (req: any, res) => {
+    try {
+      const programData = insertProgramSchema.parse(req.body);
+      const program = await storage.createProgram(programData);
+      res.json(program);
+    } catch (error) {
+      console.error("Error creating program:", error);
+      res.status(500).json({ message: "Failed to create program" });
+    }
+  });
+
+  app.put('/api/admin/programs/:id', requireAdmin, async (req: any, res) => {
+    try {
+      const programId = parseInt(req.params.id);
+      const updateData = req.body;
+      const program = await storage.updateProgram(programId, updateData);
+      res.json(program);
+    } catch (error) {
+      console.error("Error updating program:", error);
+      res.status(500).json({ message: "Failed to update program" });
+    }
+  });
+
+  app.delete('/api/admin/programs/:id', requireAdmin, async (req: any, res) => {
+    try {
+      const programId = parseInt(req.params.id);
+      await storage.deleteProgram(programId);
+      res.json({ message: "Program deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting program:", error);
+      res.status(500).json({ message: "Failed to delete program" });
+    }
+  });
+
+  app.post('/api/admin/programs/:id/workouts', requireAdmin, async (req: any, res) => {
+    try {
+      const programId = parseInt(req.params.id);
+      const workoutData = { ...req.body, programId };
+      const workout = await storage.createWorkout(workoutData);
+      res.json(workout);
+    } catch (error) {
+      console.error("Error creating workout:", error);
+      res.status(500).json({ message: "Failed to create workout" });
+    }
+  });
+
+  app.put('/api/admin/workouts/:id', requireAdmin, async (req: any, res) => {
+    try {
+      const workoutId = parseInt(req.params.id);
+      const updateData = req.body;
+      const workout = await storage.updateWorkout(workoutId, updateData);
+      res.json(workout);
+    } catch (error) {
+      console.error("Error updating workout:", error);
+      res.status(500).json({ message: "Failed to update workout" });
+    }
+  });
+
+  app.delete('/api/admin/workouts/:id', requireAdmin, async (req: any, res) => {
+    try {
+      const workoutId = parseInt(req.params.id);
+      await storage.deleteWorkout(workoutId);
+      res.json({ message: "Workout deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting workout:", error);
+      res.status(500).json({ message: "Failed to delete workout" });
+    }
+  });
+
+  app.post('/api/admin/users/:id/admin', requireAdmin, async (req: any, res) => {
+    try {
+      const userId = req.params.id;
+      const { isAdmin } = req.body;
+      const user = await storage.updateUserAdmin(userId, isAdmin);
+      res.json(user);
+    } catch (error) {
+      console.error("Error updating user admin status:", error);
+      res.status(500).json({ message: "Failed to update user admin status" });
     }
   });
 
