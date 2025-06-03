@@ -71,10 +71,10 @@ export default function WeightTracker() {
     new Date(b.recordedAt || '').getTime() - new Date(a.recordedAt || '').getTime()
   );
   
-  const currentWeight = sortedEntries[0]?.weight || 0;
-  const previousWeight = sortedEntries[1]?.weight || currentWeight;
+  const currentWeight = sortedEntries[0] ? parseFloat(sortedEntries[0].weight) : 0;
+  const previousWeight = sortedEntries[1] ? parseFloat(sortedEntries[1].weight) : currentWeight;
   const weightChange = currentWeight - previousWeight;
-  const startWeight = sortedEntries[sortedEntries.length - 1]?.weight || currentWeight;
+  const startWeight = sortedEntries[sortedEntries.length - 1] ? parseFloat(sortedEntries[sortedEntries.length - 1].weight) : currentWeight;
   const totalChange = currentWeight - startWeight;
 
   const getTrendIcon = (change: number) => {
@@ -254,8 +254,10 @@ export default function WeightTracker() {
                 </TableHeader>
                 <TableBody>
                   {sortedEntries.map((entry: WeightEntry, index: number) => {
+                    const currentWeight = parseFloat(entry.weight);
                     const previousEntry = sortedEntries[index + 1];
-                    const change = previousEntry ? entry.weight - previousEntry.weight : 0;
+                    const previousWeight = previousEntry ? parseFloat(previousEntry.weight) : currentWeight;
+                    const change = previousEntry ? currentWeight - previousWeight : 0;
                     
                     return (
                       <TableRow key={entry.id}>
@@ -265,7 +267,7 @@ export default function WeightTracker() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <div className="font-medium">{entry.weight.toFixed(1)} lbs</div>
+                          <div className="font-medium">{currentWeight.toFixed(1)} lbs</div>
                         </TableCell>
                         <TableCell>
                           {index < sortedEntries.length - 1 ? (
