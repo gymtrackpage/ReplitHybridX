@@ -402,6 +402,112 @@ export default function Dashboard() {
       <div className="h-16"></div>
       
       <BottomNav />
+
+      {/* Exercise Detail Lightbox */}
+      <Dialog open={isExerciseDetailOpen} onOpenChange={setIsExerciseDetailOpen}>
+        <DialogContent className="max-w-md mx-auto">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold text-gray-900">
+              {selectedExercise?.name || selectedExercise?.exercise || "Exercise Details"}
+            </DialogTitle>
+          </DialogHeader>
+          
+          {selectedExercise && (
+            <div className="space-y-4">
+              {/* Exercise specifications */}
+              <div className="grid grid-cols-2 gap-4">
+                {selectedExercise.sets && (
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">Sets</p>
+                    <p className="text-lg font-semibold text-gray-900">{selectedExercise.sets}</p>
+                  </div>
+                )}
+                
+                {selectedExercise.reps && (
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">Reps</p>
+                    <p className="text-lg font-semibold text-gray-900">{selectedExercise.reps}</p>
+                  </div>
+                )}
+                
+                {selectedExercise.weight && (
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">Weight</p>
+                    <p className="text-lg font-semibold text-gray-900">{selectedExercise.weight}</p>
+                  </div>
+                )}
+                
+                {selectedExercise.rpe && (
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">RPE</p>
+                    <p className="text-lg font-semibold text-gray-900">{selectedExercise.rpe}</p>
+                  </div>
+                )}
+                
+                {selectedExercise.duration && (
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">Duration</p>
+                    <p className="text-lg font-semibold text-gray-900">{selectedExercise.duration}</p>
+                  </div>
+                )}
+                
+                {selectedExercise.distance && (
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">Distance</p>
+                    <p className="text-lg font-semibold text-gray-900">{selectedExercise.distance}</p>
+                  </div>
+                )}
+                
+                {selectedExercise.rest && (
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">Rest</p>
+                    <p className="text-lg font-semibold text-gray-900">{selectedExercise.rest}</p>
+                  </div>
+                )}
+                
+                {selectedExercise.tempo && (
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">Tempo</p>
+                    <p className="text-lg font-semibold text-gray-900">{selectedExercise.tempo}</p>
+                  </div>
+                )}
+              </div>
+              
+              {/* Exercise description */}
+              {selectedExercise.description && selectedExercise.description !== selectedExercise.name && (
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <p className="text-xs text-blue-600 uppercase tracking-wide mb-2">Instructions</p>
+                  <p className="text-sm text-gray-700 leading-relaxed">{selectedExercise.description}</p>
+                </div>
+              )}
+              
+              {/* Exercise notes */}
+              {selectedExercise.notes && (
+                <div className="bg-yellow-50 p-4 rounded-lg">
+                  <p className="text-xs text-yellow-600 uppercase tracking-wide mb-2">Notes</p>
+                  <p className="text-sm text-gray-700 leading-relaxed">{selectedExercise.notes}</p>
+                </div>
+              )}
+              
+              {/* Exercise type/category */}
+              {selectedExercise.type && (
+                <div className="bg-green-50 p-4 rounded-lg">
+                  <p className="text-xs text-green-600 uppercase tracking-wide mb-2">Exercise Type</p>
+                  <p className="text-sm text-gray-700">{selectedExercise.type}</p>
+                </div>
+              )}
+              
+              {/* Close button */}
+              <Button 
+                onClick={() => setIsExerciseDetailOpen(false)}
+                className="w-full bg-yellow-400 hover:bg-yellow-500 text-black"
+              >
+                Close
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
