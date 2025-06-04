@@ -237,7 +237,7 @@ export default function Dashboard() {
                     <div className="mt-4 pt-4 border-t border-gray-200">
                       <h4 className="text-sm font-semibold text-gray-900 mb-3">Exercises:</h4>
                       <div className="space-y-2">
-                        {todaysWorkout.exercises.slice(0, 5).map((exercise: any, index: number) => (
+                        {todaysWorkout.exercises.map((exercise: any, index: number) => (
                           <div 
                             key={index} 
                             onClick={() => handleExerciseClick(exercise)}
@@ -268,11 +268,6 @@ export default function Dashboard() {
                             </div>
                           </div>
                         ))}
-                        {todaysWorkout.exercises.length > 5 && (
-                          <p className="text-xs text-gray-500 text-center py-2">
-                            +{todaysWorkout.exercises.length - 5} more exercises
-                          </p>
-                        )}
                       </div>
                     </div>
                   )}
