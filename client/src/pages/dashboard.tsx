@@ -9,6 +9,7 @@ import Header from "@/components/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Dumbbell, Calendar, User, ClipboardList, Share, SkipForward, CheckCircle, Clock } from "lucide-react";
 import { Link } from "wouter";
 
@@ -17,6 +18,8 @@ export default function Dashboard() {
   const { toast } = useToast();
   const [workoutNotes, setWorkoutNotes] = useState("");
   const [selectedRating, setSelectedRating] = useState<number | null>(null);
+  const [selectedExercise, setSelectedExercise] = useState<any | null>(null);
+  const [isExerciseDetailOpen, setIsExerciseDetailOpen] = useState(false);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -75,6 +78,11 @@ export default function Dashboard() {
   });
 
   // Button handlers
+  const handleExerciseClick = (exercise: any) => {
+    setSelectedExercise(exercise);
+    setIsExerciseDetailOpen(true);
+  };
+
   const handleCompleteWorkout = () => {
     if (!dashboardData?.todaysWorkout?.id) return;
     
@@ -230,7 +238,11 @@ export default function Dashboard() {
                       <h4 className="text-sm font-semibold text-gray-900 mb-3">Exercises:</h4>
                       <div className="space-y-2">
                         {todaysWorkout.exercises.slice(0, 5).map((exercise: any, index: number) => (
-                          <div key={index} className="flex items-start justify-between p-2 bg-white rounded border">
+                          <div 
+                            key={index} 
+                            onClick={() => handleExerciseClick(exercise)}
+                            className="flex items-start justify-between p-2 bg-white rounded border cursor-pointer hover:bg-gray-50 transition-colors"
+                          >
                             <div className="flex-1">
                               <p className="text-sm font-medium text-gray-900">
                                 {exercise.name || exercise.exercise || `Exercise ${index + 1}`}
@@ -248,6 +260,11 @@ export default function Dashboard() {
                               {exercise.description && exercise.description !== exercise.name && (
                                 <p className="text-xs text-gray-500 mt-1">{exercise.description}</p>
                               )}
+                            </div>
+                            <div className="text-gray-400 ml-2">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                              </svg>
                             </div>
                           </div>
                         ))}
