@@ -195,36 +195,10 @@ export class DatabaseStorage implements IStorage {
     let currentWeek = progress.currentWeek;
     let currentDay = progress.currentDay;
 
-    // If we have a start date, calculate the actual current week/day based on today's date
-    if (progress.startDate) {
-      const startDate = new Date(progress.startDate);
-      const today = new Date();
-      const daysSinceStart = Math.floor((today.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000));
-      
-      if (daysSinceStart >= 0) {
-        // Calculate current week and day based on program schedule
-        currentWeek = Math.floor(daysSinceStart / 7) + 1;
-        currentDay = (daysSinceStart % 7) + 1;
-        
-        // Get the program to check duration
-        const [program] = await db.select().from(programs).where(eq(programs.id, progress.programId));
-        const maxWeeks = program?.duration || 12;
-        
-        // Don't go beyond the program duration
-        if (currentWeek > maxWeeks) {
-          currentWeek = maxWeeks;
-          currentDay = 6; // Last day of final week
-        }
-        
-        // Update progress if it's different from stored values
-        if (currentWeek !== progress.currentWeek || currentDay !== progress.currentDay) {
-          await this.updateUserProgress(userId, {
-            currentWeek,
-            currentDay
-          });
-        }
-      }
-    }
+    // Use the stored progress values directly - they are already calculated correctly
+    // when the program is scheduled, taking into account event dates
+    currentWeek = progress.currentWeek;
+    currentDay = progress.currentDay;
 
     // Find the workout for calculated week and day
     const [workout] = await db
