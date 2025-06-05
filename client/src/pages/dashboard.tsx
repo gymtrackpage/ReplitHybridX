@@ -247,7 +247,7 @@ export default function Dashboard() {
                               <p className="text-sm font-medium text-gray-900">
                                 {exercise.name || exercise.exercise || `Exercise ${index + 1}`}
                               </p>
-                              {(exercise.sets || exercise.reps || exercise.duration || exercise.distance) && (
+                              {(exercise.sets || exercise.reps || exercise.duration || exercise.distance || exercise.weight || exercise.rpe || exercise.rest || exercise.tempo || exercise.type || exercise.intensity || exercise.pace || exercise.rounds || exercise.target || exercise.equipment) && (
                                 <p className="text-xs text-gray-600 mt-1">
                                   {exercise.sets && `${exercise.sets} sets`}
                                   {exercise.sets && exercise.reps && ' × '}
@@ -255,6 +255,15 @@ export default function Dashboard() {
                                   {exercise.duration && ` • ${exercise.duration}`}
                                   {exercise.distance && ` • ${exercise.distance}`}
                                   {exercise.weight && ` • ${exercise.weight}`}
+                                  {exercise.rpe && ` • RPE ${exercise.rpe}`}
+                                  {exercise.rest && ` • Rest: ${exercise.rest}`}
+                                  {exercise.tempo && ` • Tempo: ${exercise.tempo}`}
+                                  {exercise.intensity && ` • ${exercise.intensity}`}
+                                  {exercise.pace && ` • Pace: ${exercise.pace}`}
+                                  {exercise.rounds && ` • ${exercise.rounds} rounds`}
+                                  {exercise.target && ` • Target: ${exercise.target}`}
+                                  {exercise.equipment && ` • ${exercise.equipment}`}
+                                  {exercise.type && ` • ${exercise.type}`}
                                 </p>
                               )}
                               {exercise.description && exercise.description !== exercise.name && (
@@ -464,6 +473,41 @@ export default function Dashboard() {
                   <div className="bg-gray-50 p-3 rounded-lg">
                     <p className="text-xs text-gray-500 uppercase tracking-wide">Tempo</p>
                     <p className="text-lg font-semibold text-gray-900">{selectedExercise.tempo}</p>
+                  </div>
+                )}
+                
+                {selectedExercise.intensity && (
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">Intensity</p>
+                    <p className="text-lg font-semibold text-gray-900">{selectedExercise.intensity}</p>
+                  </div>
+                )}
+                
+                {selectedExercise.pace && (
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">Pace</p>
+                    <p className="text-lg font-semibold text-gray-900">{selectedExercise.pace}</p>
+                  </div>
+                )}
+                
+                {selectedExercise.rounds && (
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">Rounds</p>
+                    <p className="text-lg font-semibold text-gray-900">{selectedExercise.rounds}</p>
+                  </div>
+                )}
+                
+                {selectedExercise.target && (
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">Target</p>
+                    <p className="text-lg font-semibold text-gray-900">{selectedExercise.target}</p>
+                  </div>
+                )}
+                
+                {selectedExercise.equipment && (
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">Equipment</p>
+                    <p className="text-lg font-semibold text-gray-900">{selectedExercise.equipment}</p>
                   </div>
                 )}
               </div>
