@@ -228,23 +228,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Calculate new program schedule if event date is provided
       let startDate = new Date();
+      let currentWeek = 1;
+      let currentDay = 1;
       let totalWorkouts = (program.duration || 12) * (program.frequency || 6); // Assuming 6 days per week
       
       if (eventDate) {
         const event = new Date(eventDate);
-        
-        // Calculate backwards from event date
-        // Week 12, Day 6 should be the event date
-        // So we need to go back (12 weeks - 1) * 7 days + (6 days - 1) = 77 + 5 = 82 days
-        const totalDaysInProgram = ((program.duration || 12) - 1) * 7 + 5; // Week 12, Day 6
-        const startDateMs = event.getTime() - (totalDaysInProgram * 24 * 60 * 60 * 1000);
-        startDate = new Date(startDateMs);
-        
-        // If calculated start date is in the past, adjust but maintain the event date
         const today = new Date();
-        if (startDate < today) {
-          // Start today but keep the event date - this means the program may be compressed
+        const daysUntilEvent = Math.ceil((event.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+        const programDuration = program.duration || 12;
+        const totalDaysInProgram = ((programDuration - 1) * 7) + 6; // Week 12, Day 6 = 83 days total
+        
+        if (daysUntilEvent < totalDaysInProgram) {
+          // Event is closer than full program duration - start at appropriate week/day
+          const daysToSkip = totalDaysInProgram - daysUntilEvent;
+          currentWeek = Math.floor(daysToSkip / 7) + 1;
+          currentDay = (daysToSkip % 7) + 1;
+          
+          // Ensure we don't exceed program duration
+          if (currentWeek > programDuration) {
+            currentWeek = programDuration;
+            currentDay = 6;
+          }
+          
           startDate = new Date(today);
+        } else {
+          // Event is far enough away - calculate normal start date
+          const startDateMs = event.getTime() - (totalDaysInProgram * 24 * 60 * 60 * 1000);
+          startDate = new Date(startDateMs);
+          
+          // If calculated start date is in the future (more than 12 weeks), use maintenance program logic
+          if (startDate > today) {
+            // For now, start today at week 1 - maintenance program logic can be added later
+            startDate = new Date(today);
+          }
         }
       }
 
@@ -255,8 +272,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Update existing progress with new program
         await storage.updateUserProgress(userId, {
           programId: programId,
-          currentWeek: 1,
-          currentDay: 1,
+          currentWeek: currentWeek,
+          currentDay: currentDay,
           startDate: startDate.toISOString(),
           eventDate: eventDate ? new Date(eventDate).toISOString() : null,
           totalWorkouts: totalWorkouts,
@@ -267,8 +284,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.createUserProgress({
           userId,
           programId,
-          currentWeek: 1,
-          currentDay: 1,
+          currentWeek: currentWeek,
+          currentDay: currentDay,
           startDate: startDate.toISOString(),
           eventDate: eventDate ? new Date(eventDate).toISOString() : null,
           completedWorkouts: 0,
