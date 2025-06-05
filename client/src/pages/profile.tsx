@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dumbbell, Calendar as CalendarIcon, User, Calendar, MapPin, Clock, Target } from "lucide-react";
+import { Dumbbell, Calendar as CalendarIcon, User, Calendar, MapPin, Clock, Target, Mail, MessageSquare } from "lucide-react";
 import { format } from "date-fns";
 
 export default function Profile() {
@@ -279,7 +279,7 @@ export default function Profile() {
         </Card>
 
         {/* Current Program */}
-        <Card className="bg-white rounded-2xl shadow-sm border-0">
+        <Card className="bg-white rounded-2xl shadow-sm border-0 mb-6">
           <CardHeader>
             <CardTitle className="text-xl font-bold text-gray-900">Current Training Program</CardTitle>
           </CardHeader>
@@ -327,6 +327,101 @@ export default function Profile() {
                 </Button>
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Contact Support */}
+        <Card className="bg-white rounded-2xl shadow-sm border-0">
+          <CardHeader>
+            <CardTitle className="text-xl font-bold text-gray-900 flex items-center">
+              <MessageSquare className="h-5 w-5 mr-2" />
+              Contact Support
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-gray-600">
+              Have questions, suggestions, or need help with your training? We're here to help!
+            </p>
+            
+            <div className="space-y-3">
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                onClick={() => {
+                  const subject = encodeURIComponent("Training App Support Request");
+                  const body = encodeURIComponent(`Hi Hybrid X Team,
+
+I'm writing regarding the training app. Please describe your question or issue below:
+
+[Your message here]
+
+User Details:
+- Name: ${user?.firstName || ''} ${user?.lastName || ''}
+- Email: ${user?.email || ''}
+- Current Program: ${programs?.find((p: any) => p.id === user?.currentProgramId)?.name || 'Not selected'}
+
+Thank you!`);
+                  window.location.href = `mailto:training@hybridx.club?subject=${subject}&body=${body}`;
+                }}
+              >
+                <Mail className="h-4 w-4 mr-2" />
+                Report an Issue
+              </Button>
+              
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                onClick={() => {
+                  const subject = encodeURIComponent("Training Program Suggestion");
+                  const body = encodeURIComponent(`Hi Hybrid X Team,
+
+I have a suggestion for improving the training programs:
+
+[Your suggestion here]
+
+User Details:
+- Name: ${user?.firstName || ''} ${user?.lastName || ''}
+- Email: ${user?.email || ''}
+- Current Program: ${programs?.find((p: any) => p.id === user?.currentProgramId)?.name || 'Not selected'}
+- Fitness Level: ${user?.fitnessLevel || 'Not specified'}
+
+Thank you for considering my feedback!`);
+                  window.location.href = `mailto:training@hybridx.club?subject=${subject}&body=${body}`;
+                }}
+              >
+                <Target className="h-4 w-4 mr-2" />
+                Suggest Improvements
+              </Button>
+              
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                onClick={() => {
+                  const subject = encodeURIComponent("General Inquiry - Hybrid X Training");
+                  const body = encodeURIComponent(`Hi Hybrid X Team,
+
+I have a general question about:
+
+[Your question here]
+
+User Details:
+- Name: ${user?.firstName || ''} ${user?.lastName || ''}
+- Email: ${user?.email || ''}
+
+Looking forward to your response!`);
+                  window.location.href = `mailto:training@hybridx.club?subject=${subject}&body=${body}`;
+                }}
+              >
+                <MessageSquare className="h-4 w-4 mr-2" />
+                General Questions
+              </Button>
+            </div>
+            
+            <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+              <p className="text-sm text-blue-800">
+                <strong>Response Time:</strong> We typically respond within 24-48 hours during business days.
+              </p>
+            </div>
           </CardContent>
         </Card>
       </main>
