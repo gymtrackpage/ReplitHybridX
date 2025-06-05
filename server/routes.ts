@@ -228,16 +228,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Calculate new program schedule if event date is provided
       let startDate = new Date();
-      let totalWorkouts = (program.duration || 12) * (program.frequency || 4);
+      let totalWorkouts = (program.duration || 12) * (program.frequency || 6); // Assuming 6 days per week
       
       if (eventDate) {
         const event = new Date(eventDate);
-        const programDurationMs = (program.duration || 12) * 7 * 24 * 60 * 60 * 1000; // weeks in milliseconds
-        startDate = new Date(event.getTime() - programDurationMs);
         
-        // If calculated start date is in the past, start today
-        if (startDate < new Date()) {
-          startDate = new Date();
+        // Calculate backwards from event date
+        // Week 12, Day 6 should be the event date
+        // So we need to go back (12 weeks - 1) * 7 days + (6 days - 1) = 77 + 5 = 82 days
+        const totalDaysInProgram = ((program.duration || 12) - 1) * 7 + 5; // Week 12, Day 6
+        const startDateMs = event.getTime() - (totalDaysInProgram * 24 * 60 * 60 * 1000);
+        startDate = new Date(startDateMs);
+        
+        // If calculated start date is in the past, adjust but maintain the event date
+        const today = new Date();
+        if (startDate < today) {
+          // Start today but keep the event date - this means the program may be compressed
+          startDate = new Date(today);
         }
       }
 
