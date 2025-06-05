@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Dumbbell, Calendar, User, ClipboardList, Share, SkipForward, CheckCircle, Clock } from "lucide-react";
+import { Dumbbell, Calendar, User, ClipboardList, Share, SkipForward, CheckCircle, Clock, ChevronRight } from "lucide-react";
 import { Link } from "wouter";
 
 export default function Dashboard() {
@@ -172,11 +172,11 @@ export default function Dashboard() {
   // Quick actions removed as they're not needed in the mobile-first design
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-background">
       <Header title="Dashboard" />
       
       {/* User Welcome Section */}
-      <div className="bg-white px-4 py-3 border-b border-gray-200">
+      <div className="bg-card px-4 py-4 shadow-sm">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-bold text-gray-900">Welcome back, {user?.firstName || 'User'}!</h2>
@@ -196,83 +196,86 @@ export default function Dashboard() {
 
       <main className="px-4 py-6 pb-20 max-w-full overflow-hidden">
         {/* Today's Workout Card */}
-        <Card className="bg-white rounded-2xl shadow-sm border-0 mb-6 w-full max-w-full">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-xl sm:text-2xl font-bold text-yellow-600 mb-4 break-words">Today's Workout</CardTitle>
-          </CardHeader>
-          <CardContent className="max-w-full overflow-hidden">
+        <Card className="bg-card rounded-2xl shadow-lg border-0 mb-6 w-full max-w-full overflow-hidden">
+          <CardContent className="p-0">
             {todaysWorkout ? (
               <div>
-                <div className="bg-gray-100 rounded-lg p-4 mb-6">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-lg font-bold text-gray-900">{todaysWorkout.name}</h3>
-                    <div className="flex items-center gap-2 text-sm text-gray-500">
-                      <span>Week {todaysWorkout.week}</span>
-                      <span>•</span>
-                      <span>Day {todaysWorkout.day}</span>
+                {/* Workout Header with Accent */}
+                <div className="relative">
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary"></div>
+                  <div className="pl-6 pr-4 py-4 bg-card">
+                    <div className="mb-2">
+                      <h2 className="text-sm font-semibold text-muted-foreground mb-1">Today's workout</h2>
+                      <h3 className="text-xl font-bold text-foreground">{todaysWorkout.name}</h3>
                     </div>
-                  </div>
-                  
-                  {todaysWorkout.description && (
-                    <p className="text-gray-700 text-sm mb-4 leading-relaxed">
-                      {todaysWorkout.description}
-                    </p>
-                  )}
-                  
-                  <div className="flex items-center gap-4 text-sm text-gray-500">
-                    <div className="flex items-center gap-1">
-                      <Clock className="h-4 w-4" />
-                      <span>{todaysWorkout.duration} min</span>
-                    </div>
-                    {todaysWorkout.exercises && todaysWorkout.exercises.length > 0 && (
+                    
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground mb-3">
                       <div className="flex items-center gap-1">
-                        <Dumbbell className="h-4 w-4" />
-                        <span>{todaysWorkout.exercises.length} exercises</span>
+                        <Clock className="h-4 w-4" />
+                        <span>{todaysWorkout.duration}m</span>
                       </div>
+                      <span className="text-xs">•</span>
+                      <span>Week {todaysWorkout.week}/Day {todaysWorkout.day}</span>
+                      {todaysWorkout.exercises && todaysWorkout.exercises.length > 0 && (
+                        <>
+                          <span className="text-xs">•</span>
+                          <span>{todaysWorkout.exercises.length} exercises</span>
+                        </>
+                      )}
+                    </div>
+                    
+                    {todaysWorkout.description && (
+                      <p className="text-muted-foreground text-sm leading-relaxed">
+                        {todaysWorkout.description}
+                      </p>
                     )}
                   </div>
-
-                  {/* Exercise List */}
-                  {todaysWorkout.exercises && todaysWorkout.exercises.length > 0 && (
-                    <div className="mt-4 pt-4 border-t border-gray-200">
-                      <h4 className="text-sm font-semibold text-gray-900 mb-3">Exercises:</h4>
-                      <div className="space-y-2">
-                        {todaysWorkout.exercises.map((exercise: any, index: number) => (
-                          <div 
-                            key={index} 
-                            onClick={() => handleExerciseClick(exercise)}
-                            className="flex items-start justify-between p-2 bg-white rounded border cursor-pointer hover:bg-gray-50 transition-colors"
-                          >
-                            <div className="flex-1">
-                              <p className="text-sm font-medium text-gray-900">
-                                {exercise.name || exercise.exercise || `Exercise ${index + 1}`}
+                </div>
+                
+                {/* Exercise List */}
+                {todaysWorkout.exercises && todaysWorkout.exercises.length > 0 && (
+                  <div className="px-4 py-4 border-t border-border">
+                    <h4 className="text-sm font-semibold text-foreground mb-3">Exercises</h4>
+                    <div className="space-y-2">
+                      {todaysWorkout.exercises.map((exercise: any, index: number) => (
+                        <div 
+                          key={index} 
+                          onClick={() => handleExerciseClick(exercise)}
+                          className="flex items-start justify-between p-3 bg-muted rounded-xl cursor-pointer hover:bg-muted/80 transition-colors"
+                        >
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-foreground">
+                              {exercise.name || exercise.exercise || `Exercise ${index + 1}`}
+                            </p>
+                            {(exercise.sets || exercise.reps || exercise.duration || exercise.distance || exercise.weight || exercise.rpe || exercise.rest || exercise.tempo || exercise.type || exercise.intensity || exercise.pace || exercise.rounds || exercise.target || exercise.equipment) && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {exercise.sets && `${exercise.sets} sets`}
+                                {exercise.sets && exercise.reps && ' × '}
+                                {exercise.reps && `${exercise.reps} reps`}
+                                {exercise.duration && ` • ${exercise.duration}`}
+                                {exercise.distance && ` • ${exercise.distance}`}
+                                {exercise.weight && ` • ${exercise.weight}`}
+                                {exercise.rpe && ` • RPE ${exercise.rpe}`}
+                                {exercise.rest && ` • Rest: ${exercise.rest}`}
+                                {exercise.tempo && ` • Tempo: ${exercise.tempo}`}
+                                {exercise.intensity && ` • ${exercise.intensity}`}
+                                {exercise.pace && ` • Pace: ${exercise.pace}`}
+                                {exercise.rounds && ` • ${exercise.rounds} rounds`}
+                                {exercise.target && ` • Target: ${exercise.target}`}
+                                {exercise.equipment && ` • ${exercise.equipment}`}
+                                {exercise.type && ` • ${exercise.type}`}
                               </p>
-                              {(exercise.sets || exercise.reps || exercise.duration || exercise.distance || exercise.weight || exercise.rpe || exercise.rest || exercise.tempo || exercise.type || exercise.intensity || exercise.pace || exercise.rounds || exercise.target || exercise.equipment) && (
-                                <p className="text-xs text-gray-600 mt-1">
-                                  {exercise.sets && `${exercise.sets} sets`}
-                                  {exercise.sets && exercise.reps && ' × '}
-                                  {exercise.reps && `${exercise.reps} reps`}
-                                  {exercise.duration && ` • ${exercise.duration}`}
-                                  {exercise.distance && ` • ${exercise.distance}`}
-                                  {exercise.weight && ` • ${exercise.weight}`}
-                                  {exercise.rpe && ` • RPE ${exercise.rpe}`}
-                                  {exercise.rest && ` • Rest: ${exercise.rest}`}
-                                  {exercise.tempo && ` • Tempo: ${exercise.tempo}`}
-                                  {exercise.intensity && ` • ${exercise.intensity}`}
-                                  {exercise.pace && ` • Pace: ${exercise.pace}`}
-                                  {exercise.rounds && ` • ${exercise.rounds} rounds`}
-                                  {exercise.target && ` • Target: ${exercise.target}`}
-                                  {exercise.equipment && ` • ${exercise.equipment}`}
-                                  {exercise.type && ` • ${exercise.type}`}
-                                </p>
-                              )}
-                              {exercise.description && exercise.description !== exercise.name && (
-                                <p className="text-xs text-gray-500 mt-1">{exercise.description}</p>
-                              )}
-                            </div>
-                            <div className="text-gray-400 ml-2">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            )}
+                            {exercise.description && exercise.description !== exercise.name && (
+                              <p className="text-xs text-muted-foreground mt-1">{exercise.description}</p>
+                            )}
+                          </div>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                               </svg>
                             </div>
                           </div>
