@@ -32,32 +32,30 @@ export default function Dashboard() {
       setTimeout(() => {
         window.location.href = "/api/login";
       }, 500);
-      return;
     }
-  }, [isAuthenticated, authLoading, toast]);
+  }, [authLoading, isAuthenticated, toast]);
 
+  // Fetch dashboard data
   const { data: dashboardData, isLoading, error } = useQuery({
     queryKey: ["/api/dashboard"],
-    enabled: isAuthenticated,
     retry: false,
   });
 
-  // Workout completion mutation
+  // Complete workout mutation
   const completeWorkoutMutation = useMutation({
-    mutationFn: async (workoutData: { workoutId: number; rating?: number; notes?: string; skipped?: boolean }) => {
-      const response = await apiRequest("POST", "/api/workout-completions", workoutData);
-      return response.json();
+    mutationFn: async (data: { workoutId: number; rating?: number; notes?: string; skipped: boolean }) => {
+      return await apiRequest("POST", "/api/workout-completions", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
-      setWorkoutNotes("");
-      setSelectedRating(null);
       toast({
         title: "Workout Completed!",
-        description: "Great job! Your progress has been updated.",
+        description: "Great job on finishing your workout!",
       });
+      setWorkoutNotes("");
+      setSelectedRating(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
     },
-    onError: (error: any) => {
+    onError: (error) => {
       if (isUnauthorizedError(error)) {
         toast({
           title: "Unauthorized",
@@ -71,11 +69,25 @@ export default function Dashboard() {
       }
       toast({
         title: "Error",
-        description: error.message || "Failed to complete workout.",
+        description: "Failed to complete workout. Please try again.",
         variant: "destructive",
       });
     },
   });
+
+  // Handle error from query
+  useEffect(() => {
+    if (error && isUnauthorizedError(error)) {
+      toast({
+        title: "Unauthorized",
+        description: "You are logged out. Logging in again...",
+        variant: "destructive",
+      });
+      setTimeout(() => {
+        window.location.href = "/api/login";
+      }, 500);
+    }
+  }, [error, toast]);
 
   // Button handlers
   const handleExerciseClick = (exercise: any) => {
@@ -123,19 +135,6 @@ export default function Dashboard() {
     }
   };
 
-  useEffect(() => {
-    if (error && isUnauthorizedError(error)) {
-      toast({
-        title: "Unauthorized",
-        description: "You are logged out. Logging in again...",
-        variant: "destructive",
-      });
-      setTimeout(() => {
-        window.location.href = "/api/login";
-      }, 500);
-    }
-  }, [error, toast]);
-
   if (authLoading || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -169,8 +168,6 @@ export default function Dashboard() {
 
   const { progress, todaysWorkout, weeklyCompletions } = dashboardData;
 
-  // Quick actions removed as they're not needed in the mobile-first design
-
   return (
     <div className="min-h-screen bg-background">
       <Header title="Dashboard" />
@@ -179,18 +176,16 @@ export default function Dashboard() {
       <div className="bg-card px-4 py-4 shadow-sm">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-bold text-gray-900">Welcome back, {user?.firstName || 'User'}!</h2>
-            <p className="text-sm text-gray-500">Ready for today's training?</p>
+            <h2 className="text-lg font-bold text-foreground">Welcome back, {user?.firstName || 'User'}!</h2>
+            <p className="text-sm text-muted-foreground">Ready for today's training?</p>
           </div>
-          <div className="flex items-center space-x-2">
-            {user?.profileImageUrl && (
-              <img 
-                src={user.profileImageUrl} 
-                alt="Profile" 
-                className="w-10 h-10 rounded-full object-cover"
-              />
-            )}
-          </div>
+          {user?.profileImageUrl && (
+            <img
+              src={user.profileImageUrl}
+              alt="Profile"
+              className="w-10 h-10 rounded-full object-cover"
+            />
+          )}
         </div>
       </div>
 
@@ -276,278 +271,246 @@ export default function Dashboard() {
                     </div>
                   </div>
                 )}
-                              </svg>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* How did this workout feel? */}
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">How did this workout feel?</h3>
-                  
-                  <div className="grid grid-cols-3 gap-2 mb-4">
-                    <Button 
-                      onClick={() => setSelectedRating(5)}
-                      className={`rounded-lg py-3 font-medium ${
-                        selectedRating === 5 
-                          ? "bg-yellow-400 hover:bg-yellow-500 text-black" 
-                          : "border-gray-300 text-gray-700"
-                      }`}
-                      variant={selectedRating === 5 ? "default" : "outline"}
-                    >
-                      😊 Great
-                    </Button>
-                    <Button 
-                      onClick={() => setSelectedRating(4)}
-                      className={`rounded-lg py-3 ${
-                        selectedRating === 4 
-                          ? "bg-yellow-400 hover:bg-yellow-500 text-black" 
-                          : "border-gray-300 text-gray-700"
-                      }`}
-                      variant={selectedRating === 4 ? "default" : "outline"}
-                    >
-                      😐 Good
-                    </Button>
-                    <Button 
-                      onClick={() => setSelectedRating(3)}
-                      className={`rounded-lg py-3 ${
-                        selectedRating === 3 
-                          ? "bg-yellow-400 hover:bg-yellow-500 text-black" 
-                          : "border-gray-300 text-gray-700"
-                      }`}
-                      variant={selectedRating === 3 ? "default" : "outline"}
-                    >
-                      😕 Average
-                    </Button>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 mb-6">
-                    <Button 
-                      onClick={() => setSelectedRating(2)}
-                      className={`rounded-lg py-3 ${
-                        selectedRating === 2 
-                          ? "bg-yellow-400 hover:bg-yellow-500 text-black" 
-                          : "border-gray-300 text-gray-700"
-                      }`}
-                      variant={selectedRating === 2 ? "default" : "outline"}
-                    >
-                      😣 Difficult
-                    </Button>
-                    <Button 
-                      onClick={() => setSelectedRating(1)}
-                      className={`rounded-lg py-3 ${
-                        selectedRating === 1 
-                          ? "bg-yellow-400 hover:bg-yellow-500 text-black" 
-                          : "border-gray-300 text-gray-700"
-                      }`}
-                      variant={selectedRating === 1 ? "default" : "outline"}
-                    >
-                      😫 Very Hard
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Notes textarea */}
-                <div className="mb-6">
-                  <Textarea 
-                    value={workoutNotes}
-                    onChange={(e) => setWorkoutNotes(e.target.value)}
-                    className="w-full p-4 border border-gray-200 rounded-lg resize-none"
-                    rows={4}
-                    placeholder="Add any notes, PBs, or how you felt..."
-                  />
-                </div>
-
-                {/* Action buttons */}
-                <div className="space-y-3">
-                  <Button 
-                    onClick={handleCompleteWorkout}
-                    disabled={completeWorkoutMutation.isPending}
-                    className="w-full bg-yellow-400 hover:bg-yellow-500 text-black font-semibold py-4 rounded-lg text-lg flex items-center justify-center gap-2"
-                  >
-                    <CheckCircle className="h-5 w-5" />
-                    {completeWorkoutMutation.isPending ? "Completing..." : "Mark Complete"}
-                  </Button>
-                  
-                  <div className="flex space-x-3">
-                    <Button 
-                      onClick={handleSkipWorkout}
-                      disabled={completeWorkoutMutation.isPending}
-                      variant="outline" 
-                      className="flex-1 border-gray-300 text-gray-700 py-3 rounded-lg flex items-center justify-center gap-2"
-                    >
-                      <SkipForward className="h-4 w-4" />
-                      Skip Workout
-                    </Button>
-                    <Button 
-                      onClick={handleShareWorkout}
-                      className="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-lg flex items-center justify-center gap-2"
-                    >
-                      <Share className="h-4 w-4" />
-                      Share
-                    </Button>
-                  </div>
-                </div>
               </div>
             ) : (
               <div className="text-center py-8">
-                <p className="text-gray-500 mb-4">No workout scheduled for today</p>
-                <Button onClick={() => window.location.href = "/assessment"}>
-                  Start Assessment
-                </Button>
+                <Dumbbell className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-foreground mb-2">No workout today</h3>
+                <p className="text-muted-foreground mb-4">
+                  Enjoy your rest day or check your program schedule.
+                </p>
+                <Link href="/calendar">
+                  <Button variant="outline" size="sm">
+                    <Calendar className="h-4 w-4 mr-2" />
+                    View Calendar
+                  </Button>
+                </Link>
               </div>
             )}
           </CardContent>
         </Card>
+        
+        {/* Workout Actions - Only show if there's a workout */}
+        {todaysWorkout && (
+          <Card className="bg-card rounded-2xl shadow-lg border-0 mb-6">
+            <CardContent className="p-6">
+              {/* How did this workout feel? */}
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold text-foreground mb-4">How did this workout feel?</h3>
+                
+                <div className="grid grid-cols-3 gap-2 mb-4">
+                  <Button 
+                    variant={selectedRating === 1 ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setSelectedRating(selectedRating === 1 ? null : 1)}
+                    className="text-xs"
+                  >
+                    Too Easy
+                  </Button>
+                  <Button 
+                    variant={selectedRating === 3 ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setSelectedRating(selectedRating === 3 ? null : 3)}
+                    className="text-xs"
+                  >
+                    Perfect
+                  </Button>
+                  <Button 
+                    variant={selectedRating === 5 ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setSelectedRating(selectedRating === 5 ? null : 5)}
+                    className="text-xs"
+                  >
+                    Too Hard
+                  </Button>
+                </div>
+              </div>
+
+              {/* Notes section */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-foreground mb-2">Notes (optional)</label>
+                <Textarea
+                  value={workoutNotes}
+                  onChange={(e) => setWorkoutNotes(e.target.value)}
+                  placeholder="How did the workout go? Any comments?"
+                  className="min-h-[80px]"
+                />
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex flex-col gap-3">
+                <Button
+                  onClick={handleCompleteWorkout}
+                  disabled={completeWorkoutMutation.isPending}
+                  className="w-full"
+                  size="lg"
+                >
+                  {completeWorkoutMutation.isPending ? (
+                    <div className="animate-spin w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full mr-2" />
+                  ) : (
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                  )}
+                  Complete Workout
+                </Button>
+                
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={handleSkipWorkout}
+                    disabled={completeWorkoutMutation.isPending}
+                    className="flex-1"
+                  >
+                    <SkipForward className="h-4 w-4 mr-2" />
+                    Skip Today
+                  </Button>
+                  
+                  <Button
+                    variant="outline"
+                    onClick={handleShareWorkout}
+                    className="flex-1"
+                  >
+                    <Share className="h-4 w-4 mr-2" />
+                    Share
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Quick Stats Card */}
+        <Card className="bg-card rounded-2xl shadow-lg border-0 mb-6">
+          <CardContent className="p-6">
+            <h3 className="text-lg font-semibold text-foreground mb-4">This Week</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-primary">{weeklyCompletions?.length || 0}</div>
+                <div className="text-sm text-muted-foreground">Workouts</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-primary">{progress?.currentWeek || 1}</div>
+                <div className="text-sm text-muted-foreground">Week</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </main>
-      
-      {/* Bottom spacing to prevent content from being hidden behind bottom nav */}
+
       <div className="h-16"></div>
-      
       <BottomNav />
 
-      {/* Exercise Detail Lightbox */}
+      {/* Exercise Detail Dialog */}
       <Dialog open={isExerciseDetailOpen} onOpenChange={setIsExerciseDetailOpen}>
-        <DialogContent className="max-w-md mx-auto">
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-lg font-semibold text-gray-900">
-              {selectedExercise?.name || selectedExercise?.exercise || "Exercise Details"}
+            <DialogTitle className="text-lg font-bold">
+              {selectedExercise?.name || selectedExercise?.exercise || 'Exercise Details'}
             </DialogTitle>
           </DialogHeader>
           
-          {selectedExercise && (
-            <div className="space-y-4">
-              {/* Exercise specifications */}
-              <div className="grid grid-cols-2 gap-4">
-                {selectedExercise.sets && (
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <p className="text-xs text-gray-500 uppercase tracking-wide">Sets</p>
-                    <p className="text-lg font-semibold text-gray-900">{selectedExercise.sets}</p>
-                  </div>
-                )}
-                
-                {selectedExercise.reps && (
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <p className="text-xs text-gray-500 uppercase tracking-wide">Reps</p>
-                    <p className="text-lg font-semibold text-gray-900">{selectedExercise.reps}</p>
-                  </div>
-                )}
-                
-                {selectedExercise.weight && (
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <p className="text-xs text-gray-500 uppercase tracking-wide">Weight</p>
-                    <p className="text-lg font-semibold text-gray-900">{selectedExercise.weight}</p>
-                  </div>
-                )}
-                
-                {selectedExercise.rpe && (
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <p className="text-xs text-gray-500 uppercase tracking-wide">RPE</p>
-                    <p className="text-lg font-semibold text-gray-900">{selectedExercise.rpe}</p>
-                  </div>
-                )}
-                
-                {selectedExercise.duration && (
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <p className="text-xs text-gray-500 uppercase tracking-wide">Duration</p>
-                    <p className="text-lg font-semibold text-gray-900">{selectedExercise.duration}</p>
-                  </div>
-                )}
-                
-                {selectedExercise.distance && (
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <p className="text-xs text-gray-500 uppercase tracking-wide">Distance</p>
-                    <p className="text-lg font-semibold text-gray-900">{selectedExercise.distance}</p>
-                  </div>
-                )}
-                
-                {selectedExercise.rest && (
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <p className="text-xs text-gray-500 uppercase tracking-wide">Rest</p>
-                    <p className="text-lg font-semibold text-gray-900">{selectedExercise.rest}</p>
-                  </div>
-                )}
-                
-                {selectedExercise.tempo && (
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <p className="text-xs text-gray-500 uppercase tracking-wide">Tempo</p>
-                    <p className="text-lg font-semibold text-gray-900">{selectedExercise.tempo}</p>
-                  </div>
-                )}
-                
-                {selectedExercise.intensity && (
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <p className="text-xs text-gray-500 uppercase tracking-wide">Intensity</p>
-                    <p className="text-lg font-semibold text-gray-900">{selectedExercise.intensity}</p>
-                  </div>
-                )}
-                
-                {selectedExercise.pace && (
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <p className="text-xs text-gray-500 uppercase tracking-wide">Pace</p>
-                    <p className="text-lg font-semibold text-gray-900">{selectedExercise.pace}</p>
-                  </div>
-                )}
-                
-                {selectedExercise.rounds && (
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <p className="text-xs text-gray-500 uppercase tracking-wide">Rounds</p>
-                    <p className="text-lg font-semibold text-gray-900">{selectedExercise.rounds}</p>
-                  </div>
-                )}
-                
-                {selectedExercise.target && (
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <p className="text-xs text-gray-500 uppercase tracking-wide">Target</p>
-                    <p className="text-lg font-semibold text-gray-900">{selectedExercise.target}</p>
-                  </div>
-                )}
-                
-                {selectedExercise.equipment && (
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <p className="text-xs text-gray-500 uppercase tracking-wide">Equipment</p>
-                    <p className="text-lg font-semibold text-gray-900">{selectedExercise.equipment}</p>
-                  </div>
-                )}
+          <div className="space-y-4">
+            {selectedExercise?.description && selectedExercise.description !== selectedExercise.name && (
+              <div>
+                <h4 className="font-semibold text-sm text-muted-foreground mb-1">DESCRIPTION</h4>
+                <p className="text-sm">{selectedExercise.description}</p>
               </div>
-              
-              {/* Exercise description */}
-              {selectedExercise.description && selectedExercise.description !== selectedExercise.name && (
-                <div className="bg-blue-50 p-4 rounded-lg">
-                  <p className="text-xs text-blue-600 uppercase tracking-wide mb-2">Instructions</p>
-                  <p className="text-sm text-gray-700 leading-relaxed">{selectedExercise.description}</p>
+            )}
+            
+            {/* Exercise Details Grid */}
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              {selectedExercise?.sets && (
+                <div>
+                  <span className="font-semibold text-muted-foreground">Sets:</span>
+                  <p>{selectedExercise.sets}</p>
                 </div>
               )}
-              
-              {/* Exercise notes */}
-              {selectedExercise.notes && (
-                <div className="bg-yellow-50 p-4 rounded-lg">
-                  <p className="text-xs text-yellow-600 uppercase tracking-wide mb-2">Notes</p>
-                  <p className="text-sm text-gray-700 leading-relaxed">{selectedExercise.notes}</p>
+              {selectedExercise?.reps && (
+                <div>
+                  <span className="font-semibold text-muted-foreground">Reps:</span>
+                  <p>{selectedExercise.reps}</p>
                 </div>
               )}
-              
-              {/* Exercise type/category */}
-              {selectedExercise.type && (
-                <div className="bg-green-50 p-4 rounded-lg">
-                  <p className="text-xs text-green-600 uppercase tracking-wide mb-2">Exercise Type</p>
-                  <p className="text-sm text-gray-700">{selectedExercise.type}</p>
+              {selectedExercise?.duration && (
+                <div>
+                  <span className="font-semibold text-muted-foreground">Duration:</span>
+                  <p>{selectedExercise.duration}</p>
                 </div>
               )}
-              
-              {/* Close button */}
-              <Button 
-                onClick={() => setIsExerciseDetailOpen(false)}
-                className="w-full bg-yellow-400 hover:bg-yellow-500 text-black"
-              >
-                Close
-              </Button>
+              {selectedExercise?.distance && (
+                <div>
+                  <span className="font-semibold text-muted-foreground">Distance:</span>
+                  <p>{selectedExercise.distance}</p>
+                </div>
+              )}
+              {selectedExercise?.weight && (
+                <div>
+                  <span className="font-semibold text-muted-foreground">Weight:</span>
+                  <p>{selectedExercise.weight}</p>
+                </div>
+              )}
+              {selectedExercise?.rpe && (
+                <div>
+                  <span className="font-semibold text-muted-foreground">RPE:</span>
+                  <p>{selectedExercise.rpe}</p>
+                </div>
+              )}
+              {selectedExercise?.rest && (
+                <div>
+                  <span className="font-semibold text-muted-foreground">Rest:</span>
+                  <p>{selectedExercise.rest}</p>
+                </div>
+              )}
+              {selectedExercise?.tempo && (
+                <div>
+                  <span className="font-semibold text-muted-foreground">Tempo:</span>
+                  <p>{selectedExercise.tempo}</p>
+                </div>
+              )}
+              {selectedExercise?.intensity && (
+                <div>
+                  <span className="font-semibold text-muted-foreground">Intensity:</span>
+                  <p>{selectedExercise.intensity}</p>
+                </div>
+              )}
+              {selectedExercise?.pace && (
+                <div>
+                  <span className="font-semibold text-muted-foreground">Pace:</span>
+                  <p>{selectedExercise.pace}</p>
+                </div>
+              )}
+              {selectedExercise?.rounds && (
+                <div>
+                  <span className="font-semibold text-muted-foreground">Rounds:</span>
+                  <p>{selectedExercise.rounds}</p>
+                </div>
+              )}
+              {selectedExercise?.target && (
+                <div>
+                  <span className="font-semibold text-muted-foreground">Target:</span>
+                  <p>{selectedExercise.target}</p>
+                </div>
+              )}
+              {selectedExercise?.equipment && (
+                <div>
+                  <span className="font-semibold text-muted-foreground">Equipment:</span>
+                  <p>{selectedExercise.equipment}</p>
+                </div>
+              )}
+              {selectedExercise?.type && (
+                <div>
+                  <span className="font-semibold text-muted-foreground">Type:</span>
+                  <p>{selectedExercise.type}</p>
+                </div>
+              )}
             </div>
-          )}
+            
+            <Button 
+              onClick={() => setIsExerciseDetailOpen(false)}
+              className="w-full"
+            >
+              Close
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
