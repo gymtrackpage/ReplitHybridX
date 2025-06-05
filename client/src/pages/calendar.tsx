@@ -78,13 +78,20 @@ export default function Calendar() {
 
   // Generate calendar workouts with scheduling
   const calendarWorkouts: CalendarWorkout[] = workouts.map((workout: Workout) => {
-    const startDate = dashboardData?.progress?.startDate ? parseISO(dashboardData.progress.startDate) : new Date();
+    const progress = dashboardData?.progress;
+    const startDate = progress?.startDate ? parseISO(progress.startDate) : new Date();
     
-    // Calculate scheduled date based on week and day
-    const weekOffset = (workout.week - 1) * 7;
-    const dayOffset = workout.day - 1;
+    // Calculate scheduled date based on week and day, accounting for program starting position
+    const currentWeek = progress?.currentWeek || 1;
+    const currentDay = progress?.currentDay || 1;
+    
+    // Calculate the offset from the program's current position
+    const weekDifference = workout.week - currentWeek;
+    const dayDifference = workout.day - currentDay;
+    const totalDayOffset = (weekDifference * 7) + dayDifference;
+    
     const scheduledDate = new Date(startDate);
-    scheduledDate.setDate(startDate.getDate() + weekOffset + dayOffset);
+    scheduledDate.setDate(startDate.getDate() + totalDayOffset);
 
     // Find completion for this workout
     const completion = completions.find((c: WorkoutCompletion) => c.workoutId === workout.id);
