@@ -9,7 +9,8 @@ import { Progress } from "@/components/ui/progress";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import Navigation from "@/components/Navigation";
+import Header from "@/components/Header";
+import BottomNav from "@/components/BottomNav";
 
 interface AssessmentData {
   // Experience Level Assessment
@@ -270,18 +271,19 @@ export default function Assessment() {
   const question = questions[currentQuestion];
 
   return (
-    <div className="min-h-screen bg-background">
-      <Navigation user={user} />
+    <div className="min-h-screen bg-gray-100">
+      <Header title="Fitness Assessment" />
       
-      <main className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2">Fitness Assessment</h1>
-          <p className="text-muted-foreground">
-            Help us create the perfect training program for you
-          </p>
-        </div>
+      <main className="px-4 py-6">
+        <div className="max-w-2xl mx-auto">
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Fitness Assessment</h1>
+            <p className="text-gray-600">
+              Help us create the perfect training program for you
+            </p>
+          </div>
 
-        <Card>
+          <Card className="bg-white rounded-2xl shadow-sm border-0">
           <CardHeader>
             <div className="flex justify-between text-sm text-muted-foreground mb-2">
               <span>Progress</span>
@@ -358,7 +360,13 @@ export default function Assessment() {
             </div>
           </CardContent>
         </Card>
+        </div>
       </main>
+      
+      {/* Bottom spacing to prevent content from being hidden behind bottom nav */}
+      <div className="h-16"></div>
+      
+      <BottomNav />
     </div>
   );
 }

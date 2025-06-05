@@ -10,7 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import Navigation from "@/components/Navigation";
+import Header from "@/components/Header";
+import BottomNav from "@/components/BottomNav";
 
 interface AssessmentData {
   hyroxEventsCompleted: number;
@@ -340,12 +341,13 @@ export default function EnhancedAssessment() {
   const currentSectionData = assessmentSections[currentSection];
 
   return (
-    <div className="min-h-screen bg-background">
-      <Navigation user={user} />
-      <div className="container mx-auto px-4 py-8">
+    <div className="min-h-screen bg-gray-100">
+      <Header title="HYROX Assessment" />
+      
+      <main className="px-4 py-6">
         <div className="max-w-2xl mx-auto">
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-center mb-4">HYROX Training Assessment</h1>
+            <h1 className="text-3xl font-bold text-center mb-4 text-gray-900">HYROX Training Assessment</h1>
             <div className="flex justify-center mb-4">
               <div className="flex space-x-2">
                 {assessmentSections.map((_, index) => (
@@ -363,7 +365,7 @@ export default function EnhancedAssessment() {
             </p>
           </div>
 
-          <Card>
+          <Card className="bg-white rounded-2xl shadow-sm border-0">
             <CardHeader>
               <CardTitle>{currentSectionData.title}</CardTitle>
               <CardDescription>{currentSectionData.description}</CardDescription>
@@ -482,7 +484,12 @@ export default function EnhancedAssessment() {
             </Button>
           </div>
         </div>
-      </div>
+      </main>
+      
+      {/* Bottom spacing to prevent content from being hidden behind bottom nav */}
+      <div className="h-16"></div>
+      
+      <BottomNav />
     </div>
   );
 }
