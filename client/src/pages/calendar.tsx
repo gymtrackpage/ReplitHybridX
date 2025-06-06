@@ -71,14 +71,19 @@ export default function Calendar() {
     queryKey: ["/api/workout-completions"],
   });
 
+  // Fetch historical workout completions for permanent calendar display
+  const { data: workoutHistory = [] } = useQuery({
+    queryKey: ["/api/calendar-workout-history"],
+  });
+
   // Fetch user progress to determine start date
   const { data: dashboardData } = useQuery({
     queryKey: ["/api/dashboard"],
   });
 
   // Generate calendar workouts with scheduling
-  const calendarWorkouts: CalendarWorkout[] = workouts.map((workout: Workout) => {
-    const progress = dashboardData?.progress;
+  const calendarWorkouts: CalendarWorkout[] = (workouts as Workout[]).map((workout: Workout) => {
+    const progress = (dashboardData as any)?.progress;
     const startDate = progress?.startDate ? parseISO(progress.startDate) : new Date();
     
     // Calculate scheduled date based on week and day, accounting for program starting position
@@ -117,7 +122,43 @@ export default function Calendar() {
   const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
   const getWorkoutsForDate = (date: Date): CalendarWorkout[] => {
-    return calendarWorkouts.filter(workout => isSameDay(workout.scheduledDate, date));
+    // Get scheduled workouts for this date
+    const scheduledWorkouts = calendarWorkouts.filter(workout => isSameDay(workout.scheduledDate, date));
+    
+    // Get historical completed workouts for this date
+    const historicalWorkouts = workoutHistory
+      .filter((completion: any) => {
+        const completedDate = completion.completedDate ? new Date(completion.completedDate) : new Date(completion.completedAt);
+        return isSameDay(completedDate, date) && !completion.skipped;
+      })
+      .map((completion: any) => ({
+        id: completion.workoutId,
+        name: completion.workoutName,
+        description: completion.workoutDescription,
+        duration: completion.workoutDuration,
+        week: completion.week,
+        day: completion.day,
+        scheduledDate: date,
+        status: 'completed' as const,
+        completion: completion,
+        isHistorical: true
+      }));
+    
+    // Combine and deduplicate (scheduled workout takes precedence if both exist)
+    const allWorkouts = [...scheduledWorkouts];
+    
+    // Add historical workouts that don't conflict with scheduled ones
+    historicalWorkouts.forEach(historical => {
+      const hasScheduled = scheduledWorkouts.some(scheduled => 
+        scheduled.id === historical.id || 
+        (scheduled.completion && scheduled.completion.workoutId === historical.id)
+      );
+      if (!hasScheduled) {
+        allWorkouts.push(historical);
+      }
+    });
+    
+    return allWorkouts;
   };
 
   const getStatusColor = (status: string): string => {

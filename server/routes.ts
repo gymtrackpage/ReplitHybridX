@@ -719,6 +719,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get workout completions with full workout details for calendar history
+  app.get('/api/calendar-workout-history', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const completions = await storage.getWorkoutCompletions(userId);
+      
+      // Get workout details for each completion to preserve historical data
+      const historicalCompletions = await Promise.all(
+        completions.map(async (completion) => {
+          const workout = await storage.getWorkout(completion.workoutId);
+          return {
+            ...completion,
+            workoutName: workout?.name || 'Deleted Workout',
+            workoutDescription: workout?.description || 'Workout no longer available',
+            workoutDuration: workout?.estimatedDuration || 0,
+            week: workout?.week || 0,
+            day: workout?.day || 0,
+            completedDate: completion.completedAt
+          };
+        })
+      );
+      
+      res.json(historicalCompletions);
+    } catch (error) {
+      console.error("Error fetching calendar workout history:", error);
+      res.status(500).json({ message: "Failed to fetch workout history" });
+    }
+  });
+
 
 
   // Get available programs for selection
