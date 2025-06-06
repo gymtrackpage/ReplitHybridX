@@ -11,16 +11,17 @@ export default function BottomNav() {
     { path: "/", icon: Home, label: "Home" },
     { path: "/calendar", icon: Calendar, label: "Calendar" },
     { path: "/programs", icon: Target, label: "Programs" },
+    { path: "/random-workout", icon: Shuffle, label: "Random" },
     { path: "/weight-tracker", icon: Scale, label: "Weight" },
     { path: "/profile", icon: UserIcon, label: "Profile" },
   ];
 
   // Add admin button if user is admin
-  if (user?.isAdmin) {
+  if ((user as any)?.isAdmin) {
     navItems.push({ path: "/admin", icon: Shield, label: "Admin" });
   }
 
-  const gridCols = user?.isAdmin ? "grid-cols-6" : "grid-cols-5";
+  const gridCols = (user as any)?.isAdmin ? "grid-cols-7" : "grid-cols-6";
 
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50">
