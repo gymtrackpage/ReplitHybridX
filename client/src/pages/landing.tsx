@@ -34,7 +34,7 @@ export default function Landing() {
               <img src={logoFull} alt="HybridX Club" className="h-32 mx-auto mb-6" />
             </div>
             <h1 className="text-4xl md:text-6xl font-bold text-white mb-6">
-              Transform Your
+              It's Your
               <span className="text-yellow-400">
                 {" "}Fitness Journey
               </span>
