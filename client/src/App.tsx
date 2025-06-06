@@ -8,6 +8,7 @@ import Landing from "@/pages/landing";
 import Dashboard from "@/pages/dashboard";
 import Admin from "@/pages/admin";
 import Subscribe from "@/pages/subscribe";
+import SubscriptionChoice from "@/pages/subscription-choice";
 import EnhancedAssessment from "@/pages/enhanced-assessment";
 import Calendar from "@/pages/calendar";
 import Profile from "@/pages/profile";
@@ -40,6 +41,7 @@ function Router() {
           <Route path="/programs" component={Programs} />
           <Route path="/admin" component={Admin} />
           <Route path="/subscribe" component={Subscribe} />
+          <Route path="/subscription-choice" component={SubscriptionChoice} />
           <Route path="/assessment" component={EnhancedAssessment} />
         </>
       )}

@@ -325,10 +325,10 @@ export default function EnhancedAssessment() {
                 )}
 
                 <Button 
-                  onClick={() => window.location.href = '/dashboard'} 
+                  onClick={() => window.location.href = '/subscription-choice'} 
                   className="w-full"
                 >
-                  Start Your Training Program
+                  Continue to Subscription
                 </Button>
               </CardContent>
             </Card>
