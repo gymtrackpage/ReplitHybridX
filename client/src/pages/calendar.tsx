@@ -99,7 +99,7 @@ export default function Calendar() {
     scheduledDate.setDate(startDate.getDate() + totalDayOffset);
 
     // Find completion for this workout
-    const completion = completions.find((c: WorkoutCompletion) => c.workoutId === workout.id);
+    const completion = (completions as WorkoutCompletion[]).find((c: WorkoutCompletion) => c.workoutId === workout.id);
     
     let status: 'completed' | 'skipped' | 'pending' | 'overdue' = 'pending';
     
@@ -126,7 +126,7 @@ export default function Calendar() {
     const scheduledWorkouts = calendarWorkouts.filter(workout => isSameDay(workout.scheduledDate, date));
     
     // Get historical completed workouts for this date
-    const historicalWorkouts = workoutHistory
+    const historicalWorkouts = (workoutHistory as any[])
       .filter((completion: any) => {
         const completedDate = completion.completedDate ? new Date(completion.completedDate) : new Date(completion.completedAt);
         return isSameDay(completedDate, date) && !completion.skipped;
@@ -148,7 +148,7 @@ export default function Calendar() {
     const allWorkouts = [...scheduledWorkouts];
     
     // Add historical workouts that don't conflict with scheduled ones
-    historicalWorkouts.forEach(historical => {
+    historicalWorkouts.forEach((historical: any) => {
       const hasScheduled = scheduledWorkouts.some(scheduled => 
         scheduled.id === historical.id || 
         (scheduled.completion && scheduled.completion.workoutId === historical.id)
