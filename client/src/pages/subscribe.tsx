@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Check, Crown, Zap } from "lucide-react";
+import logoIcon from "@assets/Icon Logo-1.png";
 
 // Make sure to call `loadStripe` outside of a component's render to avoid
 // recreating the `Stripe` object on every render.
@@ -198,8 +199,8 @@ export default function Subscribe() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
       <div className="max-w-2xl mx-auto pt-20">
         <div className="text-center mb-8">
-          <Crown className="h-12 w-12 text-primary mx-auto mb-4" />
-          <h1 className="text-3xl font-bold mb-2">Subscribe to Hybrid X Premium</h1>
+          <img src={logoIcon} alt="HybridX" className="h-12 w-12 mx-auto mb-4" />
+          <h1 className="text-3xl font-bold mb-2">Subscribe to HybridX Premium</h1>
           <p className="text-muted-foreground">
             Get unlimited access to all HYROX training programs
           </p>

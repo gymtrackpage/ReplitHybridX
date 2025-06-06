@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Check, Crown, Star, Users, Zap } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import logoIcon from "@assets/Icon Logo-1.png";
 
 export default function SubscriptionChoice() {
   const [, setLocation] = useLocation();
@@ -53,7 +54,7 @@ export default function SubscriptionChoice() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
       <div className="max-w-4xl mx-auto pt-20">
         <div className="text-center mb-12">
-          <Crown className="h-16 w-16 text-primary mx-auto mb-6" />
+          <img src={logoIcon} alt="HybridX" className="h-16 w-16 mx-auto mb-6" />
           <h1 className="text-4xl font-bold mb-4">Complete Your Setup</h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
             You've completed your assessment and selected your training program. 
