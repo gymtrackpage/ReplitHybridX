@@ -89,6 +89,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // User onboarding status check
+  app.get('/api/user-onboarding-status', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      res.json({
+        assessmentCompleted: user.assessmentCompleted || false,
+        subscriptionStatus: user.subscriptionStatus || "none",
+        currentProgramId: user.currentProgramId,
+        hasCompletedOnboarding: (user.assessmentCompleted && user.subscriptionStatus !== "none")
+      });
+    } catch (error) {
+      console.error("Error fetching onboarding status:", error);
+      res.status(500).json({ message: "Failed to fetch onboarding status" });
+    }
+  });
+
   // User profile with assessment data
   app.get('/api/profile', isAuthenticated, async (req: any, res) => {
     try {
@@ -697,57 +719,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Assessment endpoint with program selection algorithm
-  app.post('/api/assessment', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const assessmentData = req.body;
-      
-      // Use your program selection algorithm
-      const programRecommendation = selectHyroxProgram(assessmentData);
-      
-      // Store the assessment data
-      const validatedData = insertAssessmentSchema.parse({
-        userId: userId,
-        fitnessLevel: programRecommendation.experienceLevel,
-        goals: assessmentData.goals || ["Complete first HYROX"],
-        experience: assessmentData.primaryTrainingBackground || "General Fitness",
-        timeAvailability: parseInt(assessmentData.weeklyTrainingDays) || 4,
-        equipmentAccess: assessmentData.equipmentAccess || ["Full gym access"]
-      });
-      
-      const assessment = await storage.createAssessment(validatedData);
 
-      // Update user's fitness level
-      await storage.updateUserAssessment(userId, programRecommendation.experienceLevel);
-      
-      // Find the recommended program in our database
-      const programs = await storage.getPrograms();
-      const matchingProgram = programs.find(p => 
-        p.name.toLowerCase().includes(programRecommendation.recommendedProgram.name.toLowerCase().split(' ')[0])
-      );
-      
-      if (matchingProgram) {
-        await storage.updateUserProgram(userId, matchingProgram.id);
-      }
-
-      res.json({
-        assessment,
-        programRecommendation: {
-          program: matchingProgram || programs[0],
-          reasoning: programRecommendation.reasoningExplanation,
-          modifications: programRecommendation.modifications,
-          experienceLevel: programRecommendation.experienceLevel,
-          trainingBackground: programRecommendation.trainingBackground,
-          timeAvailability: programRecommendation.timeAvailability,
-          specialCategory: programRecommendation.specialCategory
-        }
-      });
-    } catch (error) {
-      console.error("Error creating assessment:", error);
-      res.status(500).json({ message: "Failed to create assessment" });
-    }
-  });
 
   // Get available programs for selection
   app.get('/api/available-programs', async (req, res) => {
