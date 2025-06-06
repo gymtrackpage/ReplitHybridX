@@ -40,7 +40,7 @@ export default function Landing() {
               </span>
             </h1>
             <p className="text-xl text-gray-300 mb-8 max-w-3xl mx-auto">
-              Professional personal training programs designed to help you achieve your fitness goals with expert guidance and personalized workouts.
+              Professional training programs designed to help you achieve your Hyrox and fitness goals with the right training plan for you.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button 
@@ -53,7 +53,8 @@ export default function Landing() {
               <Button 
                 variant="outline" 
                 size="lg"
-                className="border-gray-600 text-gray-300 hover:bg-gray-800 px-8 py-3"
+                onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
+                className="border-gray-600 text-gray-300 hover:bg-gray-800 hover:text-white px-8 py-3"
               >
                 Learn More
               </Button>
@@ -63,7 +64,7 @@ export default function Landing() {
       </section>
 
       {/* Features Section */}
-      <section className="py-20 bg-gray-800">
+      <section id="features" className="py-20 bg-gray-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
@@ -83,7 +84,7 @@ export default function Landing() {
                 <CardTitle className="text-white">Expert Trainers</CardTitle>
               </CardHeader>
               <CardContent>
-                <CardDescription className="text-gray-300">
+                <CardDescription className="text-gray-200">
                   Work with certified personal trainers who design programs specifically for your goals and fitness level.
                 </CardDescription>
               </CardContent>
@@ -97,7 +98,7 @@ export default function Landing() {
                 <CardTitle className="text-white">Personalized Programs</CardTitle>
               </CardHeader>
               <CardContent>
-                <CardDescription className="text-gray-300">
+                <CardDescription className="text-gray-200">
                   Get custom workout plans based on your fitness assessment, schedule, and equipment availability.
                 </CardDescription>
               </CardContent>
@@ -111,7 +112,7 @@ export default function Landing() {
                 <CardTitle className="text-white">Track Progress</CardTitle>
               </CardHeader>
               <CardContent>
-                <CardDescription className="text-gray-300">
+                <CardDescription className="text-gray-200">
                   Monitor your progress with detailed analytics, workout completion tracking, and achievement badges.
                 </CardDescription>
               </CardContent>
@@ -126,7 +127,7 @@ export default function Landing() {
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
             Ready to Get Started?
           </h2>
-          <p className="text-xl text-gray-400 mb-8">
+          <p className="text-xl text-gray-300 mb-8">
             Join thousands of members who have transformed their lives with HybridX
           </p>
           <Button 
