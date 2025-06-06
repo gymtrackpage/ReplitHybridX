@@ -205,11 +205,6 @@ export default function Dashboard() {
                     </div>
                     
                     <div className="flex items-center gap-4 text-sm text-muted-foreground mb-3">
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-4 w-4" />
-                        <span>{todaysWorkout.duration || 0}m</span>
-                      </div>
-                      <span className="text-xs">•</span>
                       <span>Week {todaysWorkout.week}/Day {todaysWorkout.day}</span>
                       {todaysWorkout.exercises && todaysWorkout.exercises.length > 0 && (
                         <>
