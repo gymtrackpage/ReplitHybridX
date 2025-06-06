@@ -54,7 +54,7 @@ export default function Landing() {
                 variant="outline" 
                 size="lg"
                 onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
-                className="border-gray-600 text-gray-300 hover:bg-gray-800 hover:text-white px-8 py-3"
+                className="border-gray-600 text-gray-800 hover:bg-gray-800 hover:text-white px-8 py-3"
               >
                 Learn More
               </Button>
@@ -71,7 +71,7 @@ export default function Landing() {
               Why Choose HybridX?
             </h2>
             <p className="text-xl text-gray-400">
-              Everything you need to reach your fitness goals
+              Everything you need to reach your Hyrox goals, for every ability.
             </p>
           </div>
 
@@ -81,11 +81,11 @@ export default function Landing() {
                 <div className="w-12 h-12 bg-yellow-400/20 rounded-lg flex items-center justify-center mx-auto mb-4">
                   <Users className="h-6 w-6 text-yellow-400" />
                 </div>
-                <CardTitle className="text-white">Expert Trainers</CardTitle>
+                <CardTitle className="text-white">Experienced Trainers</CardTitle>
               </CardHeader>
               <CardContent>
                 <CardDescription className="text-gray-200">
-                  Work with certified personal trainers who design programs specifically for your goals and fitness level.
+                  Training plans built by trainers with direct expereince who design programs specifically for your goals for Hyrox and hybrid fitness.
                 </CardDescription>
               </CardContent>
             </Card>
@@ -95,11 +95,12 @@ export default function Landing() {
                 <div className="w-12 h-12 bg-yellow-400/20 rounded-lg flex items-center justify-center mx-auto mb-4">
                   <Calendar className="h-6 w-6 text-yellow-400" />
                 </div>
-                <CardTitle className="text-white">Personalized Programs</CardTitle>
+                <CardTitle className="text-white">Varied Programs</CardTitle>
               </CardHeader>
               <CardContent>
                 <CardDescription className="text-gray-200">
-                  Get custom workout plans based on your fitness assessment, schedule, and equipment availability.
+                  Variety of programs to suit your goals either to prepare for Hyrox or to improve your hybrid fitness.
+                  Additional offseason training plans for strength and running.
                 </CardDescription>
               </CardContent>
             </Card>
@@ -113,7 +114,7 @@ export default function Landing() {
               </CardHeader>
               <CardContent>
                 <CardDescription className="text-gray-200">
-                  Monitor your progress with detailed analytics, workout completion tracking, and achievement badges.
+                  Record your feedback and your progress with workout notes and completion tracking.
                 </CardDescription>
               </CardContent>
             </Card>

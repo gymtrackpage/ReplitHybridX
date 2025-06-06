@@ -127,7 +127,7 @@ export default function Subscribe() {
                   Premium Membership
                 </CardTitle>
                 <div className="space-y-2">
-                  <div className="text-3xl font-bold">$29.99<span className="text-sm font-normal text-muted-foreground">/month</span></div>
+                  <div className="text-3xl font-bold">£5.00<span className="text-sm font-normal text-muted-foreground">/month</span></div>
                   <CardDescription>Everything you need to excel at HYROX</CardDescription>
                 </div>
               </CardHeader>

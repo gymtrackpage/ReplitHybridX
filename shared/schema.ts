@@ -35,7 +35,7 @@ export const users = pgTable("users", {
   profileImageUrl: varchar("profile_image_url"),
   stripeCustomerId: varchar("stripe_customer_id"),
   stripeSubscriptionId: varchar("stripe_subscription_id"),
-  subscriptionStatus: varchar("subscription_status").default("inactive"),
+  subscriptionStatus: varchar("subscription_status").default("none"), // none, active, cancelled, subscribe_later
   isAdmin: boolean("is_admin").default(false),
   currentProgramId: integer("current_program_id"),
   fitnessLevel: varchar("fitness_level"), // beginner, intermediate, advanced

@@ -556,7 +556,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Stripe subscription route
+  // Subscribe later - allows users to access app without subscription
+  app.post('/api/subscribe-later', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      await storage.updateUserSubscriptionStatus(userId, "subscribe_later");
+      res.json({ message: "Subscription deferred successfully" });
+    } catch (error: any) {
+      console.error("Subscribe later error:", error);
+      res.status(500).json({ message: "Error deferring subscription" });
+    }
+  });
+
+  // Create £5/month subscription
   app.post('/api/create-subscription', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -587,10 +599,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
       });
 
+      // Create £5/month subscription
       const subscription = await stripe.subscriptions.create({
         customer: customer.id,
         items: [{
-          price: process.env.STRIPE_PRICE_ID || 'price_default', // Set this in environment
+          price_data: {
+            currency: 'gbp',
+            product_data: {
+              name: 'HybridX Premium',
+              description: 'Access to all HYROX training programs and features'
+            },
+            unit_amount: 500, // £5.00/month (500 pence)
+            recurring: {
+              interval: 'month'
+            }
+          }
         }],
         payment_behavior: 'default_incomplete',
         expand: ['latest_invoice.payment_intent'],
