@@ -1,0 +1,23 @@
+{
+  "name": "HybridX Training",
+  "short_name": "HybridX",
+  "description": "HYROX-focused personal training application",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#000000",
+  "orientation": "portrait",
+  "categories": ["fitness", "health", "sports"],
+  "icons": [
+    {
+      "src": "/assets/Icon Logo-1.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/assets/Icon Logo-1.png", 
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
