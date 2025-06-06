@@ -270,19 +270,13 @@ export class DatabaseStorage implements IStorage {
     startOfWeek.setDate(now.getDate() - now.getDay()); // Sunday
     startOfWeek.setHours(0, 0, 0, 0);
 
-    const endOfWeek = new Date(startOfWeek);
-    endOfWeek.setDate(startOfWeek.getDate() + 7);
-
     return await db
       .select()
       .from(workoutCompletions)
       .where(
         and(
           eq(workoutCompletions.userId, userId),
-          and(
-            gte(workoutCompletions.completedAt, startOfWeek),
-            lte(workoutCompletions.completedAt, endOfWeek)
-          ),
+          gte(workoutCompletions.completedAt, startOfWeek),
           eq(workoutCompletions.skipped, false) // Only count completed workouts, not skipped ones
         )
       )
