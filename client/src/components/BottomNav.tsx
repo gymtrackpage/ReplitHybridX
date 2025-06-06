@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
-import { Home, Calendar, Scale, User as UserIcon, Shield, Target } from "lucide-react";
+import { Home, Calendar, Scale, User as UserIcon, Shield, Target, Shuffle } from "lucide-react";
 
 export default function BottomNav() {
   const [location] = useLocation();

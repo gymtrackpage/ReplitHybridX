@@ -11,6 +11,7 @@ import Admin from "@/pages/admin";
 import Subscribe from "@/pages/subscribe";
 import SubscriptionChoice from "@/pages/subscription-choice";
 import EnhancedAssessment from "@/pages/enhanced-assessment";
+import RandomWorkout from "@/pages/random-workout";
 import Calendar from "@/pages/calendar";
 import Profile from "@/pages/profile";
 import WeightTracker from "@/pages/weight-tracker";
@@ -81,6 +82,7 @@ function Router() {
       <Route path="/profile" component={Profile} />
       <Route path="/weight-tracker" component={WeightTracker} />
       <Route path="/programs" component={Programs} />
+      <Route path="/random-workout" component={RandomWorkout} />
       <Route path="/admin" component={Admin} />
       <Route path="/subscribe" component={Subscribe} />
       <Route path="/subscription-choice" component={SubscriptionChoice} />

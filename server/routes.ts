@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
+import { generateRandomHyroxWorkout } from "./hyroxWorkoutGenerator";
 import multer from "multer";
 import * as XLSX from "xlsx";
 import { selectHyroxProgram, HYROX_PROGRAMS } from "./programSelection";
@@ -748,7 +749,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Generate random HYROX workout
+  app.get('/api/generate-random-workout', isAuthenticated, async (req: any, res) => {
+    try {
+      const randomWorkout = generateRandomHyroxWorkout();
+      res.json(randomWorkout);
+    } catch (error) {
+      console.error("Error generating random workout:", error);
+      res.status(500).json({ message: "Failed to generate random workout" });
+    }
+  });
 
+  // Complete random HYROX workout and log it
+  app.post('/api/complete-random-workout', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { workoutData, duration, notes, rating } = req.body;
+
+      // Create a temporary workout entry for the random workout
+      const tempWorkout = await storage.createWorkout({
+        programId: 0, // Special ID for random workouts
+        name: workoutData.name,
+        description: workoutData.description,
+        week: 0,
+        day: 0,
+        estimatedDuration: workoutData.estimatedDuration,
+        exercises: workoutData.exercises
+      });
+
+      // Record the completion
+      await storage.createWorkoutCompletion({
+        userId,
+        workoutId: tempWorkout.id,
+        duration: duration || workoutData.estimatedDuration,
+        notes: notes || null,
+        rating: rating || null,
+        skipped: false,
+        exerciseData: workoutData.exercises
+      });
+
+      // Update user progress (add to completed workouts count)
+      const progress = await storage.getUserProgress(userId);
+      if (progress) {
+        await storage.updateUserProgress(userId, {
+          completedWorkouts: (progress.completedWorkouts || 0) + 1,
+          lastWorkoutDate: new Date().toISOString().split('T')[0] as any
+        });
+      }
+
+      res.json({ 
+        success: true, 
+        message: "Random workout completed and logged successfully",
+        workoutId: tempWorkout.id
+      });
+    } catch (error) {
+      console.error("Error completing random workout:", error);
+      res.status(500).json({ message: "Failed to complete random workout" });
+    }
+  });
 
   // Get available programs for selection
   app.get('/api/available-programs', async (req, res) => {
