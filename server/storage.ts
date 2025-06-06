@@ -22,7 +22,7 @@ import {
   type InsertWeightEntry,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, asc } from "drizzle-orm";
+import { eq, and, desc, asc, gte, lte } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (required for Replit Auth)
@@ -265,13 +265,27 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getWeeklyCompletions(userId: string): Promise<WorkoutCompletion[]> {
-    const oneWeekAgo = new Date();
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    const now = new Date();
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay()); // Sunday
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 7);
 
     return await db
       .select()
       .from(workoutCompletions)
-      .where(eq(workoutCompletions.userId, userId))
+      .where(
+        and(
+          eq(workoutCompletions.userId, userId),
+          and(
+            gte(workoutCompletions.completedAt, startOfWeek),
+            lte(workoutCompletions.completedAt, endOfWeek)
+          ),
+          eq(workoutCompletions.skipped, false) // Only count completed workouts, not skipped ones
+        )
+      )
       .orderBy(desc(workoutCompletions.completedAt));
   }
 
