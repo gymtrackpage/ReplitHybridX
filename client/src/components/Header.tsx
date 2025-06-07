@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Shield } from "lucide-react";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
-import logoPath from "@assets/Icon Logo-1.png";
+import logoPath from "@assets/Untitled design_20250607_123708_0000_1749296269592.png";
 
 interface HeaderProps {
   title?: string;
