@@ -17,25 +17,52 @@ export default function BottomNav() {
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50">
       <div className="relative">
-        {/* Main Navigation Grid */}
-        <div className="grid grid-cols-4 gap-1 px-2 py-2">
-          {navItems.map(({ path, icon: Icon, label }) => {
-            const isActive = location === path || (path !== "/" && location.startsWith(path));
-            return (
-              <Link key={path} href={path}>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={`flex flex-col items-center gap-1 h-auto py-2 px-1 ${
-                    isActive ? "text-yellow-600 bg-yellow-50" : "text-gray-600"
-                  }`}
-                >
-                  <Icon className="h-5 w-5" />
-                  <span className="text-xs">{label}</span>
-                </Button>
-              </Link>
-            );
-          })}
+        {/* Main Navigation with Center Gap */}
+        <div className="flex justify-between items-center px-2 py-2">
+          {/* Left side - First 2 items */}
+          <div className="flex flex-1 justify-around">
+            {navItems.slice(0, 2).map(({ path, icon: Icon, label }) => {
+              const isActive = location === path || (path !== "/" && location.startsWith(path));
+              return (
+                <Link key={path} href={path}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={`flex flex-col items-center gap-1 h-auto py-2 px-1 ${
+                      isActive ? "text-yellow-600 bg-yellow-50" : "text-gray-600"
+                    }`}
+                  >
+                    <Icon className="h-5 w-5" />
+                    <span className="text-xs">{label}</span>
+                  </Button>
+                </Link>
+              );
+            })}
+          </div>
+          
+          {/* Center spacer for floating button */}
+          <div className="w-16"></div>
+          
+          {/* Right side - Last 2 items */}
+          <div className="flex flex-1 justify-around">
+            {navItems.slice(2, 4).map(({ path, icon: Icon, label }) => {
+              const isActive = location === path || (path !== "/" && location.startsWith(path));
+              return (
+                <Link key={path} href={path}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={`flex flex-col items-center gap-1 h-auto py-2 px-1 ${
+                      isActive ? "text-yellow-600 bg-yellow-50" : "text-gray-600"
+                    }`}
+                  >
+                    <Icon className="h-5 w-5" />
+                    <span className="text-xs">{label}</span>
+                  </Button>
+                </Link>
+              );
+            })}
+          </div>
         </div>
         
         {/* Floating Action Button */}
