@@ -48,13 +48,14 @@ export default function Profile() {
   // Load user data when available
   useEffect(() => {
     if (user) {
+      const userData = user as any;
       setProfileData({
-        firstName: user.firstName || "",
-        lastName: user.lastName || "",
-        hyroxEventDate: user.hyroxEventDate ? format(new Date(user.hyroxEventDate), 'yyyy-MM-dd') : "",
-        hyroxEventLocation: user.hyroxEventLocation || "",
-        targetTime: user.targetTime || "",
-        fitnessLevel: user.fitnessLevel || "",
+        firstName: userData.firstName || "",
+        lastName: userData.lastName || "",
+        hyroxEventDate: userData.hyroxEventDate ? format(new Date(userData.hyroxEventDate), 'yyyy-MM-dd') : "",
+        hyroxEventLocation: userData.hyroxEventLocation || "",
+        targetTime: userData.targetTime || "",
+        fitnessLevel: userData.fitnessLevel || "",
       });
     }
   }, [user]);
@@ -96,8 +97,6 @@ export default function Profile() {
       });
     },
   });
-
-
 
   const changeProgramMutation = useMutation({
     mutationFn: async (programId: number) => {
@@ -143,9 +142,11 @@ export default function Profile() {
     updateProfileMutation.mutate(profileData);
   };
 
+  const userData = user as any;
+
   const getDaysUntilEvent = () => {
-    if (!user?.hyroxEventDate) return null;
-    const eventDate = new Date(user.hyroxEventDate);
+    if (!userData?.hyroxEventDate) return null;
+    const eventDate = new Date(userData.hyroxEventDate);
     const today = new Date();
     const diffTime = eventDate.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -160,7 +161,7 @@ export default function Profile() {
 
       <main className="px-4 py-6">
         {/* Hyrox Event Countdown */}
-        {user?.hyroxEventDate && (
+        {userData?.hyroxEventDate && (
           <Card className="bg-gradient-to-r from-yellow-400 to-yellow-500 text-black rounded-2xl shadow-sm border-0 mb-6">
             <CardContent className="pt-6">
               <div className="text-center">
@@ -169,16 +170,71 @@ export default function Profile() {
                   {daysUntilEvent !== null ? `${daysUntilEvent} days` : 'Event Date Set'}
                 </div>
                 <p className="text-lg">
-                  {user.hyroxEventLocation && `${user.hyroxEventLocation} • `}
-                  {format(new Date(user.hyroxEventDate), 'MMM d, yyyy')}
+                  {userData.hyroxEventLocation && `${userData.hyroxEventLocation} • `}
+                  {format(new Date(userData.hyroxEventDate), 'MMM d, yyyy')}
                 </p>
-                {user.targetTime && (
-                  <p className="text-lg mt-2">Target Time: {user.targetTime}</p>
+                {userData.targetTime && (
+                  <p className="text-lg mt-2">Target Time: {userData.targetTime}</p>
                 )}
               </div>
             </CardContent>
           </Card>
         )}
+
+        {/* Program Selection */}
+        <Card className="bg-white rounded-2xl shadow-sm border-0 mb-6">
+          <CardHeader>
+            <CardTitle className="text-xl font-bold text-gray-900 flex items-center">
+              <Target className="h-5 w-5 mr-2" />
+              Training Program
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {userData?.currentProgramId && programs ? (
+              <div className="space-y-4">
+                {(() => {
+                  const currentProgram = (programs as any[]).find((p: any) => p.id === userData.currentProgramId);
+                  return currentProgram ? (
+                    <div className="p-4 bg-gray-50 rounded-lg">
+                      <h3 className="font-semibold text-lg">{currentProgram.name}</h3>
+                      <p className="text-gray-600 mb-2">{currentProgram.description}</p>
+                      <div className="flex space-x-4 text-sm text-gray-500">
+                        <span>Duration: {currentProgram.duration} weeks</span>
+                        <span>Difficulty: {currentProgram.difficulty}</span>
+                        <span>Frequency: {currentProgram.frequency}x/week</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-gray-500">Program not found</p>
+                  );
+                })()}
+                
+                <div>
+                  <Label>Change Program</Label>
+                  <Select onValueChange={(value) => changeProgramMutation.mutate(parseInt(value))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a new program" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(programs as any[]).map((program: any) => (
+                        <SelectItem key={program.id} value={program.id.toString()}>
+                          {program.name} - {program.difficulty}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-gray-500 mb-4">No program selected</p>
+                <Button onClick={() => window.location.href = "/assessment"}>
+                  Take Assessment
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Profile Information */}
         <Card className="bg-white rounded-2xl shadow-sm border-0 mb-6">
@@ -280,58 +336,6 @@ export default function Profile() {
           </CardContent>
         </Card>
 
-        {/* Current Program */}
-        <Card className="bg-white rounded-2xl shadow-sm border-0 mb-6">
-          <CardHeader>
-            <CardTitle className="text-xl font-bold text-gray-900">Current Training Program</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {user?.currentProgramId && programs ? (
-              <div className="space-y-4">
-                {(() => {
-                  const currentProgram = programs.find((p: any) => p.id === user.currentProgramId);
-                  return currentProgram ? (
-                    <div className="p-4 bg-gray-50 rounded-lg">
-                      <h3 className="font-semibold text-lg">{currentProgram.name}</h3>
-                      <p className="text-gray-600 mb-2">{currentProgram.description}</p>
-                      <div className="flex space-x-4 text-sm text-gray-500">
-                        <span>Duration: {currentProgram.duration} weeks</span>
-                        <span>Difficulty: {currentProgram.difficulty}</span>
-                        <span>Frequency: {currentProgram.frequency}x/week</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-gray-500">Program not found</p>
-                  );
-                })()}
-                
-                <div>
-                  <Label>Change Program</Label>
-                  <Select onValueChange={(value) => changeProgramMutation.mutate(parseInt(value))}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a new program" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {programs.map((program: any) => (
-                        <SelectItem key={program.id} value={program.id.toString()}>
-                          {program.name} - {program.difficulty}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-gray-500 mb-4">No program selected</p>
-                <Button onClick={() => window.location.href = "/assessment"}>
-                  Take Assessment
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
         {/* Contact Support */}
         <Card className="bg-white rounded-2xl shadow-sm border-0">
           <CardHeader>
@@ -358,9 +362,9 @@ I'm writing regarding the training app. Please describe your question or issue b
 [Your message here]
 
 User Details:
-- Name: ${user?.firstName || ''} ${user?.lastName || ''}
-- Email: ${user?.email || ''}
-- Current Program: ${programs?.find((p: any) => p.id === user?.currentProgramId)?.name || 'Not selected'}
+- Name: ${userData?.firstName || ''} ${userData?.lastName || ''}
+- Email: ${userData?.email || ''}
+- Current Program: ${programs && (programs as any[]).find((p: any) => p.id === userData?.currentProgramId)?.name || 'Not selected'}
 
 Thank you!`);
                   window.location.href = `mailto:training@hybridx.club?subject=${subject}&body=${body}`;
@@ -382,10 +386,10 @@ I have a suggestion for improving the training programs:
 [Your suggestion here]
 
 User Details:
-- Name: ${user?.firstName || ''} ${user?.lastName || ''}
-- Email: ${user?.email || ''}
-- Current Program: ${programs?.find((p: any) => p.id === user?.currentProgramId)?.name || 'Not selected'}
-- Fitness Level: ${user?.fitnessLevel || 'Not specified'}
+- Name: ${userData?.firstName || ''} ${userData?.lastName || ''}
+- Email: ${userData?.email || ''}
+- Current Program: ${programs && (programs as any[]).find((p: any) => p.id === userData?.currentProgramId)?.name || 'Not selected'}
+- Fitness Level: ${userData?.fitnessLevel || 'Not specified'}
 
 Thank you for considering my feedback!`);
                   window.location.href = `mailto:training@hybridx.club?subject=${subject}&body=${body}`;
@@ -399,37 +403,32 @@ Thank you for considering my feedback!`);
                 variant="outline"
                 className="w-full justify-start"
                 onClick={() => {
-                  const subject = encodeURIComponent("General Inquiry - Hybrid X Training");
+                  const subject = encodeURIComponent("General Training Question");
                   const body = encodeURIComponent(`Hi Hybrid X Team,
 
-I have a general question about:
+I have a question about my training:
 
 [Your question here]
 
 User Details:
-- Name: ${user?.firstName || ''} ${user?.lastName || ''}
-- Email: ${user?.email || ''}
+- Name: ${userData?.firstName || ''} ${userData?.lastName || ''}
+- Email: ${userData?.email || ''}
+- Current Program: ${programs && (programs as any[]).find((p: any) => p.id === userData?.currentProgramId)?.name || 'Not selected'}
+- Fitness Level: ${userData?.fitnessLevel || 'Not specified'}
 
-Looking forward to your response!`);
+Thank you!`);
                   window.location.href = `mailto:training@hybridx.club?subject=${subject}&body=${body}`;
                 }}
               >
                 <MessageSquare className="h-4 w-4 mr-2" />
-                General Questions
+                Ask a Question
               </Button>
-            </div>
-            
-            <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-              <p className="text-sm text-blue-800">
-                <strong>Response Time:</strong> We typically respond within 24-48 hours during business days.
-              </p>
             </div>
           </CardContent>
         </Card>
+
+        <div className="h-16"></div>
       </main>
-      
-      {/* Bottom spacing to prevent content from being hidden behind bottom nav */}
-      <div className="h-16"></div>
       
       <BottomNav />
     </div>
