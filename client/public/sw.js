@@ -1,9 +1,9 @@
-const CACHE_NAME = 'hybridx-v1';
+const CACHE_NAME = 'hybrid-x-v1';
 const urlsToCache = [
   '/',
   '/static/js/bundle.js',
   '/static/css/main.css',
-  '/assets/Icon Logo-1.png'
+  '/manifest.json'
 ];
 
 self.addEventListener('install', function(event) {
@@ -25,5 +25,19 @@ self.addEventListener('fetch', function(event) {
         return fetch(event.request);
       }
     )
+  );
+});
+
+self.addEventListener('activate', function(event) {
+  event.waitUntil(
+    caches.keys().then(function(cacheNames) {
+      return Promise.all(
+        cacheNames.map(function(cacheName) {
+          if (cacheName !== CACHE_NAME) {
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    })
   );
 });

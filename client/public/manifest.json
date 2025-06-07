@@ -1,23 +1,28 @@
 {
-  "name": "HybridX Training",
-  "short_name": "HybridX",
-  "description": "HYROX-focused personal training application",
+  "name": "Hybrid X Training",
+  "short_name": "Hybrid X",
+  "description": "Complete HYROX training application with personalized programs, workout tracking, and progress monitoring",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#000000",
-  "orientation": "portrait",
-  "categories": ["fitness", "health", "sports"],
+  "theme_color": "#facc15",
+  "orientation": "portrait-primary",
+  "scope": "/",
   "icons": [
     {
-      "src": "/assets/Icon Logo-1.png",
+      "src": "/icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "maskable any"
     },
     {
-      "src": "/assets/Icon Logo-1.png", 
+      "src": "/icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "maskable any"
     }
-  ]
+  ],
+  "categories": ["fitness", "health", "sports"],
+  "lang": "en",
+  "dir": "ltr"
 }

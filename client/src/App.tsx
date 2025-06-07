@@ -12,6 +12,7 @@ import Subscribe from "@/pages/subscribe";
 import SubscriptionChoice from "@/pages/subscription-choice";
 import EnhancedAssessment from "@/pages/enhanced-assessment";
 import RandomWorkout from "@/pages/random-workout";
+import PWAInstallPrompt from "@/components/PWAInstallPrompt";
 import Calendar from "@/pages/calendar";
 import Profile from "@/pages/profile";
 import WeightTracker from "@/pages/weight-tracker";
@@ -97,6 +98,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
+        <PWAInstallPrompt />
         <Router />
       </TooltipProvider>
     </QueryClientProvider>
