@@ -20,8 +20,15 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable any"
+    },
+    {
+      "src": "/splash-screen.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
     }
   ],
+  "splash_pages": null,
   "categories": ["fitness", "health", "sports"],
   "lang": "en",
   "dir": "ltr"
