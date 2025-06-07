@@ -97,6 +97,8 @@ export default function Profile() {
     },
   });
 
+
+
   const changeProgramMutation = useMutation({
     mutationFn: async (programId: number) => {
       await apiRequest("PUT", "/api/change-program", { programId });
