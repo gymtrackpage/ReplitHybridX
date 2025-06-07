@@ -210,19 +210,13 @@ export default function Profile() {
                 })()}
                 
                 <div>
-                  <Label>Change Program</Label>
-                  <Select onValueChange={(value) => changeProgramMutation.mutate(parseInt(value))}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a new program" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(programs as any[]).map((program: any) => (
-                        <SelectItem key={program.id} value={program.id.toString()}>
-                          {program.name} - {program.difficulty}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={() => window.location.href = "/programs"}
+                  >
+                    View All Programs & Change
+                  </Button>
                 </div>
               </div>
             ) : (

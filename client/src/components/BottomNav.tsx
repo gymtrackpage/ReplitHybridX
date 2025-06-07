@@ -10,7 +10,6 @@ export default function BottomNav() {
   const navItems = [
     { path: "/", icon: Home, label: "Home" },
     { path: "/calendar", icon: Calendar, label: "Calendar" },
-    { path: "/programs", icon: Target, label: "Programs" },
     { path: "/weight-tracker", icon: Scale, label: "Weight" },
     { path: "/profile", icon: UserIcon, label: "Profile" },
   ];
@@ -19,7 +18,7 @@ export default function BottomNav() {
     <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50">
       <div className="relative">
         {/* Main Navigation Grid */}
-        <div className="grid grid-cols-5 gap-1 px-2 py-2">
+        <div className="grid grid-cols-4 gap-1 px-2 py-2">
           {navItems.map(({ path, icon: Icon, label }) => {
             const isActive = location === path || (path !== "/" && location.startsWith(path));
             return (
@@ -46,11 +45,11 @@ export default function BottomNav() {
               size="lg"
               className={`w-14 h-14 rounded-full shadow-lg border-4 border-white ${
                 location === "/random-workout"
-                  ? "bg-pink-500 hover:bg-pink-600"
-                  : "bg-pink-500 hover:bg-pink-600"
+                  ? "bg-yellow-400 hover:bg-yellow-500"
+                  : "bg-yellow-400 hover:bg-yellow-500"
               }`}
             >
-              <Shuffle className="h-6 w-6 text-white" />
+              <Shuffle className="h-6 w-6 text-black" />
             </Button>
           </Link>
         </div>
