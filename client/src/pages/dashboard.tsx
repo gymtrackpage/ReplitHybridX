@@ -4,6 +4,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState } from "react";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { formatWeight, parseWeightString } from "@/lib/weightUtils";
+import { ExerciseDetailModal } from "@/components/ExerciseDetailModal";
 import BottomNav from "@/components/BottomNav";
 import Header from "@/components/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

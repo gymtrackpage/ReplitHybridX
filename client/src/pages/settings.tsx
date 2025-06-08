@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/queryClient";
@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
-import { Settings, Weight, Mail } from "lucide-react";
+import { Settings as SettingsIcon, Weight, Mail } from "lucide-react";
 import { isUnauthorizedError } from "@/lib/authUtils";
 
 export default function Settings() {
@@ -19,12 +19,14 @@ export default function Settings() {
   const { data: profile, isLoading } = useQuery({
     queryKey: ["/api/profile"],
     enabled: !!user,
-    onSuccess: (data: any) => {
-      if (data?.user?.weightUnit) {
-        setSelectedUnit(data.user.weightUnit);
-      }
-    }
   });
+
+  // Update selected unit when profile data loads
+  useEffect(() => {
+    if (profile?.user?.weightUnit) {
+      setSelectedUnit(profile.user.weightUnit);
+    }
+  }, [profile]);
 
   const updateWeightUnitMutation = useMutation({
     mutationFn: async (weightUnit: string) => {

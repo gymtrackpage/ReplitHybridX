@@ -17,6 +17,7 @@ import PWAInstallPrompt from "@/components/PWAInstallPrompt";
 import SplashScreen from "@/components/SplashScreen";
 import Calendar from "@/pages/calendar";
 import Profile from "@/pages/profile";
+import Settings from "@/pages/settings";
 import WeightTracker from "@/pages/weight-tracker";
 import Programs from "@/pages/programs";
 import NotFound from "@/pages/not-found";
@@ -83,6 +84,7 @@ function Router() {
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/calendar" component={Calendar} />
       <Route path="/profile" component={Profile} />
+      <Route path="/settings" component={Settings} />
       <Route path="/weight-tracker" component={WeightTracker} />
       <Route path="/programs" component={Programs} />
       <Route path="/random-workout" component={RandomWorkout} />
