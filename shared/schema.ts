@@ -45,7 +45,6 @@ export const users = pgTable("users", {
   hyroxEventDate: timestamp("hyrox_event_date"),
   hyroxEventLocation: varchar("hyrox_event_location"),
   targetTime: varchar("target_time"),
-  weightUnit: varchar("weight_unit").default("kg"), // kg or lbs
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
