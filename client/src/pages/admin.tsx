@@ -33,7 +33,8 @@ import {
   Clock,
   Target,
   Activity,
-  Upload
+  Upload,
+  Eye
 } from "lucide-react";
 
 interface Program {
@@ -80,6 +81,8 @@ export default function AdminPanel() {
   const [selectedWorkout, setSelectedWorkout] = useState<Workout | null>(null);
   const [expandedPrograms, setExpandedPrograms] = useState<Set<number>>(new Set());
   const [isUploadProgramOpen, setIsUploadProgramOpen] = useState(false);
+  const [isViewWorkoutOpen, setIsViewWorkoutOpen] = useState(false);
+  const [viewingWorkout, setViewingWorkout] = useState<Workout | null>(null);
 
   // Upload program mutation
   const uploadProgramMutation = useMutation({
@@ -536,6 +539,18 @@ export default function AdminPanel() {
                                           variant="ghost"
                                           size="sm"
                                           onClick={() => {
+                                            setViewingWorkout(workout);
+                                            setIsViewWorkoutOpen(true);
+                                          }}
+                                          className="h-8 w-8 p-0"
+                                          title="View Workout"
+                                        >
+                                          <Eye className="h-3 w-3" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => {
                                             setSelectedWorkout(workout);
                                             setIsEditWorkoutOpen(true);
                                           }}
@@ -718,6 +733,103 @@ export default function AdminPanel() {
               }}
               isLoading={uploadProgramMutation.isPending}
             />
+          </DialogContent>
+        </Dialog>
+
+        {/* View Workout Dialog */}
+        <Dialog open={isViewWorkoutOpen} onOpenChange={setIsViewWorkoutOpen}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Workout Preview</DialogTitle>
+            </DialogHeader>
+            
+            {viewingWorkout && (
+              <div className="space-y-4">
+                {/* Workout Header */}
+                <div className="relative bg-gradient-to-r from-primary/10 to-primary/5 rounded-xl overflow-hidden">
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary"></div>
+                  <div className="pl-6 pr-4 py-4">
+                    <div className="mb-2">
+                      <h2 className="text-sm font-semibold text-muted-foreground mb-1">
+                        Week {viewingWorkout.week} • Day {viewingWorkout.day}
+                      </h2>
+                      <h3 className="text-xl font-bold text-foreground">{viewingWorkout.name}</h3>
+                    </div>
+                    
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground mb-3">
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-4 w-4" />
+                        {viewingWorkout.duration} min
+                      </span>
+                      {viewingWorkout.exercises && viewingWorkout.exercises.length > 0 && (
+                        <>
+                          <span className="text-xs">•</span>
+                          <span className="flex items-center gap-1">
+                            <Activity className="h-4 w-4" />
+                            {viewingWorkout.exercises.length} exercises
+                          </span>
+                        </>
+                      )}
+                    </div>
+                    
+                    {viewingWorkout.description && (
+                      <p className="text-muted-foreground text-sm leading-relaxed">
+                        {viewingWorkout.description}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Exercise List */}
+                {viewingWorkout.exercises && viewingWorkout.exercises.length > 0 && (
+                  <div className="px-4 py-4 border border-border rounded-xl">
+                    <h4 className="text-sm font-semibold text-foreground mb-3">Exercises</h4>
+                    <div className="space-y-2">
+                      {viewingWorkout.exercises.map((exercise: any, index: number) => (
+                        <div 
+                          key={index} 
+                          className="flex items-start justify-between p-3 bg-muted rounded-xl"
+                        >
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-foreground">
+                              {exercise.name || exercise.exercise || `Exercise ${index + 1}`}
+                            </p>
+                            {(exercise.sets || exercise.reps || exercise.duration || exercise.distance || exercise.weight || exercise.rpe || exercise.rest || exercise.tempo || exercise.type || exercise.intensity || exercise.pace || exercise.rounds || exercise.target || exercise.equipment) && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {exercise.sets && `${exercise.sets} sets`}
+                                {exercise.sets && exercise.reps && ' × '}
+                                {exercise.reps && `${exercise.reps} reps`}
+                                {exercise.duration && ` • ${exercise.duration}`}
+                                {exercise.distance && ` • ${exercise.distance}`}
+                                {exercise.weight && ` • ${exercise.weight}`}
+                                {exercise.rpe && ` • RPE ${exercise.rpe}`}
+                                {exercise.rest && ` • Rest: ${exercise.rest}`}
+                                {exercise.tempo && ` • Tempo: ${exercise.tempo}`}
+                                {exercise.type && ` • ${exercise.type}`}
+                                {exercise.intensity && ` • ${exercise.intensity}`}
+                                {exercise.pace && ` • Pace: ${exercise.pace}`}
+                                {exercise.rounds && ` • ${exercise.rounds} rounds`}
+                                {exercise.target && ` • Target: ${exercise.target}`}
+                                {exercise.equipment && ` • Equipment: ${exercise.equipment}`}
+                              </p>
+                            )}
+                            {exercise.notes && (
+                              <p className="text-xs text-muted-foreground mt-1 italic">
+                                {exercise.notes}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                <div className="text-xs text-muted-foreground text-center pt-2">
+                  This is how the workout appears to users in their dashboard
+                </div>
+              </div>
+            )}
           </DialogContent>
         </Dialog>
       </main>
