@@ -5,6 +5,20 @@ interface HyroxExercise {
   distance?: number; // in meters
   sets?: number;
   restBetweenSets?: number; // in seconds
+  type?: 'AMRAP' | 'EMOM' | 'Tabata' | 'Interval' | 'For Time' | 'Chipper' | 'Ladder' | 'Standard';
+  rounds?: number;
+  workPeriod?: number; // seconds
+  restPeriod?: number; // seconds
+  notes?: string;
+}
+
+interface WorkoutBlock {
+  type: 'warmup' | 'main' | 'finisher' | 'running';
+  exercises: HyroxExercise[];
+  structure: 'AMRAP' | 'EMOM' | 'Tabata' | 'For Time' | 'Intervals' | 'Chipper' | 'Standard';
+  duration?: number;
+  rounds?: number;
+  notes?: string;
 }
 
 interface RandomWorkout {
@@ -12,51 +26,72 @@ interface RandomWorkout {
   description: string;
   estimatedDuration: number; // in minutes
   exercises: HyroxExercise[];
-  workoutType: 'strength' | 'cardio' | 'mixed' | 'station-focus';
+  workoutType: 'strength' | 'cardio' | 'mixed' | 'station-focus' | 'race-prep' | 'conditioning';
+  structure: string;
 }
 
-// HYROX station-specific exercises
-const HYROX_STATIONS = {
-  skiErg: [
-    { name: "Ski Erg", distance: 1000, sets: 1 },
-    { name: "Ski Erg", distance: 500, sets: 2, restBetweenSets: 60 },
-    { name: "Ski Erg Intervals", distance: 250, sets: 4, restBetweenSets: 30 },
-  ],
-  sledPush: [
-    { name: "Sled Push", distance: 50, sets: 2, restBetweenSets: 90 },
-    { name: "Sled Push", distance: 25, sets: 4, restBetweenSets: 60 },
-    { name: "Sled Push Sprint", distance: 15, sets: 6, restBetweenSets: 45 },
-  ],
-  sledPull: [
-    { name: "Sled Pull", distance: 50, sets: 2, restBetweenSets: 90 },
-    { name: "Sled Pull", distance: 25, sets: 4, restBetweenSets: 60 },
-    { name: "Sled Pull Intervals", distance: 15, sets: 6, restBetweenSets: 45 },
-  ],
-  burpees: [
-    { name: "Burpee Broad Jumps", reps: 80, sets: 1 },
-    { name: "Burpee Broad Jumps", reps: 40, sets: 2, restBetweenSets: 120 },
-    { name: "Burpee Broad Jumps", reps: 20, sets: 4, restBetweenSets: 90 },
-  ],
-  rowing: [
-    { name: "Rowing", distance: 1000, sets: 1 },
-    { name: "Rowing", distance: 500, sets: 2, restBetweenSets: 60 },
-    { name: "Rowing Intervals", distance: 250, sets: 4, restBetweenSets: 30 },
-  ],
-  farmersCarry: [
-    { name: "Farmers Carry", distance: 200, sets: 1 },
-    { name: "Farmers Carry", distance: 100, sets: 2, restBetweenSets: 90 },
-    { name: "Farmers Carry", distance: 50, sets: 4, restBetweenSets: 60 },
-  ],
-  sandbag: [
-    { name: "Sandbag Lunges", distance: 100, sets: 1 },
-    { name: "Sandbag Lunges", distance: 50, sets: 2, restBetweenSets: 90 },
-    { name: "Sandbag Lunges", distance: 25, sets: 4, restBetweenSets: 60 },
-  ],
-  wallBalls: [
-    { name: "Wall Balls", reps: 100, sets: 1 },
-    { name: "Wall Balls", reps: 50, sets: 2, restBetweenSets: 120 },
-    { name: "Wall Balls", reps: 25, sets: 4, restBetweenSets: 90 },
-  ]
+// HYROX station exercises
+const HYROX_STATIONS = [
+  "Ski Erg", "Sled Push", "Sled Pull", "Burpee Broad Jumps", 
+  "Rowing", "Farmers Carry", "Sandbag Lunges", "Wall Balls"
+];
+
+// Functional strength exercises
+const STRENGTH_EXERCISES = [
+  "Kettlebell Swings", "Thrusters", "Pull-ups", "Push-ups", "Box Jumps",
+  "Deadlifts", "Air Squats", "Lunges", "Dumbbell Snatches", "Clean & Press",
+  "Russian Twists", "Mountain Climbers", "Plank Hold", "Bear Crawls",
+  "Turkish Get-ups", "Battle Ropes", "Slam Balls", "Tire Flips"
+];
+
+// Running variations
+const RUNNING_EXERCISES = [
+  "Running", "Treadmill Run", "Hill Sprints", "Stair Runs", "Shuttle Runs",
+  "400m Run", "800m Run", "1km Run", "5-10-5 Drill", "Suicide Runs"
+];
+
+// Workout structures with specific formats
+const WORKOUT_STRUCTURES = {
+  HYROX_SIMULATION: {
+    name: "HYROX Race Simulation",
+    description: "Full race simulation with all 8 stations",
+    format: "8 x (1km Run + Station Exercise)"
+  },
+  STATION_FOCUS: {
+    name: "Station-Focused Training",
+    description: "Emphasis on specific HYROX stations",
+    format: "Multiple rounds of 2-3 stations with running"
+  },
+  AMRAP_STRENGTH: {
+    name: "Strength AMRAP",
+    description: "As Many Rounds As Possible in set time",
+    format: "AMRAP 15-20 minutes"
+  },
+  INTERVAL_CARDIO: {
+    name: "Cardio Intervals",
+    description: "High-intensity interval training",
+    format: "Work/Rest intervals"
+  },
+  EMOM_POWER: {
+    name: "Power EMOM",
+    description: "Every Minute On the Minute",
+    format: "EMOM 12-20 minutes"
+  },
+  CHIPPER: {
+    name: "Chipper Workout",
+    description: "Complete all exercises for time",
+    format: "For Time - work through exercise list"
+  },
+  TABATA_FINISHER: {
+    name: "Tabata Finisher",
+    description: "4-minute high-intensity finish",
+    format: "8 rounds of 20s work / 10s rest"
+  },
+  LADDER_WORKOUT: {
+    name: "Ascending/Descending Ladder",
+    description: "Reps increase then decrease",
+    format: "Ladder format with running breaks"
+  }
 };
 
 // Running variations
