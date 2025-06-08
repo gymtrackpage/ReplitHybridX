@@ -254,10 +254,16 @@ export default function Dashboard() {
                                 {exercise.target && ` • Target: ${exercise.target}`}
                                 {exercise.equipment && ` • ${exercise.equipment}`}
                                 {exercise.type && ` • ${exercise.type}`}
+                                {exercise.load && ` • Load: ${exercise.load}`}
+                                {exercise.zone && ` • Zone: ${exercise.zone}`}
+                                {exercise.cadence && ` • Cadence: ${exercise.cadence}`}
                               </p>
                             )}
                             {exercise.description && exercise.description !== exercise.name && (
-                              <p className="text-xs text-muted-foreground mt-1">{exercise.description}</p>
+                              <p className="text-xs text-muted-foreground mt-1 italic">{exercise.description}</p>
+                            )}
+                            {exercise.notes && (
+                              <p className="text-xs text-muted-foreground mt-1 italic">Notes: {exercise.notes}</p>
                             )}
                           </div>
                           <ChevronRight className="h-4 w-4 text-muted-foreground" />
