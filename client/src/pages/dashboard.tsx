@@ -289,9 +289,9 @@ export default function Dashboard() {
         {todaysWorkout && (
           <Card className="bg-card rounded-2xl shadow-lg border-0 mb-6">
             <CardContent className="p-6">
-              {/* How did this workout feel? */}
+              {/* How did you feel in this workout? */}
               <div className="mb-6">
-                <h3 className="text-lg font-semibold text-foreground mb-4">How did this workout feel?</h3>
+                <h3 className="text-lg font-semibold text-foreground mb-4">How did you feel in this workout?</h3>
                 
                 <div className="grid grid-cols-3 gap-2 mb-4">
                   <Button 
@@ -300,7 +300,7 @@ export default function Dashboard() {
                     onClick={() => setSelectedRating(selectedRating === 1 ? null : 1)}
                     className="text-xs"
                   >
-                    Too Easy
+                    Tough
                   </Button>
                   <Button 
                     variant={selectedRating === 3 ? "default" : "outline"}
@@ -308,7 +308,7 @@ export default function Dashboard() {
                     onClick={() => setSelectedRating(selectedRating === 3 ? null : 3)}
                     className="text-xs"
                   >
-                    Perfect
+                    Great
                   </Button>
                   <Button 
                     variant={selectedRating === 5 ? "default" : "outline"}
@@ -316,7 +316,7 @@ export default function Dashboard() {
                     onClick={() => setSelectedRating(selectedRating === 5 ? null : 5)}
                     className="text-xs"
                   >
-                    Too Hard
+                    Amazing
                   </Button>
                 </div>
               </div>
