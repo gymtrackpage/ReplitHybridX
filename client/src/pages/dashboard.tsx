@@ -4,8 +4,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState } from "react";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { formatWeight, parseWeightString } from "@/lib/weightUtils";
-import { ExerciseDetailModal } from "@/components/ExerciseDetailModal";
 import BottomNav from "@/components/BottomNav";
 import Header from "@/components/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,11 +20,6 @@ export default function Dashboard() {
   const [selectedRating, setSelectedRating] = useState<number | null>(null);
   const [selectedExercise, setSelectedExercise] = useState<any | null>(null);
   const [isExerciseDetailOpen, setIsExerciseDetailOpen] = useState(false);
-
-  const handleExerciseClick = (exercise: any) => {
-    setSelectedExercise(exercise);
-    setIsExerciseDetailOpen(true);
-  };
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -46,16 +39,7 @@ export default function Dashboard() {
   const { data: dashboardData, isLoading, error } = useQuery({
     queryKey: ["/api/dashboard"],
     retry: false,
-    enabled: isAuthenticated,
   });
-
-  // Type-safe data with defaults
-  const safeData = {
-    todaysWorkout: (dashboardData as any)?.todaysWorkout || null,
-    progress: (dashboardData as any)?.progress || { completedWorkouts: 0 },
-    weeklyCompletions: (dashboardData as any)?.weeklyCompletions || [],
-    user: (dashboardData as any)?.user || user || { firstName: '', profileImageUrl: null, weightUnit: 'kg' }
-  };
 
   // Complete workout mutation
   const completeWorkoutMutation = useMutation({
@@ -106,12 +90,16 @@ export default function Dashboard() {
   }, [error, toast]);
 
   // Button handlers
+  const handleExerciseClick = (exercise: any) => {
+    setSelectedExercise(exercise);
+    setIsExerciseDetailOpen(true);
+  };
 
   const handleCompleteWorkout = () => {
-    if (!safeData.todaysWorkout?.id) return;
+    if (!dashboardData?.todaysWorkout?.id) return;
     
     completeWorkoutMutation.mutate({
-      workoutId: safeData.todaysWorkout.id,
+      workoutId: dashboardData.todaysWorkout.id,
       rating: selectedRating || undefined,
       notes: workoutNotes.trim() || undefined,
       skipped: false
@@ -119,20 +107,20 @@ export default function Dashboard() {
   };
 
   const handleSkipWorkout = () => {
-    if (!safeData.todaysWorkout?.id) return;
+    if (!dashboardData?.todaysWorkout?.id) return;
     
     completeWorkoutMutation.mutate({
-      workoutId: safeData.todaysWorkout.id,
+      workoutId: dashboardData.todaysWorkout.id,
       skipped: true
     });
   };
 
   const handleShareWorkout = () => {
-    if (!safeData.todaysWorkout) return;
+    if (!dashboardData?.todaysWorkout) return;
     
     const shareData = {
-      title: `HYROX Training - ${safeData.todaysWorkout.name}`,
-      text: `Just completed: ${safeData.todaysWorkout.name}\n${safeData.todaysWorkout.description}`,
+      title: `HYROX Training - ${dashboardData.todaysWorkout.name}`,
+      text: `Just completed: ${dashboardData.todaysWorkout.name}\n${dashboardData.todaysWorkout.description}`,
       url: window.location.href
     };
 
@@ -178,7 +166,7 @@ export default function Dashboard() {
     );
   }
 
-  const { progress, todaysWorkout, weeklyCompletions } = safeData;
+  const { progress, todaysWorkout, weeklyCompletions } = dashboardData;
 
   return (
     <div className="min-h-screen bg-background">
@@ -188,12 +176,12 @@ export default function Dashboard() {
       <div className="bg-card px-4 py-4 shadow-sm">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-bold text-foreground">Welcome back, {safeData.user.firstName || 'User'}!</h2>
+            <h2 className="text-lg font-bold text-foreground">Welcome back, {user?.firstName || 'User'}!</h2>
             <p className="text-sm text-muted-foreground">Ready for today's training?</p>
           </div>
-          {safeData.user.profileImageUrl && (
+          {user?.profileImageUrl && (
             <img
-              src={safeData.user.profileImageUrl}
+              src={user.profileImageUrl}
               alt="Profile"
               className="w-10 h-10 rounded-full object-cover"
             />
@@ -256,7 +244,7 @@ export default function Dashboard() {
                                 {exercise.reps && `${exercise.reps} reps`}
                                 {exercise.duration && ` • ${exercise.duration}`}
                                 {exercise.distance && ` • ${exercise.distance}`}
-                                {exercise.weight && ` • ${formatWeight(exercise.weight, safeData.user?.weightUnit || 'kg')}`}
+                                {exercise.weight && ` • ${exercise.weight}`}
                                 {exercise.rpe && ` • RPE ${exercise.rpe}`}
                                 {exercise.rest && ` • Rest: ${exercise.rest}`}
                                 {exercise.tempo && ` • Tempo: ${exercise.tempo}`}
@@ -412,12 +400,120 @@ export default function Dashboard() {
       <div className="h-16"></div>
       <BottomNav />
 
-      {/* Exercise Detail Modal */}
-      <ExerciseDetailModal
-        isOpen={isExerciseDetailOpen}
-        onClose={() => setIsExerciseDetailOpen(false)}
-        exercise={selectedExercise}
-      />
+      {/* Exercise Detail Dialog */}
+      <Dialog open={isExerciseDetailOpen} onOpenChange={setIsExerciseDetailOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold">
+              {selectedExercise?.name || selectedExercise?.exercise || 'Exercise Details'}
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {selectedExercise?.description && selectedExercise.description !== selectedExercise.name && (
+              <div>
+                <h4 className="font-semibold text-sm text-muted-foreground mb-1">DESCRIPTION</h4>
+                <p className="text-sm">{selectedExercise.description}</p>
+              </div>
+            )}
+            
+            {/* Exercise Details Grid */}
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              {selectedExercise?.sets && (
+                <div>
+                  <span className="font-semibold text-muted-foreground">Sets:</span>
+                  <p>{selectedExercise.sets}</p>
+                </div>
+              )}
+              {selectedExercise?.reps && (
+                <div>
+                  <span className="font-semibold text-muted-foreground">Reps:</span>
+                  <p>{selectedExercise.reps}</p>
+                </div>
+              )}
+              {selectedExercise?.duration && (
+                <div>
+                  <span className="font-semibold text-muted-foreground">Duration:</span>
+                  <p>{selectedExercise.duration}</p>
+                </div>
+              )}
+              {selectedExercise?.distance && (
+                <div>
+                  <span className="font-semibold text-muted-foreground">Distance:</span>
+                  <p>{selectedExercise.distance}</p>
+                </div>
+              )}
+              {selectedExercise?.weight && (
+                <div>
+                  <span className="font-semibold text-muted-foreground">Weight:</span>
+                  <p>{selectedExercise.weight}</p>
+                </div>
+              )}
+              {selectedExercise?.rpe && (
+                <div>
+                  <span className="font-semibold text-muted-foreground">RPE:</span>
+                  <p>{selectedExercise.rpe}</p>
+                </div>
+              )}
+              {selectedExercise?.rest && (
+                <div>
+                  <span className="font-semibold text-muted-foreground">Rest:</span>
+                  <p>{selectedExercise.rest}</p>
+                </div>
+              )}
+              {selectedExercise?.tempo && (
+                <div>
+                  <span className="font-semibold text-muted-foreground">Tempo:</span>
+                  <p>{selectedExercise.tempo}</p>
+                </div>
+              )}
+              {selectedExercise?.intensity && (
+                <div>
+                  <span className="font-semibold text-muted-foreground">Intensity:</span>
+                  <p>{selectedExercise.intensity}</p>
+                </div>
+              )}
+              {selectedExercise?.pace && (
+                <div>
+                  <span className="font-semibold text-muted-foreground">Pace:</span>
+                  <p>{selectedExercise.pace}</p>
+                </div>
+              )}
+              {selectedExercise?.rounds && (
+                <div>
+                  <span className="font-semibold text-muted-foreground">Rounds:</span>
+                  <p>{selectedExercise.rounds}</p>
+                </div>
+              )}
+              {selectedExercise?.target && (
+                <div>
+                  <span className="font-semibold text-muted-foreground">Target:</span>
+                  <p>{selectedExercise.target}</p>
+                </div>
+              )}
+              {selectedExercise?.equipment && (
+                <div>
+                  <span className="font-semibold text-muted-foreground">Equipment:</span>
+                  <p>{selectedExercise.equipment}</p>
+                </div>
+              )}
+              {selectedExercise?.type && (
+                <div>
+                  <span className="font-semibold text-muted-foreground">Type:</span>
+                  <p>{selectedExercise.type}</p>
+                </div>
+              )}
+            </div>
+            
+            <Button 
+              onClick={() => setIsExerciseDetailOpen(false)}
+              className="w-full"
+            >
+              Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
