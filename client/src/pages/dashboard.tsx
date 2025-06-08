@@ -23,6 +23,11 @@ export default function Dashboard() {
   const [selectedExercise, setSelectedExercise] = useState<any | null>(null);
   const [isExerciseDetailOpen, setIsExerciseDetailOpen] = useState(false);
 
+  const handleExerciseClick = (exercise: any) => {
+    setSelectedExercise(exercise);
+    setIsExerciseDetailOpen(true);
+  };
+
   // Redirect if not authenticated
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -92,10 +97,6 @@ export default function Dashboard() {
   }, [error, toast]);
 
   // Button handlers
-  const handleExerciseClick = (exercise: any) => {
-    setSelectedExercise(exercise);
-    setIsExerciseDetailOpen(true);
-  };
 
   const handleCompleteWorkout = () => {
     if (!dashboardData?.todaysWorkout?.id) return;
@@ -246,7 +247,7 @@ export default function Dashboard() {
                                 {exercise.reps && `${exercise.reps} reps`}
                                 {exercise.duration && ` • ${exercise.duration}`}
                                 {exercise.distance && ` • ${exercise.distance}`}
-                                {exercise.weight && ` • ${exercise.weight}`}
+                                {exercise.weight && ` • ${formatWeight(exercise.weight, dashboardData?.user?.weightUnit || 'kg')}`}
                                 {exercise.rpe && ` • RPE ${exercise.rpe}`}
                                 {exercise.rest && ` • Rest: ${exercise.rest}`}
                                 {exercise.tempo && ` • Tempo: ${exercise.tempo}`}
@@ -402,25 +403,12 @@ export default function Dashboard() {
       <div className="h-16"></div>
       <BottomNav />
 
-      {/* Exercise Detail Dialog */}
-      <Dialog open={isExerciseDetailOpen} onOpenChange={setIsExerciseDetailOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-lg font-bold">
-              {selectedExercise?.name || selectedExercise?.exercise || 'Exercise Details'}
-            </DialogTitle>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            {selectedExercise?.description && selectedExercise.description !== selectedExercise.name && (
-              <div>
-                <h4 className="font-semibold text-sm text-muted-foreground mb-1">DESCRIPTION</h4>
-                <p className="text-sm">{selectedExercise.description}</p>
-              </div>
-            )}
-            
-            {/* Exercise Details Grid */}
-            <div className="grid grid-cols-2 gap-4 text-sm">
+      {/* Exercise Detail Modal */}
+      <ExerciseDetailModal
+        isOpen={isExerciseDetailOpen}
+        onClose={() => setIsExerciseDetailOpen(false)}
+        exercise={selectedExercise}
+      />
               {selectedExercise?.sets && (
                 <div>
                   <span className="font-semibold text-muted-foreground">Sets:</span>
