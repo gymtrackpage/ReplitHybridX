@@ -100,7 +100,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <Toaster />
       <PWAInstallPrompt />
-      <Router />
+      <SimpleRouter />
     </QueryClientProvider>
   );
 }

@@ -46,7 +46,16 @@ export default function Dashboard() {
   const { data: dashboardData, isLoading, error } = useQuery({
     queryKey: ["/api/dashboard"],
     retry: false,
+    enabled: isAuthenticated,
   });
+
+  // Type-safe data with defaults
+  const safeData = {
+    todaysWorkout: (dashboardData as any)?.todaysWorkout || null,
+    progress: (dashboardData as any)?.progress || { completedWorkouts: 0 },
+    weeklyCompletions: (dashboardData as any)?.weeklyCompletions || [],
+    user: (dashboardData as any)?.user || user || { firstName: '', profileImageUrl: null, weightUnit: 'kg' }
+  };
 
   // Complete workout mutation
   const completeWorkoutMutation = useMutation({
@@ -99,10 +108,10 @@ export default function Dashboard() {
   // Button handlers
 
   const handleCompleteWorkout = () => {
-    if (!dashboardData?.todaysWorkout?.id) return;
+    if (!safeData.todaysWorkout?.id) return;
     
     completeWorkoutMutation.mutate({
-      workoutId: dashboardData.todaysWorkout.id,
+      workoutId: safeData.todaysWorkout.id,
       rating: selectedRating || undefined,
       notes: workoutNotes.trim() || undefined,
       skipped: false
@@ -110,20 +119,20 @@ export default function Dashboard() {
   };
 
   const handleSkipWorkout = () => {
-    if (!dashboardData?.todaysWorkout?.id) return;
+    if (!safeData.todaysWorkout?.id) return;
     
     completeWorkoutMutation.mutate({
-      workoutId: dashboardData.todaysWorkout.id,
+      workoutId: safeData.todaysWorkout.id,
       skipped: true
     });
   };
 
   const handleShareWorkout = () => {
-    if (!dashboardData?.todaysWorkout) return;
+    if (!safeData.todaysWorkout) return;
     
     const shareData = {
-      title: `HYROX Training - ${dashboardData.todaysWorkout.name}`,
-      text: `Just completed: ${dashboardData.todaysWorkout.name}\n${dashboardData.todaysWorkout.description}`,
+      title: `HYROX Training - ${safeData.todaysWorkout.name}`,
+      text: `Just completed: ${safeData.todaysWorkout.name}\n${safeData.todaysWorkout.description}`,
       url: window.location.href
     };
 
@@ -169,7 +178,7 @@ export default function Dashboard() {
     );
   }
 
-  const { progress, todaysWorkout, weeklyCompletions } = dashboardData;
+  const { progress, todaysWorkout, weeklyCompletions } = safeData;
 
   return (
     <div className="min-h-screen bg-background">
@@ -179,12 +188,12 @@ export default function Dashboard() {
       <div className="bg-card px-4 py-4 shadow-sm">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-bold text-foreground">Welcome back, {user?.firstName || 'User'}!</h2>
+            <h2 className="text-lg font-bold text-foreground">Welcome back, {safeData.user.firstName || 'User'}!</h2>
             <p className="text-sm text-muted-foreground">Ready for today's training?</p>
           </div>
-          {user?.profileImageUrl && (
+          {safeData.user.profileImageUrl && (
             <img
-              src={user.profileImageUrl}
+              src={safeData.user.profileImageUrl}
               alt="Profile"
               className="w-10 h-10 rounded-full object-cover"
             />
@@ -247,7 +256,7 @@ export default function Dashboard() {
                                 {exercise.reps && `${exercise.reps} reps`}
                                 {exercise.duration && ` • ${exercise.duration}`}
                                 {exercise.distance && ` • ${exercise.distance}`}
-                                {exercise.weight && ` • ${formatWeight(exercise.weight, dashboardData?.user?.weightUnit || 'kg')}`}
+                                {exercise.weight && ` • ${formatWeight(exercise.weight, safeData.user?.weightUnit || 'kg')}`}
                                 {exercise.rpe && ` • RPE ${exercise.rpe}`}
                                 {exercise.rest && ` • Rest: ${exercise.rest}`}
                                 {exercise.tempo && ` • Tempo: ${exercise.tempo}`}
