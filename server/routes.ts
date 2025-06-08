@@ -678,6 +678,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update weight unit preference
+  app.patch('/api/user/weight-unit', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { weightUnit } = req.body;
+      
+      if (!weightUnit || !['kg', 'lbs'].includes(weightUnit)) {
+        return res.status(400).json({ message: 'Invalid weight unit. Must be "kg" or "lbs"' });
+      }
+
+      const user = await storage.updateUserProfile(userId, { weightUnit });
+      res.json({ weightUnit: user.weightUnit });
+    } catch (error) {
+      console.error("Error updating weight unit:", error);
+      res.status(500).json({ message: "Failed to update weight unit" });
+    }
+  });
+
   app.put('/api/change-program', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
