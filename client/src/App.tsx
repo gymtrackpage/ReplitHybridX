@@ -5,7 +5,6 @@ import { Toaster } from "@/components/ui/toaster";
 
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
 import Landing from "@/pages/landing";
 import Dashboard from "@/pages/dashboard";
 import Admin from "@/pages/admin";
@@ -14,7 +13,6 @@ import SubscriptionChoice from "@/pages/subscription-choice";
 import EnhancedAssessment from "@/pages/enhanced-assessment";
 import RandomWorkout from "@/pages/random-workout";
 import PWAInstallPrompt from "@/components/PWAInstallPrompt";
-import SplashScreen from "@/components/SplashScreen";
 import Calendar from "@/pages/calendar";
 import Profile from "@/pages/profile";
 import Settings from "@/pages/settings";
@@ -98,17 +96,11 @@ function Router() {
 }
 
 function App() {
-  const [showSplash, setShowSplash] = useState(true);
-
   return (
     <QueryClientProvider client={queryClient}>
       <Toaster />
       <PWAInstallPrompt />
-      {showSplash ? (
-        <SplashScreen onComplete={() => setShowSplash(false)} />
-      ) : (
-        <Router />
-      )}
+      <Router />
     </QueryClientProvider>
   );
 }
