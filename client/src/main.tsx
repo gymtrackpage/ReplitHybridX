@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react'
 import ReactDOM from 'react-dom/client'
+import { Dashboard } from './pages/Dashboard'
+import { BottomNav } from './components/BottomNav'
+import './index.css'
 
 interface User {
   id: string;
@@ -10,6 +13,7 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
+  const [activeTab, setActiveTab] = useState('dashboard');
 
   useEffect(() => {
     checkAuthStatus();
@@ -130,109 +134,220 @@ function App() {
     );
   }
 
+  const renderCurrentTab = () => {
+    switch (activeTab) {
+      case 'dashboard':
+        return <Dashboard user={user!} />;
+      case 'programs':
+        return <ProgramsPage />;
+      case 'workouts':
+        return <WorkoutsPage />;
+      case 'calendar':
+        return <CalendarPage />;
+      case 'profile':
+        return <ProfilePage user={user!} onLogout={handleLogout} />;
+      default:
+        return <Dashboard user={user!} />;
+    }
+  };
+
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f9fafb' }}>
-      <nav style={{ backgroundColor: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-        <div style={{
-          maxWidth: '1280px',
-          margin: '0 auto',
-          padding: '0 16px'
-        }}>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            height: '64px',
-            alignItems: 'center'
-          }}>
-            <h1 style={{
-              fontSize: '20px',
-              fontWeight: '600',
-              color: '#111827'
-            }}>
-              Hybrid X Dashboard
-            </h1>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '16px'
-            }}>
-              <span style={{
-                fontSize: '14px',
-                color: '#374151'
-              }}>
-                Welcome, {user?.email}
-              </span>
-              <button
-                onClick={handleLogout}
-                style={{
-                  backgroundColor: '#dc2626',
-                  color: 'white',
-                  padding: '8px 12px',
-                  borderRadius: '6px',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  border: 'none',
-                  cursor: 'pointer'
-                }}
-              >
-                Logout
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
+      {renderCurrentTab()}
+      <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
+    </div>
+  );
+}
 
-      <main style={{
-        maxWidth: '1280px',
-        margin: '0 auto',
-        padding: '24px 16px'
-      }}>
-        <div style={{
-          border: '4px dashed #d1d5db',
-          borderRadius: '8px',
-          height: '384px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
+// Placeholder components for other tabs
+function ProgramsPage() {
+  return (
+    <div style={{
+      minHeight: '100vh',
+      backgroundColor: '#f9fafb',
+      paddingBottom: '80px',
+      padding: '20px 16px'
+    }}>
+      <div style={{ maxWidth: '640px', margin: '0 auto' }}>
+        <h1 style={{
+          fontSize: '24px',
+          fontWeight: '700',
+          color: '#111827',
+          marginBottom: '20px'
         }}>
-          <div style={{ textAlign: 'center' }}>
-            <h2 style={{
-              fontSize: '24px',
-              fontWeight: '700',
-              color: '#111827',
-              marginBottom: '16px'
-            }}>
-              Welcome to Hybrid X
-            </h2>
-            <p style={{
-              color: '#6b7280',
-              marginBottom: '32px'
-            }}>
-              Your personal HYROX training application is ready to use.
-            </p>
-            <div style={{ marginBottom: '16px' }}>
-              <p style={{
-                fontSize: '14px',
-                color: '#059669'
-              }}>
-                ✓ Authentication working
-              </p>
-              <p style={{
-                fontSize: '14px',
-                color: '#059669'
-              }}>
-                ✓ React hooks functioning properly
-              </p>
-              <p style={{
-                fontSize: '14px',
-                color: '#059669'
-              }}>
-                ✓ Clean application setup complete
-              </p>
-            </div>
-          </div>
+          Training Programs
+        </h1>
+        <div style={{
+          backgroundColor: 'white',
+          padding: '40px 20px',
+          borderRadius: '8px',
+          border: '1px solid #e5e7eb',
+          textAlign: 'center'
+        }}>
+          <h3 style={{
+            fontSize: '16px',
+            fontWeight: '600',
+            color: '#111827',
+            marginBottom: '8px'
+          }}>
+            Programs Feature
+          </h3>
+          <p style={{
+            color: '#6b7280',
+            fontSize: '14px'
+          }}>
+            Browse and select HYROX training programs tailored to your fitness level.
+          </p>
         </div>
-      </main>
+      </div>
+    </div>
+  );
+}
+
+function WorkoutsPage() {
+  return (
+    <div style={{
+      minHeight: '100vh',
+      backgroundColor: '#f9fafb',
+      paddingBottom: '80px',
+      padding: '20px 16px'
+    }}>
+      <div style={{ maxWidth: '640px', margin: '0 auto' }}>
+        <h1 style={{
+          fontSize: '24px',
+          fontWeight: '700',
+          color: '#111827',
+          marginBottom: '20px'
+        }}>
+          Workouts
+        </h1>
+        <div style={{
+          backgroundColor: 'white',
+          padding: '40px 20px',
+          borderRadius: '8px',
+          border: '1px solid #e5e7eb',
+          textAlign: 'center'
+        }}>
+          <h3 style={{
+            fontSize: '16px',
+            fontWeight: '600',
+            color: '#111827',
+            marginBottom: '8px'
+          }}>
+            Workout Library
+          </h3>
+          <p style={{
+            color: '#6b7280',
+            fontSize: '14px'
+          }}>
+            Access your workout history and track your performance.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CalendarPage() {
+  return (
+    <div style={{
+      minHeight: '100vh',
+      backgroundColor: '#f9fafb',
+      paddingBottom: '80px',
+      padding: '20px 16px'
+    }}>
+      <div style={{ maxWidth: '640px', margin: '0 auto' }}>
+        <h1 style={{
+          fontSize: '24px',
+          fontWeight: '700',
+          color: '#111827',
+          marginBottom: '20px'
+        }}>
+          Training Calendar
+        </h1>
+        <div style={{
+          backgroundColor: 'white',
+          padding: '40px 20px',
+          borderRadius: '8px',
+          border: '1px solid #e5e7eb',
+          textAlign: 'center'
+        }}>
+          <h3 style={{
+            fontSize: '16px',
+            fontWeight: '600',
+            color: '#111827',
+            marginBottom: '8px'
+          }}>
+            Calendar View
+          </h3>
+          <p style={{
+            color: '#6b7280',
+            fontSize: '14px'
+          }}>
+            View your training schedule and track your progress over time.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProfilePage({ user, onLogout }: { user: User; onLogout: () => void }) {
+  return (
+    <div style={{
+      minHeight: '100vh',
+      backgroundColor: '#f9fafb',
+      paddingBottom: '80px',
+      padding: '20px 16px'
+    }}>
+      <div style={{ maxWidth: '640px', margin: '0 auto' }}>
+        <h1 style={{
+          fontSize: '24px',
+          fontWeight: '700',
+          color: '#111827',
+          marginBottom: '20px'
+        }}>
+          Profile
+        </h1>
+        <div style={{
+          backgroundColor: 'white',
+          padding: '20px',
+          borderRadius: '8px',
+          border: '1px solid #e5e7eb',
+          marginBottom: '20px'
+        }}>
+          <h3 style={{
+            fontSize: '16px',
+            fontWeight: '600',
+            color: '#111827',
+            marginBottom: '8px'
+          }}>
+            Account Information
+          </h3>
+          <p style={{
+            color: '#6b7280',
+            fontSize: '14px',
+            marginBottom: '16px'
+          }}>
+            Email: {user.email}
+          </p>
+          <button
+            onClick={onLogout}
+            style={{
+              backgroundColor: '#dc2626',
+              color: 'white',
+              border: 'none',
+              padding: '8px 16px',
+              borderRadius: '6px',
+              fontSize: '14px',
+              fontWeight: '500',
+              cursor: 'pointer'
+            }}
+          >
+            Logout
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
