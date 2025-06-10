@@ -116,11 +116,11 @@ export default function Dashboard() {
   };
 
   const handleShareWorkout = () => {
-    if (!dashboardData?.todaysWorkout) return;
+    if (!(dashboardData as any)?.todaysWorkout) return;
     
     const shareData = {
-      title: `HYROX Training - ${dashboardData.todaysWorkout.name}`,
-      text: `Just completed: ${dashboardData.todaysWorkout.name}\n${dashboardData.todaysWorkout.description}`,
+      title: `HYROX Training - ${(dashboardData as any).todaysWorkout.name}`,
+      text: `Just completed: ${(dashboardData as any).todaysWorkout.name}\n${(dashboardData as any).todaysWorkout.description}`,
       url: window.location.href
     };
 
@@ -166,7 +166,7 @@ export default function Dashboard() {
     );
   }
 
-  const { progress, todaysWorkout, weeklyCompletions } = dashboardData;
+  const { progress, todaysWorkout, weeklyCompletions } = dashboardData as any;
 
   return (
     <div className="min-h-screen bg-background">
@@ -176,12 +176,12 @@ export default function Dashboard() {
       <div className="bg-card px-4 py-4 shadow-sm">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-bold text-foreground">Welcome back, {user?.firstName || 'User'}!</h2>
+            <h2 className="text-lg font-bold text-foreground">Welcome back, {(user as any)?.firstName || 'User'}!</h2>
             <p className="text-sm text-muted-foreground">Ready for today's training?</p>
           </div>
-          {user?.profileImageUrl && (
+          {(user as any)?.profileImageUrl && (
             <img
-              src={user.profileImageUrl}
+              src={(user as any).profileImageUrl}
               alt="Profile"
               className="w-10 h-10 rounded-full object-cover"
             />
