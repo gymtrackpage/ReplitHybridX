@@ -114,7 +114,12 @@ export async function setupAuth(app: Express) {
   });
 
   app.get("/api/callback", (req, res, next) => {
-    passport.authenticate(`replitauth:${req.hostname}`, {
+    // Use the first domain from REPLIT_DOMAINS for localhost requests
+    const hostname = req.hostname === 'localhost' ? 
+      process.env.REPLIT_DOMAINS!.split(",")[0] : 
+      req.hostname;
+    
+    passport.authenticate(`replitauth:${hostname}`, {
       successReturnToOrRedirect: "/",
       failureRedirect: "/api/login",
     })(req, res, next);
