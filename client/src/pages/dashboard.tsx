@@ -37,7 +37,7 @@ export default function Dashboard() {
 
   // Fetch dashboard data
   const { data: dashboardData, isLoading, error } = useQuery({
-    queryKey: ["/api/dashboard"],
+    queryKey: ["/api/workouts/today"],
     retry: false,
   });
 
@@ -53,7 +53,7 @@ export default function Dashboard() {
       });
       setWorkoutNotes("");
       setSelectedRating(null);
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/workouts/today"] });
     },
     onError: (error) => {
       if (isUnauthorizedError(error)) {
@@ -96,10 +96,10 @@ export default function Dashboard() {
   };
 
   const handleCompleteWorkout = () => {
-    if (!(dashboardData as any)?.todaysWorkout?.id) return;
+    if (!todaysWorkout?.id) return;
     
     completeWorkoutMutation.mutate({
-      workoutId: (dashboardData as any).todaysWorkout.id,
+      workoutId: todaysWorkout.id,
       rating: selectedRating || undefined,
       notes: workoutNotes.trim() || undefined,
       skipped: false
@@ -107,10 +107,10 @@ export default function Dashboard() {
   };
 
   const handleSkipWorkout = () => {
-    if (!(dashboardData as any)?.todaysWorkout?.id) return;
+    if (!todaysWorkout?.id) return;
     
     completeWorkoutMutation.mutate({
-      workoutId: (dashboardData as any).todaysWorkout.id,
+      workoutId: todaysWorkout.id,
       skipped: true
     });
   };
