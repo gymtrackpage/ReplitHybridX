@@ -90,6 +90,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Dashboard data endpoint
+  app.get('/api/dashboard', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      console.log('Dashboard request for user:', userId);
+      
+      const user = await storage.getUser(userId);
+      console.log('User found:', !!user, 'Program ID:', user?.currentProgramId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const progress = await storage.getUserProgress(userId);
+      console.log('Progress found:', !!progress, 'Program ID:', progress?.programId);
+      
+      let todaysWorkout = null;
+      if (user.currentProgramId && progress) {
+        const workouts = await storage.getWorkoutsByProgram(user.currentProgramId);
+        const currentWeek = progress.currentWeek || 1;
+        const currentDay = progress.currentDay || 1;
+        
+        todaysWorkout = workouts.find(w => w.week === currentWeek && w.day === currentDay);
+        console.log('Today\'s workout found:', !!todaysWorkout);
+      }
+
+      // Get this week's completions (last 7 days)
+      const completions = await storage.getWorkoutCompletions(userId);
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+      const weeklyCompletions = completions.filter(c => new Date(c.completedAt) >= oneWeekAgo);
+
+      res.json({
+        user,
+        progress,
+        todaysWorkout,
+        weeklyCompletions
+      });
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error);
+      res.status(500).json({ message: "Failed to fetch dashboard data" });
+    }
+  });
+
   // User onboarding status check
   app.get('/api/user-onboarding-status', isAuthenticated, async (req: any, res) => {
     try {

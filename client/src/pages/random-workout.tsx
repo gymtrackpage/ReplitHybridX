@@ -44,7 +44,7 @@ export default function RandomWorkout() {
   // Generate random workout
   const generateWorkoutMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("GET", "/api/generate-random-workout");
+      const response = await apiRequest("POST", "/api/workouts/random");
       return response.json();
     },
     onSuccess: (data: RandomWorkout) => {

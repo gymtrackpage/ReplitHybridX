@@ -379,6 +379,49 @@ export default function Dashboard() {
           </Card>
         )}
 
+        {/* Quick Actions Grid */}
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          <Link href="/calendar">
+            <Card className="bg-card rounded-2xl shadow-lg border-0 cursor-pointer hover:shadow-xl transition-shadow">
+              <CardContent className="p-4 text-center">
+                <Calendar className="h-8 w-8 text-primary mx-auto mb-2" />
+                <h3 className="text-sm font-semibold text-foreground">Calendar</h3>
+                <p className="text-xs text-muted-foreground">View schedule</p>
+              </CardContent>
+            </Card>
+          </Link>
+          
+          <Link href="/random-workout">
+            <Card className="bg-card rounded-2xl shadow-lg border-0 cursor-pointer hover:shadow-xl transition-shadow">
+              <CardContent className="p-4 text-center">
+                <Dumbbell className="h-8 w-8 text-primary mx-auto mb-2" />
+                <h3 className="text-sm font-semibold text-foreground">Random</h3>
+                <p className="text-xs text-muted-foreground">Quick workout</p>
+              </CardContent>
+            </Card>
+          </Link>
+          
+          <Link href="/profile">
+            <Card className="bg-card rounded-2xl shadow-lg border-0 cursor-pointer hover:shadow-xl transition-shadow">
+              <CardContent className="p-4 text-center">
+                <User className="h-8 w-8 text-primary mx-auto mb-2" />
+                <h3 className="text-sm font-semibold text-foreground">Profile</h3>
+                <p className="text-xs text-muted-foreground">Your progress</p>
+              </CardContent>
+            </Card>
+          </Link>
+          
+          <Link href="/history">
+            <Card className="bg-card rounded-2xl shadow-lg border-0 cursor-pointer hover:shadow-xl transition-shadow">
+              <CardContent className="p-4 text-center">
+                <ClipboardList className="h-8 w-8 text-primary mx-auto mb-2" />
+                <h3 className="text-sm font-semibold text-foreground">History</h3>
+                <p className="text-xs text-muted-foreground">Past workouts</p>
+              </CardContent>
+            </Card>
+          </Link>
+        </div>
+
         {/* Quick Stats Card */}
         <Card className="bg-card rounded-2xl shadow-lg border-0 mb-6">
           <CardContent className="p-6">
