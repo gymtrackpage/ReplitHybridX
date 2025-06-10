@@ -35,8 +35,8 @@ export default function Dashboard() {
     }
   }, [authLoading, isAuthenticated, toast]);
 
-  // Fetch dashboard data
-  const { data: dashboardData, isLoading, error } = useQuery({
+  // Fetch today's workout
+  const { data: todaysWorkout, isLoading, error } = useQuery({
     queryKey: ["/api/workouts/today"],
     retry: false,
   });
@@ -116,18 +116,17 @@ export default function Dashboard() {
   };
 
   const handleShareWorkout = () => {
-    if (!(dashboardData as any)?.todaysWorkout) return;
+    if (!todaysWorkout) return;
     
-    const shareData = {
-      title: `HYROX Training - ${(dashboardData as any).todaysWorkout.name}`,
-      text: `Just completed: ${(dashboardData as any).todaysWorkout.name}\n${(dashboardData as any).todaysWorkout.description}`,
-      url: window.location.href
-    };
-
+    const shareText = `Check out my workout: ${todaysWorkout.name}\n\nWeek ${todaysWorkout.week}, Day ${todaysWorkout.day}`;
+    
     if (navigator.share) {
-      navigator.share(shareData);
+      navigator.share({
+        title: 'My Workout',
+        text: shareText,
+      });
     } else {
-      navigator.clipboard.writeText(`${shareData.text}\n${shareData.url}`);
+      navigator.clipboard.writeText(shareText);
       toast({
         title: "Copied to clipboard",
         description: "Workout details copied to clipboard",
@@ -137,55 +136,70 @@ export default function Dashboard() {
 
   if (authLoading || isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
+      <div className="h-screen flex items-center justify-center">
+        <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" aria-label="Loading"/>
       </div>
     );
   }
 
-  if (!user || !dashboardData) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Header title="Welcome" />
-        
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold text-foreground mb-4">Welcome to Hybrid X!</h1>
-            <p className="text-muted-foreground mb-6">
-              Let's get you started with a fitness assessment and program selection.
-            </p>
-            <Button onClick={() => window.location.href = "/assessment"}>
-              Start Assessment
-            </Button>
-          </div>
-        </div>
-        
-        <div className="h-16"></div>
-        <BottomNav />
-      </div>
-    );
+  if (!isAuthenticated) {
+    return null;
   }
-
-  const { progress, todaysWorkout, weeklyCompletions } = dashboardData as any;
 
   return (
     <div className="min-h-screen bg-background">
-      <Header title="Dashboard" />
+      <Header />
       
-      {/* User Welcome Section */}
-      <div className="bg-card px-4 py-4 shadow-sm">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-bold text-foreground">Welcome back, {(user as any)?.firstName || 'User'}!</h2>
-            <p className="text-sm text-muted-foreground">Ready for today's training?</p>
-          </div>
-          {(user as any)?.profileImageUrl && (
-            <img
-              src={(user as any).profileImageUrl}
-              alt="Profile"
-              className="w-10 h-10 rounded-full object-cover"
-            />
-          )}
+      {/* Welcome Section */}
+      <div className="px-4 pt-6 pb-4">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-foreground mb-2">
+            Welcome back{user?.firstName ? `, ${user.firstName}` : ''}!
+          </h1>
+          <p className="text-muted-foreground text-sm">
+            Ready to crush today's workout?
+          </p>
+        </div>
+      </div>
+
+      {/* Quick Action Tiles */}
+      <div className="px-4 mb-6">
+        <div className="grid grid-cols-2 gap-3">
+          <Link href="/calendar">
+            <Card className="cursor-pointer hover:shadow-md transition-shadow bg-card border-0 rounded-2xl">
+              <CardContent className="p-4 text-center">
+                <Calendar className="w-6 h-6 text-primary mx-auto mb-2" />
+                <p className="text-sm font-medium text-foreground">Calendar</p>
+              </CardContent>
+            </Card>
+          </Link>
+          
+          <Link href="/random-workout">
+            <Card className="cursor-pointer hover:shadow-md transition-shadow bg-card border-0 rounded-2xl">
+              <CardContent className="p-4 text-center">
+                <Dumbbell className="w-6 h-6 text-primary mx-auto mb-2" />
+                <p className="text-sm font-medium text-foreground">Random Workout</p>
+              </CardContent>
+            </Card>
+          </Link>
+          
+          <Link href="/profile">
+            <Card className="cursor-pointer hover:shadow-md transition-shadow bg-card border-0 rounded-2xl">
+              <CardContent className="p-4 text-center">
+                <User className="w-6 h-6 text-primary mx-auto mb-2" />
+                <p className="text-sm font-medium text-foreground">Profile</p>
+              </CardContent>
+            </Card>
+          </Link>
+          
+          <Link href="/history">
+            <Card className="cursor-pointer hover:shadow-md transition-shadow bg-card border-0 rounded-2xl">
+              <CardContent className="p-4 text-center">
+                <ClipboardList className="w-6 h-6 text-primary mx-auto mb-2" />
+                <p className="text-sm font-medium text-foreground">History</p>
+              </CardContent>
+            </Card>
+          </Link>
         </div>
       </div>
 
@@ -215,7 +229,7 @@ export default function Dashboard() {
                     </div>
                     
                     {todaysWorkout.description && (
-                      <p className="text-muted-foreground text-sm leading-relaxed">
+                      <p className="text-muted-foreground text-sm leading-relaxed italic">
                         {todaysWorkout.description}
                       </p>
                     )}
@@ -248,315 +262,177 @@ export default function Dashboard() {
                                 {exercise.rpe && ` • RPE ${exercise.rpe}`}
                                 {exercise.rest && ` • Rest: ${exercise.rest}`}
                                 {exercise.tempo && ` • Tempo: ${exercise.tempo}`}
-                                {exercise.intensity && ` • ${exercise.intensity}`}
+                                {exercise.type && ` • Type: ${exercise.type}`}
+                                {exercise.intensity && ` • Intensity: ${exercise.intensity}`}
                                 {exercise.pace && ` • Pace: ${exercise.pace}`}
-                                {exercise.rounds && ` • ${exercise.rounds} rounds`}
+                                {exercise.rounds && ` • Rounds: ${exercise.rounds}`}
                                 {exercise.target && ` • Target: ${exercise.target}`}
-                                {exercise.equipment && ` • ${exercise.equipment}`}
-                                {exercise.type && ` • ${exercise.type}`}
-                                {exercise.load && ` • Load: ${exercise.load}`}
-                                {exercise.zone && ` • Zone: ${exercise.zone}`}
-                                {exercise.cadence && ` • Cadence: ${exercise.cadence}`}
+                                {exercise.equipment && ` • Equipment: ${exercise.equipment}`}
                               </p>
                             )}
-                            {exercise.description && exercise.description !== exercise.name && (
-                              <p className="text-xs text-muted-foreground mt-1 italic">{exercise.description}</p>
+                            {exercise.description && (
+                              <p className="text-xs text-muted-foreground mt-1 italic">
+                                {exercise.description}
+                              </p>
                             )}
                             {exercise.notes && (
-                              <p className="text-xs text-muted-foreground mt-1 italic">Notes: {exercise.notes}</p>
+                              <p className="text-xs text-muted-foreground mt-1 italic">
+                                Note: {exercise.notes}
+                              </p>
                             )}
                           </div>
-                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                          <ChevronRight className="w-4 h-4 text-muted-foreground ml-2" />
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
+                
+                {/* Action Buttons */}
+                <div className="px-4 py-4 border-t border-border bg-muted/50">
+                  <div className="space-y-3">
+                    {/* Rating Selection */}
+                    <div>
+                      <p className="text-sm font-medium text-foreground mb-2">How did it feel? (1-5)</p>
+                      <div className="flex gap-2">
+                        {[1, 2, 3, 4, 5].map((rating) => (
+                          <Button
+                            key={rating}
+                            variant={selectedRating === rating ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setSelectedRating(rating)}
+                            className="w-8 h-8 p-0"
+                          >
+                            {rating}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    {/* Notes */}
+                    <div>
+                      <Textarea
+                        placeholder="Add notes about your workout..."
+                        value={workoutNotes}
+                        onChange={(e) => setWorkoutNotes(e.target.value)}
+                        className="resize-none"
+                        rows={2}
+                      />
+                    </div>
+                    
+                    {/* Action Buttons */}
+                    <div className="flex gap-2">
+                      <Button 
+                        onClick={handleCompleteWorkout}
+                        disabled={completeWorkoutMutation.isPending}
+                        className="flex-1"
+                      >
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                        Complete
+                      </Button>
+                      
+                      <Button 
+                        variant="outline" 
+                        onClick={handleSkipWorkout}
+                        disabled={completeWorkoutMutation.isPending}
+                      >
+                        <SkipForward className="w-4 h-4 mr-2" />
+                        Skip
+                      </Button>
+                      
+                      <Button 
+                        variant="outline" 
+                        onClick={handleShareWorkout}
+                      >
+                        <Share className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               </div>
             ) : (
-              <div className="text-center py-8">
-                <Dumbbell className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-foreground mb-2">No workout today</h3>
-                <p className="text-muted-foreground mb-4">
-                  Enjoy your rest day or check your program schedule.
+              <div className="p-6 text-center">
+                <Clock className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+                <h3 className="text-lg font-semibold text-foreground mb-2">No workout scheduled</h3>
+                <p className="text-muted-foreground text-sm mb-4">
+                  You're all caught up! Check back tomorrow for your next workout.
                 </p>
-                <Link href="/calendar">
-                  <Button variant="outline" size="sm">
-                    <Calendar className="h-4 w-4 mr-2" />
-                    View Calendar
+                <Link href="/random-workout">
+                  <Button variant="outline">
+                    <Dumbbell className="w-4 h-4 mr-2" />
+                    Try Random Workout
                   </Button>
                 </Link>
               </div>
             )}
           </CardContent>
         </Card>
-        
-        {/* Workout Actions - Only show if there's a workout */}
-        {todaysWorkout && (
-          <Card className="bg-card rounded-2xl shadow-lg border-0 mb-6">
-            <CardContent className="p-6">
-              {/* How did you feel in this workout? */}
-              <div className="mb-6">
-                <h3 className="text-lg font-semibold text-foreground mb-4">How did you feel in this workout?</h3>
-                
-                <div className="grid grid-cols-3 gap-2 mb-4">
-                  <Button 
-                    variant={selectedRating === 1 ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setSelectedRating(selectedRating === 1 ? null : 1)}
-                    className="text-xs"
-                  >
-                    Tough
-                  </Button>
-                  <Button 
-                    variant={selectedRating === 3 ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setSelectedRating(selectedRating === 3 ? null : 3)}
-                    className="text-xs"
-                  >
-                    Great
-                  </Button>
-                  <Button 
-                    variant={selectedRating === 5 ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setSelectedRating(selectedRating === 5 ? null : 5)}
-                    className="text-xs"
-                  >
-                    Amazing
-                  </Button>
-                </div>
-              </div>
-
-              {/* Notes section */}
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-foreground mb-2">Notes (optional)</label>
-                <Textarea
-                  value={workoutNotes}
-                  onChange={(e) => setWorkoutNotes(e.target.value)}
-                  placeholder="How did the workout go? Any comments?"
-                  className="min-h-[80px]"
-                />
-              </div>
-
-              {/* Action buttons */}
-              <div className="flex flex-col gap-3">
-                <Button
-                  onClick={handleCompleteWorkout}
-                  disabled={completeWorkoutMutation.isPending}
-                  className="w-full"
-                  size="lg"
-                >
-                  {completeWorkoutMutation.isPending ? (
-                    <div className="animate-spin w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full mr-2" />
-                  ) : (
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                  )}
-                  Complete Workout
-                </Button>
-                
-                <div className="flex gap-3">
-                  <Button
-                    variant="outline"
-                    onClick={handleSkipWorkout}
-                    disabled={completeWorkoutMutation.isPending}
-                    className="flex-1"
-                  >
-                    <SkipForward className="h-4 w-4 mr-2" />
-                    Skip Today
-                  </Button>
-                  
-                  <Button
-                    variant="outline"
-                    onClick={handleShareWorkout}
-                    className="flex-1"
-                  >
-                    <Share className="h-4 w-4 mr-2" />
-                    Share
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Quick Actions Grid */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          <Link href="/calendar">
-            <Card className="bg-card rounded-2xl shadow-lg border-0 cursor-pointer hover:shadow-xl transition-shadow">
-              <CardContent className="p-4 text-center">
-                <Calendar className="h-8 w-8 text-primary mx-auto mb-2" />
-                <h3 className="text-sm font-semibold text-foreground">Calendar</h3>
-                <p className="text-xs text-muted-foreground">View schedule</p>
-              </CardContent>
-            </Card>
-          </Link>
-          
-          <Link href="/random-workout">
-            <Card className="bg-card rounded-2xl shadow-lg border-0 cursor-pointer hover:shadow-xl transition-shadow">
-              <CardContent className="p-4 text-center">
-                <Dumbbell className="h-8 w-8 text-primary mx-auto mb-2" />
-                <h3 className="text-sm font-semibold text-foreground">Random</h3>
-                <p className="text-xs text-muted-foreground">Quick workout</p>
-              </CardContent>
-            </Card>
-          </Link>
-          
-          <Link href="/profile">
-            <Card className="bg-card rounded-2xl shadow-lg border-0 cursor-pointer hover:shadow-xl transition-shadow">
-              <CardContent className="p-4 text-center">
-                <User className="h-8 w-8 text-primary mx-auto mb-2" />
-                <h3 className="text-sm font-semibold text-foreground">Profile</h3>
-                <p className="text-xs text-muted-foreground">Your progress</p>
-              </CardContent>
-            </Card>
-          </Link>
-          
-          <Link href="/history">
-            <Card className="bg-card rounded-2xl shadow-lg border-0 cursor-pointer hover:shadow-xl transition-shadow">
-              <CardContent className="p-4 text-center">
-                <ClipboardList className="h-8 w-8 text-primary mx-auto mb-2" />
-                <h3 className="text-sm font-semibold text-foreground">History</h3>
-                <p className="text-xs text-muted-foreground">Past workouts</p>
-              </CardContent>
-            </Card>
-          </Link>
-        </div>
-
-        {/* Quick Stats Card */}
-        <Card className="bg-card rounded-2xl shadow-lg border-0 mb-6">
-          <CardContent className="p-6">
-            <h3 className="text-lg font-semibold text-foreground mb-4">This Week</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-primary">{weeklyCompletions?.length || 0}</div>
-                <div className="text-sm text-muted-foreground">Workouts</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-primary">{progress?.currentWeek || 1}</div>
-                <div className="text-sm text-muted-foreground">Week</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </main>
 
-      <div className="h-16"></div>
-      <BottomNav />
-
-      {/* Exercise Detail Dialog */}
+      {/* Exercise Detail Modal */}
       <Dialog open={isExerciseDetailOpen} onOpenChange={setIsExerciseDetailOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold">
-              {selectedExercise?.name || selectedExercise?.exercise || 'Exercise Details'}
-            </DialogTitle>
+            <DialogTitle>{selectedExercise?.name || selectedExercise?.exercise || 'Exercise Details'}</DialogTitle>
           </DialogHeader>
-          
-          <div className="space-y-4">
-            {selectedExercise?.description && selectedExercise.description !== selectedExercise.name && (
+          <div className="space-y-3">
+            {selectedExercise?.description && (
               <div>
-                <h4 className="font-semibold text-sm text-muted-foreground mb-1">DESCRIPTION</h4>
-                <p className="text-sm">{selectedExercise.description}</p>
+                <h4 className="font-medium text-sm text-foreground mb-1">Description</h4>
+                <p className="text-sm text-muted-foreground italic">{selectedExercise.description}</p>
               </div>
             )}
             
-            {/* Exercise Details Grid */}
             <div className="grid grid-cols-2 gap-4 text-sm">
               {selectedExercise?.sets && (
                 <div>
-                  <span className="font-semibold text-muted-foreground">Sets:</span>
-                  <p>{selectedExercise.sets}</p>
+                  <span className="font-medium text-foreground">Sets:</span>
+                  <span className="text-muted-foreground ml-1">{selectedExercise.sets}</span>
                 </div>
               )}
               {selectedExercise?.reps && (
                 <div>
-                  <span className="font-semibold text-muted-foreground">Reps:</span>
-                  <p>{selectedExercise.reps}</p>
+                  <span className="font-medium text-foreground">Reps:</span>
+                  <span className="text-muted-foreground ml-1">{selectedExercise.reps}</span>
                 </div>
               )}
               {selectedExercise?.duration && (
                 <div>
-                  <span className="font-semibold text-muted-foreground">Duration:</span>
-                  <p>{selectedExercise.duration}</p>
-                </div>
-              )}
-              {selectedExercise?.distance && (
-                <div>
-                  <span className="font-semibold text-muted-foreground">Distance:</span>
-                  <p>{selectedExercise.distance}</p>
+                  <span className="font-medium text-foreground">Duration:</span>
+                  <span className="text-muted-foreground ml-1">{selectedExercise.duration}</span>
                 </div>
               )}
               {selectedExercise?.weight && (
                 <div>
-                  <span className="font-semibold text-muted-foreground">Weight:</span>
-                  <p>{selectedExercise.weight}</p>
+                  <span className="font-medium text-foreground">Weight:</span>
+                  <span className="text-muted-foreground ml-1">{selectedExercise.weight}</span>
                 </div>
               )}
               {selectedExercise?.rpe && (
                 <div>
-                  <span className="font-semibold text-muted-foreground">RPE:</span>
-                  <p>{selectedExercise.rpe}</p>
+                  <span className="font-medium text-foreground">RPE:</span>
+                  <span className="text-muted-foreground ml-1">{selectedExercise.rpe}</span>
                 </div>
               )}
               {selectedExercise?.rest && (
                 <div>
-                  <span className="font-semibold text-muted-foreground">Rest:</span>
-                  <p>{selectedExercise.rest}</p>
-                </div>
-              )}
-              {selectedExercise?.tempo && (
-                <div>
-                  <span className="font-semibold text-muted-foreground">Tempo:</span>
-                  <p>{selectedExercise.tempo}</p>
-                </div>
-              )}
-              {selectedExercise?.intensity && (
-                <div>
-                  <span className="font-semibold text-muted-foreground">Intensity:</span>
-                  <p>{selectedExercise.intensity}</p>
-                </div>
-              )}
-              {selectedExercise?.pace && (
-                <div>
-                  <span className="font-semibold text-muted-foreground">Pace:</span>
-                  <p>{selectedExercise.pace}</p>
-                </div>
-              )}
-              {selectedExercise?.rounds && (
-                <div>
-                  <span className="font-semibold text-muted-foreground">Rounds:</span>
-                  <p>{selectedExercise.rounds}</p>
-                </div>
-              )}
-              {selectedExercise?.target && (
-                <div>
-                  <span className="font-semibold text-muted-foreground">Target:</span>
-                  <p>{selectedExercise.target}</p>
-                </div>
-              )}
-              {selectedExercise?.equipment && (
-                <div>
-                  <span className="font-semibold text-muted-foreground">Equipment:</span>
-                  <p>{selectedExercise.equipment}</p>
-                </div>
-              )}
-              {selectedExercise?.type && (
-                <div>
-                  <span className="font-semibold text-muted-foreground">Type:</span>
-                  <p>{selectedExercise.type}</p>
+                  <span className="font-medium text-foreground">Rest:</span>
+                  <span className="text-muted-foreground ml-1">{selectedExercise.rest}</span>
                 </div>
               )}
             </div>
             
-            <Button 
-              onClick={() => setIsExerciseDetailOpen(false)}
-              className="w-full"
-            >
-              Close
-            </Button>
+            {selectedExercise?.notes && (
+              <div>
+                <h4 className="font-medium text-sm text-foreground mb-1">Notes</h4>
+                <p className="text-sm text-muted-foreground italic">{selectedExercise.notes}</p>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
+
+      <BottomNav />
     </div>
   );
 }
