@@ -143,27 +143,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUser(userId);
       console.log("User found:", !!user);
       
-      // If user doesn't exist or doesn't have a program, return minimal data
-      if (!user || !user.currentProgramId) {
-        console.log("User has no current program, returning minimal dashboard data");
-        return res.json({
-          user: user || null,
-          progress: null,
-          todaysWorkout: null,
-          weeklyCompletions: [],
-          weightEntries: [],
-        });
-      }
-      
       const progress = await storage.getUserProgress(userId);
       console.log("Progress found:", !!progress, progress ? `Program ID: ${progress.programId}` : 'No progress');
       
-      // Only fetch today's workout if we have valid progress data
-      let todaysWorkout = null;
-      if (progress && progress.programId && progress.currentWeek && progress.currentDay) {
-        todaysWorkout = await storage.getTodaysWorkout(userId);
-        console.log("Today's workout found:", !!todaysWorkout);
-      }
+      const todaysWorkout = await storage.getTodaysWorkout(userId);
+      console.log("Today's workout found:", !!todaysWorkout);
       
       const weeklyCompletions = await storage.getWeeklyCompletions(userId);
       const weightEntries = await storage.getUserWeightEntries(userId);
@@ -192,33 +176,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/programs/current', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      
-      if (!user || !user.currentProgramId) {
-        return res.status(404).json({ message: "No current program found" });
-      }
-      
-      const program = await storage.getProgram(user.currentProgramId);
-      if (!program) {
-        return res.status(404).json({ message: "Program not found" });
-      }
-      
-      res.json(program);
-    } catch (error) {
-      console.error("Error fetching current program:", error);
-      res.status(500).json({ message: "Failed to fetch program" });
-    }
-  });
-
   app.get('/api/programs/:id', async (req, res) => {
     try {
       const programId = parseInt(req.params.id);
-      if (isNaN(programId)) {
-        return res.status(400).json({ message: "Invalid program ID" });
-      }
       const program = await storage.getProgram(programId);
       if (!program) {
         return res.status(404).json({ message: "Program not found" });
@@ -375,28 +335,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Workout routes
-  app.get('/api/workouts/today', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const todaysWorkout = await storage.getTodaysWorkout(userId);
-      
-      if (!todaysWorkout) {
-        return res.status(404).json({ message: "No workout found for today" });
-      }
-      
-      res.json(todaysWorkout);
-    } catch (error) {
-      console.error("Error fetching today's workout:", error);
-      res.status(500).json({ message: "Failed to fetch workout" });
-    }
-  });
-
   app.get('/api/workouts/:id', async (req, res) => {
     try {
       const workoutId = parseInt(req.params.id);
-      if (isNaN(workoutId)) {
-        return res.status(400).json({ message: "Invalid workout ID" });
-      }
       const workout = await storage.getWorkout(workoutId);
       if (!workout) {
         return res.status(404).json({ message: "Workout not found" });

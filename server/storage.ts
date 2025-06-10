@@ -163,10 +163,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getProgram(id: number): Promise<Program | undefined> {
-    if (isNaN(id) || id <= 0) {
-      console.error("Invalid program ID:", id);
-      return undefined;
-    }
     const [program] = await db.select().from(programs).where(eq(programs.id, id));
     return program;
   }
@@ -199,10 +195,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getWorkout(id: number): Promise<Workout | undefined> {
-    if (isNaN(id) || id <= 0) {
-      console.error("Invalid workout ID:", id);
-      return undefined;
-    }
     const [workout] = await db.select().from(workouts).where(eq(workouts.id, id));
     return workout;
   }
@@ -210,19 +202,16 @@ export class DatabaseStorage implements IStorage {
   async getTodaysWorkout(userId: string): Promise<Workout | undefined> {
     // Get user's current progress
     const progress = await this.getUserProgress(userId);
-    if (!progress || !progress.programId || !progress.currentWeek || !progress.currentDay) {
-      return undefined;
-    }
+    if (!progress) return undefined;
 
-    // Validate progress values
-    const currentWeek = progress.currentWeek;
-    const currentDay = progress.currentDay;
-    const programId = progress.programId;
+    // Calculate which workout should be shown today based on schedule
+    let currentWeek = progress.currentWeek;
+    let currentDay = progress.currentDay;
 
-    if (isNaN(programId) || isNaN(currentWeek) || isNaN(currentDay)) {
-      console.error("Invalid progress data for user:", userId, { programId, currentWeek, currentDay });
-      return undefined;
-    }
+    // Use the stored progress values directly - they are already calculated correctly
+    // when the program is scheduled, taking into account event dates
+    currentWeek = progress.currentWeek;
+    currentDay = progress.currentDay;
 
     // Find the workout for calculated week and day
     const [workout] = await db
@@ -230,7 +219,7 @@ export class DatabaseStorage implements IStorage {
       .from(workouts)
       .where(
         and(
-          eq(workouts.programId, programId),
+          eq(workouts.programId, progress.programId),
           eq(workouts.week, currentWeek),
           eq(workouts.day, currentDay)
         )
