@@ -176,6 +176,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/programs/current', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.currentProgramId) {
+        return res.status(404).json({ message: "No current program found" });
+      }
+      
+      const program = await storage.getProgram(user.currentProgramId);
+      if (!program) {
+        return res.status(404).json({ message: "Program not found" });
+      }
+      
+      const workouts = await storage.getWorkoutsByProgram(user.currentProgramId);
+      res.json({ ...program, workouts });
+    } catch (error) {
+      console.error("Error fetching current program:", error);
+      res.status(500).json({ message: "Failed to fetch current program" });
+    }
+  });
+
   app.get('/api/programs/:id', async (req, res) => {
     try {
       const programId = parseInt(req.params.id);
@@ -338,6 +360,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Workout routes
+  app.get('/api/workouts/today', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const progress = await storage.getUserProgress(userId);
+      
+      if (!user?.currentProgramId || !progress) {
+        return res.status(404).json({ message: "No current workout found" });
+      }
+      
+      const workouts = await storage.getWorkoutsByProgram(user.currentProgramId);
+      const currentWeek = progress.currentWeek || 1;
+      const currentDay = progress.currentDay || 1;
+      
+      // Find today's workout
+      const todaysWorkout = workouts.find(w => w.week === currentWeek && w.day === currentDay);
+      
+      if (!todaysWorkout) {
+        return res.status(404).json({ message: "No workout found for today" });
+      }
+      
+      res.json(todaysWorkout);
+    } catch (error) {
+      console.error("Error fetching today's workout:", error);
+      res.status(500).json({ message: "Failed to fetch workout" });
+    }
+  });
+
   app.get('/api/workouts/:id', async (req, res) => {
     try {
       const workoutId = parseInt(req.params.id);
