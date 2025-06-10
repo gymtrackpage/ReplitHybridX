@@ -176,6 +176,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/programs/current', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const progress = await storage.getUserProgress(userId);
+      if (!progress) {
+        return res.json(null);
+      }
+      
+      const program = await storage.getProgram(progress.programId);
+      if (!program) {
+        return res.json(null);
+      }
+      
+      const workouts = await storage.getWorkoutsByProgram(progress.programId);
+      res.json({ ...program, workouts });
+    } catch (error) {
+      console.error("Error fetching current program:", error);
+      res.status(500).json({ message: "Failed to fetch current program" });
+    }
+  });
+
   app.get('/api/programs/:id', async (req, res) => {
     try {
       const programId = parseInt(req.params.id);
@@ -338,6 +359,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Workout routes
+  app.get('/api/workouts/today', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const todaysWorkout = await storage.getTodaysWorkout(userId);
+      res.json(todaysWorkout);
+    } catch (error) {
+      console.error("Error fetching today's workout:", error);
+      res.status(500).json({ message: "Failed to fetch today's workout" });
+    }
+  });
+
   app.get('/api/workouts/:id', async (req, res) => {
     try {
       const workoutId = parseInt(req.params.id);
