@@ -27,7 +27,7 @@ export function getSession() {
   const pgStore = connectPg(session);
   const sessionStore = new pgStore({
     conString: process.env.DATABASE_URL,
-    createTableIfMissing: false,
+    createTableIfMissing: true,
     ttl: sessionTtl,
     tableName: "sessions",
   });
@@ -98,14 +98,23 @@ export async function setupAuth(app: Express) {
     passport.use(strategy);
   }
 
+  // Add localhost strategy for development
+  const localhostStrategy = new Strategy(
+    {
+      name: `replitauth:localhost`,
+      config,
+      scope: "openid email profile offline_access",
+      callbackURL: `https://${process.env.REPLIT_DOMAINS!.split(",")[0]}/api/callback`,
+    },
+    verify,
+  );
+  passport.use(localhostStrategy);
+
   passport.serializeUser((user: Express.User, cb) => cb(null, user));
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
   app.get("/api/login", (req, res, next) => {
-    // Use the first domain from REPLIT_DOMAINS for localhost requests
-    const hostname = req.hostname === 'localhost' ? 
-      process.env.REPLIT_DOMAINS!.split(",")[0] : 
-      req.hostname;
+    const hostname = req.hostname;
     
     passport.authenticate(`replitauth:${hostname}`, {
       prompt: "login consent",

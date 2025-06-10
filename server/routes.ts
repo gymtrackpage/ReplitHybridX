@@ -179,6 +179,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/programs/:id', async (req, res) => {
     try {
       const programId = parseInt(req.params.id);
+      if (isNaN(programId)) {
+        return res.status(400).json({ message: "Invalid program ID" });
+      }
       const program = await storage.getProgram(programId);
       if (!program) {
         return res.status(404).json({ message: "Program not found" });
@@ -338,6 +341,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/workouts/:id', async (req, res) => {
     try {
       const workoutId = parseInt(req.params.id);
+      if (isNaN(workoutId)) {
+        return res.status(400).json({ message: "Invalid workout ID" });
+      }
       const workout = await storage.getWorkout(workoutId);
       if (!workout) {
         return res.status(404).json({ message: "Workout not found" });
