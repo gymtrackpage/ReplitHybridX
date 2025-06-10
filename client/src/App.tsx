@@ -1,17 +1,41 @@
-import { useState } from "react";
+import React, { useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import LoginPage from './pages/LoginPage';
+import Dashboard from './pages/Dashboard';
+import { useAuth } from './hooks/useAuth';
 
 function App() {
-  const [count, setCount] = useState(0);
+  return (
+    <Router>
+      <div className="min-h-screen bg-gray-50">
+        <AppRoutes />
+      </div>
+    </Router>
+  );
+}
+
+function AppRoutes() {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   return (
-    <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-      <h1>React Test</h1>
-      <p>Count: {count}</p>
-      <button onClick={() => setCount(count + 1)}>
-        Increment
-      </button>
-      <p>If you can see this and the button works, React hooks are functioning properly.</p>
-    </div>
+    <Routes>
+      <Route 
+        path="/" 
+        element={isAuthenticated ? <Navigate to="/dashboard" /> : <LoginPage />} 
+      />
+      <Route 
+        path="/dashboard" 
+        element={isAuthenticated ? <Dashboard /> : <Navigate to="/" />} 
+      />
+    </Routes>
   );
 }
 
