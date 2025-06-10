@@ -375,6 +375,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Workout routes
+  app.get('/api/workouts/today', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const todaysWorkout = await storage.getTodaysWorkout(userId);
+      
+      if (!todaysWorkout) {
+        return res.status(404).json({ message: "No workout found for today" });
+      }
+      
+      res.json(todaysWorkout);
+    } catch (error) {
+      console.error("Error fetching today's workout:", error);
+      res.status(500).json({ message: "Failed to fetch workout" });
+    }
+  });
+
   app.get('/api/workouts/:id', async (req, res) => {
     try {
       const workoutId = parseInt(req.params.id);
