@@ -112,46 +112,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // User stats
-  app.get('/api/users/stats', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const progress = await storage.getUserProgress(userId);
-      const user = await storage.getUser(userId);
-      const completions = await storage.getWorkoutCompletions(userId);
-      
-      // Calculate current streak
-      let currentStreak = 0;
-      if (completions.length > 0) {
-        const today = new Date();
-        const yesterday = new Date(today);
-        yesterday.setDate(yesterday.getDate() - 1);
-        
-        const recentCompletions = completions.filter(completion => {
-          const completionDate = new Date(completion.completedAt);
-          return completionDate >= yesterday;
-        });
-        
-        currentStreak = recentCompletions.length;
-      }
-      
-      // Calculate weekly progress
-      const weeklyProgress = progress && progress.totalWorkouts 
-        ? (progress.completedWorkouts / progress.totalWorkouts) * 100 
-        : 0;
-      
-      res.json({
-        completedWorkouts: progress?.completedWorkouts || 0,
-        totalWorkouts: progress?.totalWorkouts || 0,
-        currentStreak: currentStreak,
-        weeklyProgress: Math.min(weeklyProgress, 100)
-      });
-    } catch (error) {
-      console.error("Error fetching user stats:", error);
-      res.status(500).json({ message: "Failed to fetch user stats" });
-    }
-  });
-
   // User profile with assessment data
   app.get('/api/profile', isAuthenticated, async (req: any, res) => {
     try {
@@ -216,35 +176,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get current user's program
-  app.get('/api/programs/current', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const progress = await storage.getUserProgress(userId);
-      
-      if (!progress || !progress.programId) {
-        return res.json(null);
-      }
-      
-      const program = await storage.getProgram(progress.programId);
-      if (!program) {
-        return res.json(null);
-      }
-      
-      res.json(program);
-    } catch (error) {
-      console.error("Error fetching current program:", error);
-      res.status(500).json({ message: "Failed to fetch program" });
-    }
-  });
-
   app.get('/api/programs/:id', async (req, res) => {
     try {
       const programId = parseInt(req.params.id);
-      if (isNaN(programId)) {
-        return res.status(400).json({ message: "Invalid program ID" });
-      }
-      
       const program = await storage.getProgram(programId);
       if (!program) {
         return res.status(404).json({ message: "Program not found" });
@@ -401,34 +335,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Workout routes
-  app.get('/api/workouts/today', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const progress = await storage.getUserProgress(userId);
-      
-      if (!progress || !progress.programId) {
-        return res.json([]);
-      }
-      
-      const todaysWorkout = await storage.getTodaysWorkout(userId);
-      if (!todaysWorkout) {
-        return res.json([]);
-      }
-      
-      res.json([todaysWorkout]);
-    } catch (error) {
-      console.error("Error fetching today's workouts:", error);
-      res.status(500).json({ message: "Failed to fetch workouts" });
-    }
-  });
-
   app.get('/api/workouts/:id', async (req, res) => {
     try {
       const workoutId = parseInt(req.params.id);
-      if (isNaN(workoutId)) {
-        return res.status(400).json({ message: "Invalid workout ID" });
-      }
-      
       const workout = await storage.getWorkout(workoutId);
       if (!workout) {
         return res.status(404).json({ message: "Workout not found" });

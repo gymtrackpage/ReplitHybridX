@@ -1,59 +1,86 @@
-import React from 'react';
+import { Button } from "@/components/ui/button";
+import { Link, useLocation } from "wouter";
+import { useAuth } from "@/hooks/useAuth";
+import { Home, Calendar, Scale, User as UserIcon, Target, Shuffle } from "lucide-react";
 
-interface BottomNavProps {
-  activeTab: string;
-  onTabChange: (tab: string) => void;
-}
+export default function BottomNav() {
+  const [location] = useLocation();
+  const { user } = useAuth();
 
-export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
-  const tabs = [
-    { id: 'dashboard', label: 'Dashboard', icon: '🏠' },
-    { id: 'programs', label: 'Programs', icon: '💪' },
-    { id: 'workouts', label: 'Workouts', icon: '🏃' },
-    { id: 'calendar', label: 'Calendar', icon: '📅' },
-    { id: 'profile', label: 'Profile', icon: '👤' }
+  const navItems = [
+    { path: "/", icon: Home, label: "Home" },
+    { path: "/calendar", icon: Calendar, label: "Calendar" },
+    { path: "/weight-tracker", icon: Scale, label: "Weight" },
+    { path: "/profile", icon: UserIcon, label: "Profile" },
   ];
 
   return (
-    <nav style={{
-      position: 'fixed',
-      bottom: 0,
-      left: 0,
-      right: 0,
-      backgroundColor: 'white',
-      borderTop: '1px solid #e5e7eb',
-      padding: '8px 0',
-      zIndex: 50
-    }}>
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-around',
-        maxWidth: '640px',
-        margin: '0 auto'
-      }}>
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => onTabChange(tab.id)}
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              padding: '8px 12px',
-              border: 'none',
-              background: 'none',
-              cursor: 'pointer',
-              color: activeTab === tab.id ? '#3b82f6' : '#6b7280',
-              fontSize: '12px'
-            }}
-          >
-            <span style={{ fontSize: '20px', marginBottom: '4px' }}>
-              {tab.icon}
-            </span>
-            <span>{tab.label}</span>
-          </button>
-        ))}
+    <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50">
+      <div className="relative">
+        {/* Main Navigation with Center Gap */}
+        <div className="flex justify-between items-center px-2 py-2">
+          {/* Left side - First 2 items */}
+          <div className="flex flex-1 justify-around">
+            {navItems.slice(0, 2).map(({ path, icon: Icon, label }) => {
+              const isActive = location === path || (path !== "/" && location.startsWith(path));
+              return (
+                <Link key={path} href={path}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={`flex flex-col items-center gap-1 h-auto py-2 px-1 ${
+                      isActive ? "text-yellow-600 bg-yellow-50" : "text-gray-600"
+                    }`}
+                  >
+                    <Icon className="h-5 w-5" />
+                    <span className="text-xs">{label}</span>
+                  </Button>
+                </Link>
+              );
+            })}
+          </div>
+          
+          {/* Center spacer for floating button */}
+          <div className="w-16"></div>
+          
+          {/* Right side - Last 2 items */}
+          <div className="flex flex-1 justify-around">
+            {navItems.slice(2, 4).map(({ path, icon: Icon, label }) => {
+              const isActive = location === path || (path !== "/" && location.startsWith(path));
+              return (
+                <Link key={path} href={path}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={`flex flex-col items-center gap-1 h-auto py-2 px-1 ${
+                      isActive ? "text-yellow-600 bg-yellow-50" : "text-gray-600"
+                    }`}
+                  >
+                    <Icon className="h-5 w-5" />
+                    <span className="text-xs">{label}</span>
+                  </Button>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+        
+        {/* Floating Action Button */}
+        <div className="absolute top-[-28px] left-1/2 transform -translate-x-1/2">
+          <Link href="/random-workout">
+            <Button
+              size="lg"
+              className={`w-14 h-14 rounded-full shadow-lg border-4 border-white ${
+                location === "/random-workout"
+                  ? "bg-yellow-400 hover:bg-yellow-500"
+                  : "bg-yellow-400 hover:bg-yellow-500"
+              }`}
+            >
+              <Shuffle className="h-6 w-6 text-black" />
+            </Button>
+          </Link>
+        </div>
       </div>
-    </nav>
+    </div>
   );
 }
