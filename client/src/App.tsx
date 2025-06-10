@@ -100,13 +100,7 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <Toaster />
-      <PWAInstallPrompt />
-      {showSplash ? (
-        <SplashScreen onComplete={() => setShowSplash(false)} />
-      ) : (
-        <Router />
-      )}
+      <Router />
     </QueryClientProvider>
   );
 }
