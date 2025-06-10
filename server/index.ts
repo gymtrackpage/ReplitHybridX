@@ -38,11 +38,17 @@ app.use((req, res, next) => {
 
 async function startServer() {
   try {
-    // Check for required environment variables
+    // Check for required environment variables with better error handling
     if (!process.env.DATABASE_URL) {
       console.error("❌ DATABASE_URL environment variable is not set");
       console.error("📋 For deployment, ensure DATABASE_URL is configured as a production secret");
       console.error("🔧 Add DATABASE_URL to your deployment environment variables");
+      
+      // In production, wait a bit to help with deployment diagnostics
+      if (process.env.NODE_ENV === "production") {
+        console.error("⏳ Waiting 30 seconds before exit to allow deployment logs to be captured...");
+        await new Promise(resolve => setTimeout(resolve, 30000));
+      }
       process.exit(1);
     }
 
@@ -72,10 +78,9 @@ async function startServer() {
       serveStatic(app);
     }
 
-    // ALWAYS serve the app on port 5000
-    // this serves both the API and the client.
-    // It is the only port that is not firewalled.
-    const port = 5000;
+    // Use PORT environment variable for deployment compatibility
+    // Default to 5000 for local development
+    const port = parseInt(process.env.PORT || "5000", 10);
     server.listen({
       port,
       host: "0.0.0.0",
@@ -83,6 +88,7 @@ async function startServer() {
     }, () => {
       log(`🚀 Server running on port ${port}`);
       console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`📡 Server listening on http://0.0.0.0:${port}`);
     });
 
   } catch (error) {

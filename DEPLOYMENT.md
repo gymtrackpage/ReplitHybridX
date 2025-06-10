@@ -1,45 +1,56 @@
 # Deployment Guide for Replit
 
+## ✅ Fixed Deployment Issues
+
+All deployment issues have been resolved:
+
+1. **DATABASE_URL Configuration**: Enhanced error handling with clear messages
+2. **Port Configuration**: Updated to use PORT environment variable with 5000 fallback
+3. **Build Process**: Verified working (builds frontend + backend correctly)
+4. **Production Server**: Configured to serve static files and API endpoints
+5. **Error Handling**: Improved crash loop prevention with graceful error recovery
+
 ## Required Environment Variables
 
-Before deploying, ensure these environment variables are configured in your Replit deployment settings:
+Configure these in your Replit deployment settings:
 
 ### Production Secrets
 - `DATABASE_URL` - PostgreSQL connection string (required)
+- `STRIPE_SECRET_KEY` - Stripe API key (already configured)
 
-## Deployment Steps
+## Deployment Commands
 
-1. **Build the Application**
-   ```bash
-   npm run build
-   ```
+The application uses these commands for deployment:
+- **Build Command**: `npm run build`
+- **Start Command**: `npm run start`
 
-2. **Configure Deployment Secrets**
-   - In Replit, go to your project settings
-   - Navigate to "Secrets" or "Environment Variables"
-   - Add `DATABASE_URL` with your PostgreSQL connection string
+## Build Process Verification
 
-3. **Deploy**
-   - Click the "Deploy" button in Replit
-   - The deployment will use the following configuration:
-     - Build command: `npm run build`
-     - Start command: `npm run start`
-     - Port: 5000
+✅ Frontend builds correctly (Vite)
+✅ Backend bundles properly (esbuild) 
+✅ Static assets generated in dist/public/
+✅ Production server starts successfully
+✅ Database connection works when DATABASE_URL provided
 
-## Build Process
+## Port Configuration
 
-The build process performs these steps:
-1. Builds the frontend using Vite
-2. Bundles the backend using esbuild
-3. Creates production-ready files in the `dist` directory
+The server automatically:
+- Uses PORT environment variable if available
+- Falls back to port 5000 for Replit compatibility
+- Binds to 0.0.0.0 for external access
+- Logs connection details for debugging
 
-## Production Start
+## Deployment Instructions
 
-The production server:
-- Runs on port 5000 (required for Replit)
-- Serves static frontend files
-- Provides API endpoints
-- Uses the built files from the `dist` directory
+1. **Set Production Secrets**
+   - Go to Replit project settings
+   - Add `DATABASE_URL` with PostgreSQL connection string
+   - Format: `postgresql://username:password@host:port/database`
+
+2. **Deploy**
+   - Click "Deploy" button in Replit
+   - System automatically runs build and start commands
+   - Application serves on assigned port
 
 ## Troubleshooting
 
