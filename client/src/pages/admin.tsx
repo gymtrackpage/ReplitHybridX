@@ -794,7 +794,7 @@ export default function AdminPanel() {
                             <p className="text-sm font-medium text-foreground">
                               {exercise.name || exercise.exercise || `Exercise ${index + 1}`}
                             </p>
-                            {(exercise.sets || exercise.reps || exercise.duration || exercise.distance || exercise.weight || exercise.rpe || exercise.rest || exercise.tempo || exercise.type || exercise.intensity || exercise.pace || exercise.rounds || exercise.target || exercise.equipment || exercise.load || exercise.zone || exercise.cadence) && (
+                            {(exercise.sets || exercise.reps || exercise.duration || exercise.distance || exercise.weight || exercise.rpe || exercise.rest || exercise.tempo || exercise.type || exercise.intensity || exercise.pace || exercise.rounds || exercise.target || exercise.equipment) && (
                               <p className="text-xs text-muted-foreground mt-1">
                                 {exercise.sets && `${exercise.sets} sets`}
                                 {exercise.sets && exercise.reps && ' × '}
@@ -802,15 +802,12 @@ export default function AdminPanel() {
                                 {exercise.duration && ` • ${exercise.duration}`}
                                 {exercise.distance && ` • ${exercise.distance}`}
                                 {exercise.weight && ` • ${exercise.weight}`}
-                                {exercise.load && ` • Load: ${exercise.load}`}
                                 {exercise.rpe && ` • RPE ${exercise.rpe}`}
                                 {exercise.rest && ` • Rest: ${exercise.rest}`}
                                 {exercise.tempo && ` • Tempo: ${exercise.tempo}`}
                                 {exercise.type && ` • ${exercise.type}`}
                                 {exercise.intensity && ` • ${exercise.intensity}`}
                                 {exercise.pace && ` • Pace: ${exercise.pace}`}
-                                {exercise.zone && ` • Zone: ${exercise.zone}`}
-                                {exercise.cadence && ` • Cadence: ${exercise.cadence}`}
                                 {exercise.rounds && ` • ${exercise.rounds} rounds`}
                                 {exercise.target && ` • Target: ${exercise.target}`}
                                 {exercise.equipment && ` • Equipment: ${exercise.equipment}`}
