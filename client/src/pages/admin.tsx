@@ -611,7 +611,7 @@ export default function AdminPanel() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {users?.map((user: User) => (
+                      {(users as User[])?.map((user: User) => (
                         <TableRow key={user.id}>
                           <TableCell>
                             <div>

@@ -96,10 +96,10 @@ export default function Dashboard() {
   };
 
   const handleCompleteWorkout = () => {
-    if (!dashboardData?.todaysWorkout?.id) return;
+    if (!(dashboardData as any)?.todaysWorkout?.id) return;
     
     completeWorkoutMutation.mutate({
-      workoutId: dashboardData.todaysWorkout.id,
+      workoutId: (dashboardData as any).todaysWorkout.id,
       rating: selectedRating || undefined,
       notes: workoutNotes.trim() || undefined,
       skipped: false
@@ -107,10 +107,10 @@ export default function Dashboard() {
   };
 
   const handleSkipWorkout = () => {
-    if (!dashboardData?.todaysWorkout?.id) return;
+    if (!(dashboardData as any)?.todaysWorkout?.id) return;
     
     completeWorkoutMutation.mutate({
-      workoutId: dashboardData.todaysWorkout.id,
+      workoutId: (dashboardData as any).todaysWorkout.id,
       skipped: true
     });
   };
