@@ -119,7 +119,7 @@ export default function AdminPanel() {
 
   // Redirect if not authenticated or not admin
   useEffect(() => {
-    if (!authLoading && (!isAuthenticated || !(user as any)?.isAdmin)) {
+    if (!authLoading && (!isAuthenticated || !user?.isAdmin)) {
       toast({
         title: "Access Denied",
         description: "Admin access required",
@@ -134,7 +134,7 @@ export default function AdminPanel() {
   // Fetch admin data
   const { data: programs, isLoading: programsLoading } = useQuery({
     queryKey: ["/api/admin/programs"],
-    enabled: isAuthenticated && (user as any)?.isAdmin,
+    enabled: isAuthenticated && user?.isAdmin,
     retry: (failureCount, error) => {
       if (isUnauthorizedError(error as Error)) {
         return false;
@@ -145,7 +145,7 @@ export default function AdminPanel() {
 
   const { data: users, isLoading: usersLoading } = useQuery({
     queryKey: ["/api/admin/users"],
-    enabled: isAuthenticated && (user as any)?.isAdmin,
+    enabled: isAuthenticated && user?.isAdmin,
     retry: (failureCount, error) => {
       if (isUnauthorizedError(error as Error)) {
         return false;
@@ -351,7 +351,7 @@ export default function AdminPanel() {
     });
   };
 
-  if (authLoading || !isAuthenticated || !(user as any)?.isAdmin) {
+  if (authLoading || !isAuthenticated || !user?.isAdmin) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
@@ -415,7 +415,7 @@ export default function AdminPanel() {
               </div>
             ) : (
               <div className="grid gap-4">
-                {(programs as Program[])?.map((program: Program) => {
+                {programs?.map((program: Program) => {
                   const isExpanded = expandedPrograms.has(program.id);
                   return (
                     <Card key={program.id} className="bg-white">
@@ -611,7 +611,7 @@ export default function AdminPanel() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {(users as User[])?.map((user: User) => (
+                      {users?.map((user: User) => (
                         <TableRow key={user.id}>
                           <TableCell>
                             <div>
