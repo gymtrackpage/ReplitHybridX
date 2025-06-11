@@ -391,7 +391,16 @@ export default function Calendar() {
                 </div>
               )}
 
-              <div className="flex justify-end">
+              <div className="flex justify-between items-center">
+                {selectedWorkout.completion && (
+                  <PushToStravaButton
+                    workoutId={selectedWorkout.id}
+                    workoutName={selectedWorkout.name}
+                    isCompleted={selectedWorkout.status === 'completed'}
+                    size="sm"
+                    variant="outline"
+                  />
+                )}
                 <Button onClick={() => setIsDetailModalOpen(false)}>
                   Close
                 </Button>
