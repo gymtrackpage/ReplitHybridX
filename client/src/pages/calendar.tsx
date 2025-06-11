@@ -12,6 +12,7 @@ import BottomNav from "@/components/BottomNav";
 import Header from "@/components/Header";
 import { CheckCircle, Clock, SkipForward, Star, Calendar as CalendarIcon, ChevronLeft, ChevronRight, Dumbbell } from "lucide-react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameDay, parseISO, isToday, isBefore, isAfter } from "date-fns";
+import PushToStravaButton from "@/components/PushToStravaButton";
 
 interface WorkoutCompletion {
   id: number;

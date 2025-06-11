@@ -1445,7 +1445,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const workoutData = {
         name: workout.name,
         description: workout.description || `${workout.name} - Hybrid X Training`,
-        duration: completion.duration || workout.duration * 60, // Convert minutes to seconds
+        duration: completion.duration || (workout.estimatedDuration || 60) * 60, // Convert minutes to seconds
         type: 'workout' as const,
         start_date_local: completion.completedAt ? 
           completion.completedAt.toISOString() : 

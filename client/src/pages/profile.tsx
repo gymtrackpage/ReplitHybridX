@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dumbbell, Calendar as CalendarIcon, User, Calendar, MapPin, Clock, Target, Mail, MessageSquare } from "lucide-react";
 import { format } from "date-fns";
+import StravaIntegration from "@/components/StravaIntegration";
 
 export default function Profile() {
   const { user, isLoading: authLoading, isAuthenticated } = useAuth();
@@ -329,6 +330,9 @@ export default function Profile() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Strava Integration */}
+        <StravaIntegration />
 
         {/* Contact Support */}
         <Card className="bg-white rounded-2xl shadow-sm border-0">
