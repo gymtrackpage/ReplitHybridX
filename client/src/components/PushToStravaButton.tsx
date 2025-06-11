@@ -1,3 +1,4 @@
+import React from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -52,7 +53,7 @@ export default function PushToStravaButton({
   });
 
   // Don't show button if not connected to Strava or workout not completed
-  if (!stravaStatus?.connected || !isCompleted) {
+  if (!(stravaStatus?.connected || false) || !isCompleted) {
     return null;
   }
 

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ExternalLink, Unlink, Activity } from "lucide-react";
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 
 export default function StravaIntegration() {
   const { toast } = useToast();
@@ -104,7 +104,7 @@ export default function StravaIntegration() {
     );
   }
 
-  const isConnected = stravaStatus?.connected;
+  const isConnected = (stravaStatus as any)?.connected || false;
 
   return (
     <Card className="bg-white rounded-2xl shadow-sm border-0 mb-6">
