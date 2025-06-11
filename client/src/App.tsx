@@ -1,27 +1,26 @@
-
 import { Switch, Route } from "wouter";
-import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { useAuth } from "@/hooks/useAuth";
+import { queryClient } from "./lib/queryClient";
+import { useAuth } from "./hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
-import Landing from "@/pages/landing";
-import Dashboard from "@/pages/dashboard";
-import Admin from "@/pages/admin";
-import Subscribe from "@/pages/subscribe";
-import SubscriptionChoice from "@/pages/subscription-choice";
-import EnhancedAssessment from "@/pages/enhanced-assessment";
-import RandomWorkout from "@/pages/random-workout";
-import Calendar from "@/pages/calendar";
-import Profile from "@/pages/profile";
-import WeightTracker from "@/pages/weight-tracker";
-import Programs from "@/pages/programs";
-import NotFound from "@/pages/not-found";
-import { Toaster } from "@/components/ui/toaster";
+
+// Pages
+import Landing from "./pages/landing";
+import Dashboard from "./pages/dashboard";
+import Admin from "./pages/admin";
+import Subscribe from "./pages/subscribe";
+import SubscriptionChoice from "./pages/subscription-choice";
+import EnhancedAssessment from "./pages/enhanced-assessment";
+import RandomWorkout from "./pages/random-workout";
+import Calendar from "./pages/calendar";
+import Profile from "./pages/profile";
+import WeightTracker from "./pages/weight-tracker";
+import Programs from "./pages/programs";
+import NotFound from "./pages/not-found";
 
 function Router() {
-  const { isAuthenticated, isLoading, user } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   
-  // Get user assessment and subscription status
   const { data: userStatus, isLoading: statusLoading } = useQuery({
     queryKey: ["/api/user-onboarding-status"],
     enabled: isAuthenticated,
@@ -36,7 +35,6 @@ function Router() {
     );
   }
 
-  // If not authenticated, show landing page
   if (!isAuthenticated) {
     return (
       <Switch>
@@ -46,7 +44,6 @@ function Router() {
     );
   }
 
-  // If authenticated but assessment not completed, redirect to assessment
   if (userStatus && !(userStatus as any).assessmentCompleted) {
     return (
       <Switch>
@@ -59,7 +56,6 @@ function Router() {
     );
   }
 
-  // If assessment completed but no subscription choice made, redirect to subscription choice
   if (userStatus && (userStatus as any).assessmentCompleted && (userStatus as any).subscriptionStatus === "none") {
     return (
       <Switch>
@@ -73,7 +69,6 @@ function Router() {
     );
   }
 
-  // Full app access for users who completed onboarding
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
@@ -92,15 +87,10 @@ function Router() {
   );
 }
 
-function App() {
+export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="min-h-screen bg-background">
-        <Router />
-        <Toaster />
-      </div>
+      <Router />
     </QueryClientProvider>
   );
 }
-
-export default App;
