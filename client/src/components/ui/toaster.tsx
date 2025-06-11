@@ -1,8 +1,18 @@
+"use client"
 
-import { useToast } from "@/hooks/use-toast";
+import React from "react"
+import {
+  Toast,
+  ToastClose,
+  ToastDescription,
+  ToastProvider,
+  ToastTitle,
+  ToastViewport,
+} from "@/components/ui/toast"
+import { useToast } from "@/hooks/use-toast"
 
 export function Toaster() {
-  const { toasts, dismiss } = useToast();
+  const { toasts } = useToast()
 
   return (
     <div className="fixed top-0 right-0 z-[100] p-4 space-y-2">

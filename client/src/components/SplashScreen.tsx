@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import splashImage from "@assets/Untitled design_20250607_123901_0000_1749296362573.png";
 
 interface SplashScreenProps {
