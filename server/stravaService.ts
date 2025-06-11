@@ -1,18 +1,15 @@
-import strava from 'strava-v3';
+import axios from 'axios';
 import { storage } from './storage';
 
 if (!process.env.STRAVA_CLIENT_ID || !process.env.STRAVA_CLIENT_SECRET) {
   throw new Error('STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET environment variables must be set');
 }
 
-strava.config({
-  access_token: 'your_access_token',
-  client_id: process.env.STRAVA_CLIENT_ID,
-  client_secret: process.env.STRAVA_CLIENT_SECRET,
-  redirect_uri: process.env.REPLIT_DOMAINS ? 
-    `https://${process.env.REPLIT_DOMAINS.split(',')[0]}/api/strava/callback` : 
-    'http://localhost:5000/api/strava/callback'
-});
+const STRAVA_BASE_URL = 'https://www.strava.com/api/v3';
+const STRAVA_AUTH_URL = 'https://www.strava.com/oauth/token';
+const REDIRECT_URI = process.env.REPLIT_DOMAINS ? 
+  `https://${process.env.REPLIT_DOMAINS.split(',')[0]}/api/strava/callback` : 
+  'http://localhost:5000/api/strava/callback';
 
 export interface StravaTokens {
   access_token: string;
@@ -36,33 +33,47 @@ export interface WorkoutData {
 
 export class StravaService {
   static getAuthorizationUrl(): string {
-    return strava.oauth.getRequestAccessURL({
+    const params = new URLSearchParams({
+      client_id: process.env.STRAVA_CLIENT_ID!,
+      response_type: 'code',
+      redirect_uri: REDIRECT_URI,
+      approval_prompt: 'force',
       scope: 'activity:write'
     });
+    
+    return `https://www.strava.com/oauth/authorize?${params.toString()}`;
   }
 
   static async exchangeCodeForTokens(code: string): Promise<StravaTokens> {
-    return new Promise((resolve, reject) => {
-      strava.oauth.getToken(code, (err: any, payload: StravaTokens) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(payload);
-        }
+    try {
+      const response = await axios.post(STRAVA_AUTH_URL, {
+        client_id: process.env.STRAVA_CLIENT_ID,
+        client_secret: process.env.STRAVA_CLIENT_SECRET,
+        code,
+        grant_type: 'authorization_code'
       });
-    });
+
+      return response.data;
+    } catch (error) {
+      console.error('Failed to exchange code for tokens:', error);
+      throw error;
+    }
   }
 
   static async refreshAccessToken(refreshToken: string): Promise<StravaTokens> {
-    return new Promise((resolve, reject) => {
-      strava.oauth.refreshToken(refreshToken, (err: any, payload: StravaTokens) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(payload);
-        }
+    try {
+      const response = await axios.post(STRAVA_AUTH_URL, {
+        client_id: process.env.STRAVA_CLIENT_ID,
+        client_secret: process.env.STRAVA_CLIENT_SECRET,
+        refresh_token: refreshToken,
+        grant_type: 'refresh_token'
       });
-    });
+
+      return response.data;
+    } catch (error) {
+      console.error('Failed to refresh access token:', error);
+      throw error;
+    }
   }
 
   static async getValidAccessToken(userId: string): Promise<string | null> {
@@ -111,9 +122,6 @@ export class StravaService {
         throw new Error('No valid Strava access token');
       }
 
-      // Configure strava with the user's access token
-      strava.config({ access_token: accessToken });
-
       const activityData = {
         name: workoutData.name,
         type: this.mapWorkoutTypeToStravaType(workoutData.type),
@@ -125,17 +133,15 @@ export class StravaService {
         ...(workoutData.distance && { distance: workoutData.distance })
       };
 
-      return new Promise((resolve, reject) => {
-        strava.activities.create(activityData, (err: any, result: any) => {
-          if (err) {
-            console.error('Failed to create Strava activity:', err);
-            reject(err);
-          } else {
-            console.log('Successfully created Strava activity:', result.id);
-            resolve(true);
-          }
-        });
+      const response = await axios.post(`${STRAVA_BASE_URL}/activities`, activityData, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        }
       });
+
+      console.log('Successfully created Strava activity:', response.data.id);
+      return true;
     } catch (error) {
       console.error('Error pushing workout to Strava:', error);
       return false;

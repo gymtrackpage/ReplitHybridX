@@ -1364,6 +1364,122 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Strava integration routes
+  app.get('/api/strava/connect', isAuthenticated, async (req: any, res) => {
+    try {
+      const authUrl = StravaService.getAuthorizationUrl();
+      res.json({ authUrl });
+    } catch (error) {
+      console.error("Error getting Strava auth URL:", error);
+      res.status(500).json({ message: "Failed to get Strava authorization URL" });
+    }
+  });
+
+  app.get('/api/strava/callback', async (req, res) => {
+    try {
+      const { code, state } = req.query;
+      if (!code) {
+        return res.status(400).json({ message: "Authorization code not provided" });
+      }
+
+      // For now, we'll need to associate this with a user session
+      // In a real implementation, you'd pass the user ID in the state parameter
+      if (!req.isAuthenticated()) {
+        return res.redirect('/profile?strava_error=not_authenticated');
+      }
+
+      const userId = (req.user as any).claims.sub;
+      const tokens = await StravaService.exchangeCodeForTokens(code as string);
+
+      // Store tokens in user record
+      await storage.updateUser(userId, {
+        stravaUserId: tokens.athlete.id.toString(),
+        stravaAccessToken: tokens.access_token,
+        stravaRefreshToken: tokens.refresh_token,
+        stravaTokenExpiry: new Date(tokens.expires_at * 1000),
+        stravaConnected: true,
+      });
+
+      res.redirect('/profile?strava_connected=true');
+    } catch (error) {
+      console.error("Error in Strava callback:", error);
+      res.redirect('/profile?strava_error=connection_failed');
+    }
+  });
+
+  app.post('/api/strava/disconnect', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      await StravaService.disconnectStrava(userId);
+      res.json({ success: true, message: "Strava disconnected successfully" });
+    } catch (error) {
+      console.error("Error disconnecting Strava:", error);
+      res.status(500).json({ message: "Failed to disconnect Strava" });
+    }
+  });
+
+  app.post('/api/strava/push-workout', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { workoutId } = req.body;
+
+      if (!workoutId) {
+        return res.status(400).json({ message: "Workout ID is required" });
+      }
+
+      // Get workout details
+      const workout = await storage.getWorkout(workoutId);
+      if (!workout) {
+        return res.status(404).json({ message: "Workout not found" });
+      }
+
+      // Get completion details
+      const completions = await storage.getWorkoutCompletions(userId);
+      const completion = completions.find(c => c.workoutId === workoutId);
+      
+      if (!completion) {
+        return res.status(400).json({ message: "Workout not completed yet" });
+      }
+
+      // Prepare workout data for Strava
+      const workoutData = {
+        name: workout.name,
+        description: workout.description || `${workout.name} - Hybrid X Training`,
+        duration: completion.duration || workout.duration * 60, // Convert minutes to seconds
+        type: 'workout' as const,
+        start_date_local: completion.completedAt ? 
+          completion.completedAt.toISOString() : 
+          new Date().toISOString()
+      };
+
+      const success = await StravaService.pushWorkoutToStrava(userId, workoutData);
+      
+      if (success) {
+        res.json({ success: true, message: "Workout pushed to Strava successfully" });
+      } else {
+        res.status(500).json({ message: "Failed to push workout to Strava" });
+      }
+    } catch (error) {
+      console.error("Error pushing workout to Strava:", error);
+      res.status(500).json({ message: "Failed to push workout to Strava" });
+    }
+  });
+
+  app.get('/api/strava/status', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      res.json({
+        connected: user?.stravaConnected || false,
+        athleteId: user?.stravaUserId || null
+      });
+    } catch (error) {
+      console.error("Error getting Strava status:", error);
+      res.status(500).json({ message: "Failed to get Strava status" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
