@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
+import { StravaService } from "./stravaService";
 import { generateRandomHyroxWorkout } from "./enhancedHyroxWorkoutGenerator";
 import multer from "multer";
 import * as XLSX from "xlsx";

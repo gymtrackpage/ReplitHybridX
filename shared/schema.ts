@@ -36,6 +36,11 @@ export const users = pgTable("users", {
   stripeCustomerId: varchar("stripe_customer_id"),
   stripeSubscriptionId: varchar("stripe_subscription_id"),
   subscriptionStatus: varchar("subscription_status").default("none"), // none, active, cancelled, subscribe_later
+  stravaUserId: varchar("strava_user_id"),
+  stravaAccessToken: varchar("strava_access_token"),
+  stravaRefreshToken: varchar("strava_refresh_token"),
+  stravaTokenExpiry: timestamp("strava_token_expiry"),
+  stravaConnected: boolean("strava_connected").default(false),
   isAdmin: boolean("is_admin").default(false),
   currentProgramId: integer("current_program_id"),
   fitnessLevel: varchar("fitness_level"), // beginner, intermediate, advanced
