@@ -53,7 +53,7 @@ export default function PushToStravaButton({
   });
 
   // Don't show button if not connected to Strava or workout not completed
-  if (!(stravaStatus?.connected || false) || !isCompleted) {
+  if (!((stravaStatus as any)?.connected || false) || !isCompleted) {
     return null;
   }
 
