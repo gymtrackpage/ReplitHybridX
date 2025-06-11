@@ -2,84 +2,68 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: 0 0% 97%; /* #F7F7F7 - Light gray background */
-  --foreground: 0 0% 9%; /* #171717 - Near black text */
-  --muted: 0 0% 92%; /* #EBEBEB - Light gray for muted elements */
-  --muted-foreground: 0 0% 45%; /* #737373 - Medium gray text */
-  --popover: 0 0% 100%; /* #FFFFFF */
-  --popover-foreground: 0 0% 9%; /* #171717 */
-  --card: 0 0% 100%; /* #FFFFFF - Pure white cards */
-  --card-foreground: 0 0% 9%; /* #171717 */
-  --border: 0 0% 89%; /* #E3E3E3 - Subtle borders */
-  --input: 0 0% 96%; /* #F5F5F5 - Light input background */
-  --primary: 45 93% 47%; /* #F59E0B - Yellow primary */
-  --primary-foreground: 0 0% 9%; /* #171717 - Dark text on yellow */
-  --secondary: 0 0% 15%; /* #262626 - Dark gray secondary */
-  --secondary-foreground: 0 0% 98%; /* #FAFAFA - Light text on dark */
-  --accent: 45 93% 47%; /* #F59E0B - Yellow accent */
-  --accent-foreground: 0 0% 9%; /* #171717 */
-  --destructive: 0 72% 51%; /* #EF4444 - Red for destructive actions */
-  --destructive-foreground: 0 0% 98%; /* #FAFAFA */
-  --ring: 45 93% 47%; /* #F59E0B - Yellow focus ring */
-  --radius: 1rem; /* Larger radius for modern look */
-  
-  /* Chart colors */
-  --chart-1: 217 91% 60%; /* #2563EB */
-  --chart-2: 160 84% 39%; /* #059669 */
-  --chart-3: 45 93% 47%; /* #F59E0B */
-  --chart-4: 0 84% 60%; /* #DC2626 */
-  --chart-5: 263 70% 50%; /* #7C3AED */
-}
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 47 100% 50%;
+    --primary-foreground: 222.2 84% 4.9%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222.2 84% 4.9%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222.2 84% 4.9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --radius: 0.5rem;
+  }
 
-.dark {
-  --background: 222 84% 5%; /* #0F172A */
-  --foreground: 210 40% 98%; /* #F8FAFC */
-  --muted: 217 33% 17%; /* #1E293B */
-  --muted-foreground: 215 20% 65%; /* #94A3B8 */
-  --popover: 222 84% 5%; /* #0F172A */
-  --popover-foreground: 210 40% 98%; /* #F8FAFC */
-  --card: 222 84% 5%; /* #0F172A */
-  --card-foreground: 210 40% 98%; /* #F8FAFC */
-  --border: 217 33% 17%; /* #1E293B */
-  --input: 217 33% 17%; /* #1E293B */
-  --primary: 217 91% 60%; /* #2563EB */
-  --primary-foreground: 210 40% 98%; /* #F8FAFC */
-  --secondary: 160 84% 39%; /* #059669 */
-  --secondary-foreground: 0 0% 100%; /* #FFFFFF */
-  --accent: 0 84% 60%; /* #DC2626 */
-  --accent-foreground: 0 0% 100%; /* #FFFFFF */
-  --destructive: 0 62% 30%; /* #991B1B */
-  --destructive-foreground: 0 0% 100%; /* #FFFFFF */
-  --ring: 217 91% 60%; /* #2563EB */
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 47 100% 50%;
+    --primary-foreground: 222.2 84% 4.9%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+  }
 }
 
 @layer base {
   * {
     @apply border-border;
   }
-
   body {
-    @apply bg-background text-foreground font-sans antialiased;
-    font-family: 'Inter', sans-serif;
-  }
-}
-
-@layer utilities {
-  .gradient-bg {
-    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--secondary)) 100%);
-  }
-  
-  .progress-ring {
-    transform: rotate(-90deg);
-  }
-  
-  .progress-ring circle {
-    transition: stroke-dasharray 0.3s ease;
-  }
-  
-  .workout-card:hover {
-    transform: translateY(-2px);
-    transition: all 0.3s ease;
+    @apply bg-background text-foreground;
   }
 }
