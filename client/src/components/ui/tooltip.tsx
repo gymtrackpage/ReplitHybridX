@@ -2,15 +2,14 @@
 
 import * as React from "react"
 
-// Simple tooltip implementation without Radix UI dependencies
-interface TooltipProps {
-  children: React.ReactNode
-  content?: string
-}
-
+// Functional tooltip components that work without Radix UI dependencies
 interface TooltipProviderProps {
   children: React.ReactNode
   delayDuration?: number
+}
+
+interface TooltipProps {
+  children: React.ReactNode
 }
 
 interface TooltipTriggerProps {
@@ -24,19 +23,19 @@ interface TooltipContentProps {
   className?: string
 }
 
-const TooltipProvider = ({ children }: TooltipProviderProps) => {
+const TooltipProvider: React.FC<TooltipProviderProps> = ({ children }) => {
   return <>{children}</>
 }
 
-const Tooltip = ({ children }: TooltipProps) => {
+const Tooltip: React.FC<TooltipProps> = ({ children }) => {
   return <>{children}</>
 }
 
-const TooltipTrigger = ({ children }: TooltipTriggerProps) => {
+const TooltipTrigger: React.FC<TooltipTriggerProps> = ({ children }) => {
   return <>{children}</>
 }
 
-const TooltipContent = ({ children, className }: TooltipContentProps) => {
+const TooltipContent: React.FC<TooltipContentProps> = ({ children, className }) => {
   return (
     <div className={className}>
       {children}
@@ -44,9 +43,4 @@ const TooltipContent = ({ children, className }: TooltipContentProps) => {
   )
 }
 
-export {
-  Tooltip,
-  TooltipTrigger,
-  TooltipContent,
-  TooltipProvider,
-}
+export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider }
