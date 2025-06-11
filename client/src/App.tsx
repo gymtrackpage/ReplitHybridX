@@ -1,42 +1,26 @@
-import { Switch, Route } from "wouter";
-import { QueryClientProvider } from "@tanstack/react-query";
-import { queryClient } from "./lib/queryClient";
-import { useAuth } from "./hooks/useAuth";
-import Landing from "./pages/landing";
-import Dashboard from "./pages/dashboard";
-
-function Router() {
-  const { isAuthenticated, isLoading } = useAuth();
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <Switch>
-        <Route path="/" component={Landing} />
-        <Route component={Landing} />
-      </Switch>
-    );
-  }
-
-  return (
-    <Switch>
-      <Route path="/" component={Dashboard} />
-      <Route component={Dashboard} />
-    </Switch>
-  );
-}
-
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <Router />
-    </QueryClientProvider>
+    <div style={{
+      minHeight: '100vh',
+      backgroundColor: '#1f2937',
+      color: 'white',
+      padding: '20px',
+      fontFamily: 'Arial, sans-serif'
+    }}>
+      <h1 style={{ fontSize: '48px', marginBottom: '20px' }}>HybridX App</h1>
+      <p style={{ fontSize: '24px', marginBottom: '20px' }}>
+        App is now loading successfully!
+      </p>
+      <div style={{
+        backgroundColor: '#fbbf24',
+        color: '#000',
+        padding: '12px 24px',
+        borderRadius: '8px',
+        display: 'inline-block',
+        fontWeight: 'bold'
+      }}>
+        React is Working ✓
+      </div>
+    </div>
   );
 }
