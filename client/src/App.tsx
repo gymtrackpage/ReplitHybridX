@@ -3,8 +3,16 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { useAuth } from "./hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
+import { Toaster } from "@/components/ui/toaster";
 import Landing from "./pages/landing";
 import Dashboard from "./pages/dashboard";
+import Programs from "./pages/programs";
+import Assessment from "./pages/assessment";
+import Calendar from "./pages/calendar";
+import Workouts from "./pages/workouts";
+import Progress from "./pages/progress";
+import Profile from "./pages/profile";
+import Settings from "./pages/settings";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -32,12 +40,26 @@ function Router() {
     );
   }
 
+  // Check if user needs to complete assessment
+  if (userStatus && !userStatus.assessmentCompleted) {
+    return (
+      <Switch>
+        <Route path="/assessment" component={Assessment} />
+        <Route component={Assessment} />
+      </Switch>
+    );
+  }
+
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
-      <Route path="/dashboard" component={Dashboard} />
-      <Route path="/profile" component={Dashboard} />
-      <Route path="/workouts" component={Dashboard} />
+      <Route path="/programs" component={Programs} />
+      <Route path="/assessment" component={Assessment} />
+      <Route path="/calendar" component={Calendar} />
+      <Route path="/workouts" component={Workouts} />
+      <Route path="/progress" component={Progress} />
+      <Route path="/profile" component={Profile} />
+      <Route path="/settings" component={Settings} />
       <Route component={Dashboard} />
     </Switch>
   );
@@ -47,6 +69,7 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <Router />
+      <Toaster />
     </QueryClientProvider>
   );
 }
