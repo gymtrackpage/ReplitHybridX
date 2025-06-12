@@ -182,7 +182,9 @@ export default function Admin() {
       if (!programWorkouts[programId]) {
         try {
           const workouts = await apiRequest("GET", `/api/admin/programs/${programId}/workouts`);
-          setProgramWorkouts(prev => ({ ...prev, [programId]: workouts as any[] }));
+          // Ensure workouts is an array
+          const workoutArray = Array.isArray(workouts) ? workouts : [];
+          setProgramWorkouts(prev => ({ ...prev, [programId]: workoutArray }));
         } catch (error) {
           console.error("Failed to fetch workouts:", error);
           toast({
@@ -344,7 +346,7 @@ export default function Admin() {
                       {expandedPrograms.has(program.id) && (
                         <div className="mt-4 border-t pt-4">
                           <h4 className="font-medium text-gray-900 mb-3">Program Workouts</h4>
-                          {programWorkouts[program.id] ? (
+                          {programWorkouts[program.id] && Array.isArray(programWorkouts[program.id]) ? (
                             <div className="space-y-2">
                               {programWorkouts[program.id].map((workout: any) => (
                                 <div key={workout.id} className="bg-gray-50 rounded-lg p-3">
