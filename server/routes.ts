@@ -14,15 +14,48 @@ import { createMinimalPrograms } from "./quickProgramSetup";
 import Stripe from "stripe";
 import { insertProgramSchema, insertWorkoutSchema, insertAssessmentSchema, insertWeightEntrySchema } from "../shared/schema";
 
-if (!process.env.STRIPE_SECRET_KEY) {
-  console.error('Missing required Stripe secret: STRIPE_SECRET_KEY');
-  // Don't throw error, just log warning to allow app to start
+// Async error wrapper
+const asyncHandler = (fn: Function) => (req: Request, res: Response, next: NextFunction) => {
+  Promise.resolve(fn(req, res, next)).catch(next);
+};
+
+// Environment validation
+const requiredEnvVars = {
+  DATABASE_URL: process.env.DATABASE_URL,
+  REPLIT_DB_URL: process.env.REPLIT_DB_URL,
+};
+
+const optionalEnvVars = {
+  STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
+  STRAVA_CLIENT_ID: process.env.STRAVA_CLIENT_ID,
+  STRAVA_CLIENT_SECRET: process.env.STRAVA_CLIENT_SECRET,
+};
+
+// Check required environment variables
+for (const [key, value] of Object.entries(requiredEnvVars)) {
+  if (!value) {
+    console.error(`Missing required environment variable: ${key}`);
+  }
 }
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+// Initialize Stripe only if secret key is available
+let stripe: Stripe | null = null;
+if (process.env.STRIPE_SECRET_KEY) {
+  stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+} else {
+  console.warn('Stripe not initialized: STRIPE_SECRET_KEY not provided');
+}
+
+import type { Request, Response, NextFunction } from "express";
+
+// Extend Request interface to include user
+interface AuthenticatedRequest extends Request {
+  user?: { claims: { sub: string } };
+  isAuthenticated?: () => boolean;
+}
 
 // Admin middleware
-const requireAdmin = async (req: any, res: any, next: any) => {
+const requireAdmin = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Unauthorized" });
@@ -52,6 +85,26 @@ const upload = multer({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Health check endpoint
+  app.get('/health', async (req, res) => {
+    try {
+      // Test database connection
+      await storage.getPrograms();
+      res.json({ 
+        status: 'healthy', 
+        timestamp: new Date().toISOString(),
+        database: 'connected',
+        stripe: stripe ? 'initialized' : 'not_configured'
+      });
+    } catch (error) {
+      res.status(503).json({ 
+        status: 'unhealthy', 
+        timestamp: new Date().toISOString(),
+        error: 'Database connection failed'
+      });
+    }
+  });
+
   // Auth middleware
   await setupAuth(app);
 
@@ -81,7 +134,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Programs will be created on-demand during assessment
 
   // Auth routes
-  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
+  app.get('/api/auth/user', isAuthenticated, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);

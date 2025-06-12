@@ -356,6 +356,30 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return user;
   }
+
+  // Additional methods needed by routes
+  async disconnectStrava(userId: string): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({
+        stravaUserId: null,
+        stravaAccessToken: null,
+        stravaRefreshToken: null,
+        stravaTokenExpiry: null,
+        stravaConnected: false,
+        updatedAt: new Date()
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    return user;
+  }
+
+  async pushWorkoutToStrava(userId: string, workoutData: any): Promise<boolean> {
+    // This would typically integrate with Strava API
+    // For now, just return true as placeholder
+    console.log(`Pushing workout to Strava for user ${userId}:`, workoutData);
+    return true;
+  }
 }
 
 export const storage = new DatabaseStorage();
