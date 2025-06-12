@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { MainLayout } from "@/components/layout/main-layout";
+import { MobileLayout } from "@/components/layout/mobile-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TrendingUp, Calendar, Target, Trophy, Flame, Clock, Dumbbell } from "lucide-react";
@@ -216,6 +216,6 @@ export default function Progress() {
           </CardContent>
         </Card>
       </div>
-    </MainLayout>
+    </MobileLayout>
   );
 }

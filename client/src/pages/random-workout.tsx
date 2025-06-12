@@ -258,6 +258,6 @@ export default function RandomWorkout() {
           </div>
         )}
       </div>
-    </MainLayout>
+    </MobileLayout>
   );
 }
