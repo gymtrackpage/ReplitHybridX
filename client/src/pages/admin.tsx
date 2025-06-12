@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation } from "wouter";
+import type { User, Program, Workout } from "@shared/schema";
 import { 
   Users, 
   Database, 
@@ -31,12 +32,12 @@ export default function Admin() {
   const [_, setLocation] = useLocation();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState("programs");
-  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [editingUser, setEditingUser] = useState(false);
   const [expandedPrograms, setExpandedPrograms] = useState<Set<number>>(new Set());
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
-  const [editingProgram, setEditingProgram] = useState<any>(null);
-  const [programWorkouts, setProgramWorkouts] = useState<{[key: number]: any[]}>({});
+  const [editingProgram, setEditingProgram] = useState<Program | null>(null);
+  const [programWorkouts, setProgramWorkouts] = useState<{[key: number]: Workout[]}>({});
   const [uploadForm, setUploadForm] = useState({
     name: "",
     description: "",
@@ -182,23 +183,11 @@ export default function Admin() {
       if (!programWorkouts[programId]) {
         try {
           console.log("Fetching workouts for program:", programId);
-          const workouts = await apiRequest("GET", `/api/admin/programs/${programId}/workouts`);
-          console.log("API Response for program", programId, ":", workouts);
-          console.log("Response type:", typeof workouts, "Is array:", Array.isArray(workouts));
+          const response = await apiRequest("GET", `/api/admin/programs/${programId}/workouts`);
+          const workouts = await response.json();
           
-          // Ensure workouts is an array and handle various response formats
-          let workoutArray = [];
-          if (Array.isArray(workouts)) {
-            workoutArray = workouts;
-          } else if (workouts && Array.isArray(workouts.data)) {
-            workoutArray = workouts.data;
-          } else if (workouts && typeof workouts === 'object') {
-            // If it's an object, try to extract array from common properties
-            workoutArray = workouts.workouts || [];
-          } else {
-            console.warn("Unexpected workout data format:", workouts);
-            workoutArray = [];
-          }
+          // Ensure workouts is an array
+          const workoutArray = Array.isArray(workouts) ? workouts : [];
           
           console.log("Final workout array for program", programId, ":", workoutArray);
           setProgramWorkouts(prev => ({ ...prev, [programId]: workoutArray }));
@@ -645,7 +634,7 @@ export default function Admin() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="edit-difficulty">Difficulty</Label>
-                  <Select value={editingProgram.difficulty} onValueChange={(value) => setEditingProgram({...editingProgram, difficulty: value})}>
+                  <Select value={editingProgram.difficulty || "Beginner"} onValueChange={(value) => setEditingProgram({...editingProgram, difficulty: value})}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -659,7 +648,7 @@ export default function Admin() {
                 
                 <div>
                   <Label htmlFor="edit-category">Category</Label>
-                  <Select value={editingProgram.category} onValueChange={(value) => setEditingProgram({...editingProgram, category: value})}>
+                  <Select value={editingProgram.category || "Hyrox"} onValueChange={(value) => setEditingProgram({...editingProgram, category: value})}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -679,7 +668,7 @@ export default function Admin() {
                   <Input
                     id="edit-duration"
                     type="number"
-                    defaultValue={editingProgram.duration}
+                    defaultValue={editingProgram.duration || 12}
                     onChange={(e) => setEditingProgram({...editingProgram, duration: parseInt(e.target.value) || 12})}
                   />
                 </div>
@@ -689,7 +678,7 @@ export default function Admin() {
                   <Input
                     id="edit-frequency"
                     type="number"
-                    defaultValue={editingProgram.frequency}
+                    defaultValue={editingProgram.frequency || 4}
                     onChange={(e) => setEditingProgram({...editingProgram, frequency: parseInt(e.target.value) || 4})}
                   />
                 </div>
