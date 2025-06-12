@@ -230,7 +230,7 @@ export default function Admin() {
               Admin
             </div>
             <Button variant="outline" size="sm" onClick={() => setLocation("/")}>
-              Logout
+              Back to App
             </Button>
           </div>
         </div>
