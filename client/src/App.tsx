@@ -10,6 +10,7 @@ import Programs from "./pages/programs";
 import Assessment from "./pages/assessment";
 import Calendar from "./pages/calendar";
 import Workouts from "./pages/workouts";
+import RandomWorkout from "./pages/random-workout";
 import Progress from "./pages/progress";
 import Profile from "./pages/profile";
 import Settings from "./pages/settings";
@@ -57,6 +58,7 @@ function Router() {
       <Route path="/assessment" component={Assessment} />
       <Route path="/calendar" component={Calendar} />
       <Route path="/workouts" component={Workouts} />
+      <Route path="/random-workout" component={RandomWorkout} />
       <Route path="/progress" component={Progress} />
       <Route path="/profile" component={Profile} />
       <Route path="/settings" component={Settings} />

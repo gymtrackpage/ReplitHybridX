@@ -10,7 +10,9 @@ import {
   Settings,
   LogOut,
   Target,
-  BarChart3
+  BarChart3,
+  Zap,
+  ClipboardList
 } from "lucide-react";
 
 interface NavigationProps {
@@ -23,10 +25,11 @@ export function Navigation({ onLogout }: NavigationProps) {
   const navItems = [
     { icon: Home, label: "Dashboard", path: "/" },
     { icon: Target, label: "Programs", path: "/programs" },
+    { icon: ClipboardList, label: "Assessment", path: "/assessment" },
     { icon: Calendar, label: "Calendar", path: "/calendar" },
     { icon: Dumbbell, label: "Workouts", path: "/workouts" },
+    { icon: Zap, label: "Random Workout", path: "/random-workout" },
     { icon: BarChart3, label: "Progress", path: "/progress" },
-    { icon: Trophy, label: "Achievements", path: "/achievements" },
     { icon: User, label: "Profile", path: "/profile" },
     { icon: Settings, label: "Settings", path: "/settings" },
   ];
