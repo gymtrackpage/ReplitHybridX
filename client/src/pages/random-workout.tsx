@@ -74,7 +74,7 @@ export default function RandomWorkout() {
   };
 
   return (
-    <MainLayout>
+    <MobileLayout>
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold">Random Workout Generator</h1>

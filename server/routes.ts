@@ -280,6 +280,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get workout calendar data
+  app.get('/api/workout-calendar', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { month } = req.query;
+      const targetMonth = month ? new Date(month as string) : new Date();
+      
+      // Get user's current program
+      const user = await storage.getUser(userId);
+      if (!user?.currentProgramId) {
+        return res.json({ workouts: [] });
+      }
+
+      // Get program workouts
+      const programWorkouts = await storage.getProgramWorkouts(user.currentProgramId);
+      
+      // Get user's workout history for the month
+      const workoutHistory = await storage.getUserWorkoutHistory(userId);
+
+      // Generate calendar data for the month
+      const startOfMonth = new Date(targetMonth.getFullYear(), targetMonth.getMonth(), 1);
+      const endOfMonth = new Date(targetMonth.getFullYear(), targetMonth.getMonth() + 1, 0);
+      const calendarWorkouts = [];
+      
+      for (let date = new Date(startOfMonth); date <= endOfMonth; date.setDate(date.getDate() + 1)) {
+        const daysSinceStart = Math.floor((date.getTime() - new Date(user.programStartDate || Date.now()).getTime()) / (1000 * 60 * 60 * 24));
+        const programIndex = Math.max(0, daysSinceStart) % programWorkouts.length;
+        const programWorkout = programWorkouts[programIndex];
+        
+        if (programWorkout) {
+          // Check if this workout was completed
+          const completedWorkout = workoutHistory.find((h: any) => 
+            new Date(h.completedAt).toDateString() === date.toDateString()
+          );
+
+          let status = 'upcoming';
+          let comments = '';
+          
+          if (completedWorkout) {
+            status = completedWorkout.status || 'completed';
+            comments = completedWorkout.comments || '';
+          } else if (date < new Date()) {
+            status = 'missed';
+          }
+
+          calendarWorkouts.push({
+            date: date.toISOString().split('T')[0],
+            status,
+            workout: {
+              ...programWorkout,
+              completedAt: completedWorkout?.completedAt,
+              comments
+            }
+          });
+        }
+      }
+
+      res.json({ workouts: calendarWorkouts });
+    } catch (error) {
+      console.error("Error fetching workout calendar:", error);
+      res.status(500).json({ message: "Failed to fetch workout calendar" });
+    }
+  });
+
   app.get('/api/recent-activity', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;

@@ -44,8 +44,10 @@ export interface IStorage {
 
   // Workout operations
   getWorkoutsByProgram(programId: number): Promise<Workout[]>;
+  getProgramWorkouts(programId: number): Promise<Workout[]>;
   getWorkout(id: number): Promise<Workout | undefined>;
   getTodaysWorkout(userId: string): Promise<Workout | undefined>;
+  getUserWorkoutHistory(userId: string): Promise<WorkoutCompletion[]>;
   createWorkout(workout: InsertWorkout): Promise<Workout>;
   updateWorkout(id: number, workout: Partial<InsertWorkout>): Promise<Workout>;
   deleteWorkout(id: number): Promise<void>;
@@ -205,6 +207,22 @@ export class DatabaseStorage implements IStorage {
       .from(workouts)
       .where(eq(workouts.programId, programId))
       .orderBy(asc(workouts.week), asc(workouts.day));
+  }
+
+  async getProgramWorkouts(programId: number): Promise<Workout[]> {
+    return await db
+      .select()
+      .from(workouts)
+      .where(eq(workouts.programId, programId))
+      .orderBy(asc(workouts.week), asc(workouts.day));
+  }
+
+  async getUserWorkoutHistory(userId: string): Promise<WorkoutCompletion[]> {
+    return await db
+      .select()
+      .from(workoutCompletions)
+      .where(eq(workoutCompletions.userId, userId))
+      .orderBy(desc(workoutCompletions.completedAt));
   }
 
   async getWorkout(id: number): Promise<Workout | undefined> {
