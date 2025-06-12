@@ -124,14 +124,14 @@ export default function Dashboard() {
                 </div>
 
                 <div className="flex gap-2">
-                  <Button 
-                    className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white"
-                    onClick={() => completeWorkoutMutation.mutate((todayWorkout as any)?.id || 1)}
-                    disabled={completeWorkoutMutation.isPending}
-                  >
-                    <Play className="h-4 w-4 mr-2" />
-                    {completeWorkoutMutation.isPending ? "Starting..." : "Start Workout"}
-                  </Button>
+                  <Link href="/workouts" className="flex-1">
+                    <Button 
+                      className="w-full bg-yellow-500 hover:bg-yellow-600 text-white"
+                    >
+                      <Play className="h-4 w-4 mr-2" />
+                      Start Workout
+                    </Button>
+                  </Link>
                   <Link href="/workouts">
                     <Button variant="outline" size="icon">
                       <ChevronRight className="h-4 w-4" />

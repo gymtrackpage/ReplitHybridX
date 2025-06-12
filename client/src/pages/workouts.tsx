@@ -153,21 +153,28 @@ export default function Workouts() {
                 <div className="space-y-2">
                   <h4 className="font-medium">Exercises:</h4>
                   <div className="grid gap-2">
-                    {todayWorkout.exercises.slice(0, 3).map((exercise: any, index: number) => (
+                    {todayWorkout.exercises.map((exercise: any, index: number) => (
                       <div key={index} className="text-sm bg-white rounded p-2">
-                        <span className="font-medium">{exercise.name}</span>
-                        {exercise.sets && exercise.reps && (
-                          <span className="text-muted-foreground ml-2">
-                            {exercise.sets} x {exercise.reps}
-                          </span>
-                        )}
+                        <div className="font-medium">{exercise.name}</div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {exercise.sets && exercise.reps && (
+                            <span>{exercise.sets} x {exercise.reps}</span>
+                          )}
+                          {exercise.sets && exercise.duration && (
+                            <span>{exercise.sets} x {exercise.duration}</span>
+                          )}
+                          {exercise.duration && !exercise.sets && (
+                            <span>{exercise.duration}</span>
+                          )}
+                          {exercise.distance && (
+                            <span> • {exercise.distance}</span>
+                          )}
+                          {exercise.description && (
+                            <div className="mt-1 text-gray-600">{exercise.description}</div>
+                          )}
+                        </div>
                       </div>
                     ))}
-                    {todayWorkout.exercises.length > 3 && (
-                      <div className="text-sm text-muted-foreground">
-                        +{todayWorkout.exercises.length - 3} more exercises
-                      </div>
-                    )}
                   </div>
                 </div>
               )}
@@ -181,9 +188,9 @@ export default function Workouts() {
                   {completeWorkoutMutation.isPending ? (
                     <div className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full mr-2" />
                   ) : (
-                    <Play className="h-4 w-4 mr-2" />
+                    <CheckCircle className="h-4 w-4 mr-2" />
                   )}
-                  Start Workout
+                  Complete Workout
                 </Button>
                 <Button
                   variant="outline"
