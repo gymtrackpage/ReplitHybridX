@@ -57,3 +57,26 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Mobile-first responsive utilities */
+@layer utilities {
+  .mobile-nav-height {
+    height: calc(100vh - 4rem);
+  }
+  
+  .mobile-container {
+    @apply px-4 pb-20;
+  }
+  
+  .mobile-card {
+    @apply rounded-lg shadow-sm border bg-card;
+  }
+  
+  .mobile-header {
+    @apply text-lg font-semibold mb-2;
+  }
+  
+  .mobile-subheader {
+    @apply text-sm text-muted-foreground mb-4;
+  }
+}
