@@ -186,6 +186,6 @@ export default function Programs() {
           </Card>
         )}
       </div>
-    </MainLayout>
+    </MobileLayout>
   );
 }
