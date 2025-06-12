@@ -14,6 +14,7 @@ import RandomWorkout from "./pages/random-workout";
 import Progress from "./pages/progress";
 import Profile from "./pages/profile";
 import Settings from "./pages/settings";
+import Admin from "./pages/admin";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -62,6 +63,7 @@ function Router() {
       <Route path="/progress" component={Progress} />
       <Route path="/profile" component={Profile} />
       <Route path="/settings" component={Settings} />
+      <Route path="/admin" component={Admin} />
       <Route component={Dashboard} />
     </Switch>
   );
