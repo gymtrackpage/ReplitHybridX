@@ -7,7 +7,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { 
@@ -15,7 +14,6 @@ import {
   ChevronLeft, 
   Check, 
   Trophy, 
-  Target, 
   Calendar,
   CreditCard,
   Zap
@@ -67,10 +65,6 @@ const assessmentSteps = [
     description: "Your fitness and training experience"
   },
   {
-    title: "Current Fitness",
-    description: "Help us assess your current level"
-  },
-  {
     title: "Goals & Equipment",
     description: "What you want to achieve"
   },
@@ -88,7 +82,6 @@ export default function Assessment() {
   const [currentStep, setCurrentStep] = useState(0);
   const [assessmentData, setAssessmentData] = useState<AssessmentData>({});
   const [recommendation, setRecommendation] = useState<ProgramRecommendation | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -100,7 +93,7 @@ export default function Assessment() {
     },
     onSuccess: (data) => {
       setRecommendation(data);
-      setCurrentStep(4);
+      setCurrentStep(3);
     },
     onError: () => {
       toast({
@@ -137,7 +130,7 @@ export default function Assessment() {
       const response = await apiRequest("POST", "/api/create-subscription");
       return response;
     },
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       if (data.paymentUrl) {
         window.location.href = data.paymentUrl;
       } else {
@@ -155,8 +148,7 @@ export default function Assessment() {
   };
 
   const nextStep = () => {
-    if (currentStep === 3) {
-      setIsSubmitting(true);
+    if (currentStep === 2) {
       getRecommendationMutation.mutate(assessmentData);
     } else if (currentStep < assessmentSteps.length - 1) {
       setCurrentStep(prev => prev + 1);
@@ -195,7 +187,7 @@ export default function Assessment() {
                 <Label className="text-base font-medium">How many HYROX events have you completed?</Label>
                 <RadioGroup
                   value={assessmentData.hyroxEventsCompleted?.toString()}
-                  onValueChange={(value) => updateAssessmentData({ hyroxEventsCompleted: parseInt(value) })}
+                  onValueChange={(value: string) => updateAssessmentData({ hyroxEventsCompleted: parseInt(value) })}
                   className="mt-2"
                 >
                   <div className="flex items-center space-x-2">
@@ -217,23 +209,11 @@ export default function Assessment() {
                 </RadioGroup>
               </div>
 
-              {assessmentData.hyroxEventsCompleted && assessmentData.hyroxEventsCompleted > 0 && (
-                <div>
-                  <Label htmlFor="finish-time">Best finish time (if known)</Label>
-                  <Input
-                    id="finish-time"
-                    placeholder="e.g., 1:30:00"
-                    value={assessmentData.bestFinishTime || ""}
-                    onChange={(e) => updateAssessmentData({ bestFinishTime: e.target.value })}
-                  />
-                </div>
-              )}
-
               <div>
                 <Label className="text-base font-medium">Competition format preference</Label>
                 <RadioGroup
                   value={assessmentData.competitionFormat}
-                  onValueChange={(value) => updateAssessmentData({ competitionFormat: value })}
+                  onValueChange={(value: string) => updateAssessmentData({ competitionFormat: value })}
                   className="mt-2"
                 >
                   <div className="flex items-center space-x-2">
@@ -288,7 +268,7 @@ export default function Assessment() {
                 <Label className="text-base font-medium">Primary training background</Label>
                 <RadioGroup
                   value={assessmentData.primaryTrainingBackground}
-                  onValueChange={(value) => updateAssessmentData({ primaryTrainingBackground: value })}
+                  onValueChange={(value: string) => updateAssessmentData({ primaryTrainingBackground: value })}
                   className="mt-2"
                 >
                   <div className="flex items-center space-x-2">
@@ -324,76 +304,11 @@ export default function Assessment() {
                   onChange={(e) => updateAssessmentData({ weeklyTrainingDays: parseInt(e.target.value) })}
                 />
               </div>
-
-              <div>
-                <Label htmlFor="session-length">Average session length (minutes)</Label>
-                <Input
-                  id="session-length"
-                  type="number"
-                  placeholder="e.g., 60"
-                  value={assessmentData.avgSessionLength || ""}
-                  onChange={(e) => updateAssessmentData({ avgSessionLength: parseInt(e.target.value) })}
-                />
-              </div>
             </CardContent>
           </Card>
         );
 
       case 2:
-        return (
-          <Card className="mobile-card">
-            <CardHeader>
-              <CardTitle className="mobile-header">Current Fitness Level</CardTitle>
-              <CardDescription>Help us assess your current capabilities</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="run-time">1km run time (minutes:seconds)</Label>
-                <Input
-                  id="run-time"
-                  placeholder="e.g., 4:30"
-                  value={assessmentData.kilometerRunTime || ""}
-                  onChange={(e) => updateAssessmentData({ kilometerRunTime: parseFloat(e.target.value) })}
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="squat-reps">Maximum bodyweight squats (continuous)</Label>
-                <Input
-                  id="squat-reps"
-                  type="number"
-                  placeholder="e.g., 50"
-                  value={assessmentData.squatMaxReps || ""}
-                  onChange={(e) => updateAssessmentData({ squatMaxReps: parseInt(e.target.value) })}
-                />
-              </div>
-
-              <div>
-                <Label className="text-base font-medium">Injury considerations</Label>
-                <div className="space-y-2 mt-2">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="injury-history"
-                      checked={assessmentData.injuryHistory || false}
-                      onCheckedChange={(checked) => updateAssessmentData({ injuryHistory: checked as boolean })}
-                    />
-                    <Label htmlFor="injury-history">I have a history of injuries</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="injury-recent"
-                      checked={assessmentData.injuryRecent || false}
-                      onCheckedChange={(checked) => updateAssessmentData({ injuryRecent: checked as boolean })}
-                    />
-                    <Label htmlFor="injury-recent">I'm currently recovering from an injury</Label>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        );
-
-      case 3:
         return (
           <Card className="mobile-card">
             <CardHeader>
@@ -405,7 +320,7 @@ export default function Assessment() {
                 <Label className="text-base font-medium">Equipment access</Label>
                 <RadioGroup
                   value={assessmentData.equipmentAccess}
-                  onValueChange={(value) => updateAssessmentData({ equipmentAccess: value })}
+                  onValueChange={(value: string) => updateAssessmentData({ equipmentAccess: value })}
                   className="mt-2"
                 >
                   <div className="flex items-center space-x-2">
@@ -424,40 +339,35 @@ export default function Assessment() {
               </div>
 
               <div>
-                <Label className="text-base font-medium">Primary goals (select all that apply)</Label>
-                <div className="space-y-2 mt-2">
-                  {[
-                    "Complete my first HYROX event",
-                    "Improve my HYROX time",
-                    "Build general fitness",
-                    "Increase strength",
-                    "Improve endurance",
-                    "Weight loss",
-                    "Muscle building"
-                  ].map((goal) => (
-                    <div key={goal} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={goal}
-                        checked={assessmentData.goals?.includes(goal) || false}
-                        onCheckedChange={(checked) => {
-                          const currentGoals = assessmentData.goals || [];
-                          if (checked) {
-                            updateAssessmentData({ goals: [...currentGoals, goal] });
-                          } else {
-                            updateAssessmentData({ goals: currentGoals.filter(g => g !== goal) });
-                          }
-                        }}
-                      />
-                      <Label htmlFor={goal}>{goal}</Label>
-                    </div>
-                  ))}
-                </div>
+                <Label htmlFor="primary-goal">Primary goal</Label>
+                <RadioGroup
+                  value={assessmentData.goals?.[0]}
+                  onValueChange={(value: string) => updateAssessmentData({ goals: [value] })}
+                  className="mt-2"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="first-hyrox" id="first-hyrox" />
+                    <Label htmlFor="first-hyrox">Complete my first HYROX event</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="improve-time" id="improve-time" />
+                    <Label htmlFor="improve-time">Improve my HYROX time</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="general-fitness" id="general-fitness" />
+                    <Label htmlFor="general-fitness">Build general fitness</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="strength" id="strength" />
+                    <Label htmlFor="strength">Increase strength</Label>
+                  </div>
+                </RadioGroup>
               </div>
             </CardContent>
           </Card>
         );
 
-      case 4:
+      case 3:
         return recommendation ? (
           <Card className="mobile-card">
             <CardHeader>
@@ -504,22 +414,11 @@ export default function Assessment() {
                   </ul>
                 </div>
               )}
-
-              <div className="grid grid-cols-2 gap-4 text-center">
-                <div className="p-3 bg-muted rounded-lg">
-                  <p className="text-xs text-muted-foreground">Experience</p>
-                  <p className="font-semibold">{recommendation.experienceLevel}</p>
-                </div>
-                <div className="p-3 bg-muted rounded-lg">
-                  <p className="text-xs text-muted-foreground">Background</p>
-                  <p className="font-semibold">{recommendation.trainingBackground}</p>
-                </div>
-              </div>
             </CardContent>
           </Card>
         ) : null;
 
-      case 5:
+      case 4:
         return (
           <div className="space-y-4">
             <Card className="mobile-card bg-gradient-to-r from-yellow-50 to-orange-50 border-yellow-200">
@@ -618,13 +517,10 @@ export default function Assessment() {
         return assessmentData.hyroxEventsCompleted !== undefined && assessmentData.competitionFormat;
       case 1:
         return assessmentData.generalFitnessYears && assessmentData.age && 
-               assessmentData.primaryTrainingBackground && assessmentData.weeklyTrainingDays &&
-               assessmentData.avgSessionLength;
+               assessmentData.primaryTrainingBackground && assessmentData.weeklyTrainingDays;
       case 2:
-        return assessmentData.kilometerRunTime && assessmentData.squatMaxReps;
-      case 3:
         return assessmentData.equipmentAccess && assessmentData.goals && assessmentData.goals.length > 0;
-      case 4:
+      case 3:
         return recommendation !== null;
       default:
         return true;
@@ -655,7 +551,7 @@ export default function Assessment() {
         {renderStepContent()}
 
         {/* Navigation */}
-        {currentStep < 5 && (
+        {currentStep < 4 && (
           <div className="flex gap-3">
             {currentStep > 0 && (
               <Button 
@@ -670,10 +566,10 @@ export default function Assessment() {
             
             <Button 
               onClick={nextStep}
-              disabled={!canProceed() || isSubmitting || getRecommendationMutation.isPending}
+              disabled={!canProceed() || getRecommendationMutation.isPending}
               className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white"
             >
-              {currentStep === 3 ? (
+              {currentStep === 2 ? (
                 getRecommendationMutation.isPending ? "Analyzing..." : "Get Recommendation"
               ) : (
                 <>
