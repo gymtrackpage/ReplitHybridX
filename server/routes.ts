@@ -87,20 +87,33 @@ const upload = multer({
 export async function registerRoutes(app: Express): Promise<Server> {
   // Health check endpoint
   app.get('/health', async (req, res) => {
+    const healthStatus = {
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      checks: {
+        database: 'unknown',
+        stripe: stripe ? 'initialized' : 'not_configured',
+        environment: {
+          DATABASE_URL: !!process.env.DATABASE_URL,
+          REPLIT_DB_URL: !!process.env.REPLIT_DB_URL,
+          NODE_ENV: process.env.NODE_ENV || 'development'
+        }
+      }
+    };
+
     try {
       // Test database connection
       await storage.getPrograms();
-      res.json({ 
-        status: 'healthy', 
-        timestamp: new Date().toISOString(),
-        database: 'connected',
-        stripe: stripe ? 'initialized' : 'not_configured'
-      });
+      healthStatus.checks.database = 'connected';
+      console.log('✅ Health check passed');
+      res.json(healthStatus);
     } catch (error) {
+      console.error('❌ Health check failed:', error);
+      healthStatus.status = 'unhealthy';
+      healthStatus.checks.database = 'failed';
       res.status(503).json({ 
-        status: 'unhealthy', 
-        timestamp: new Date().toISOString(),
-        error: 'Database connection failed'
+        ...healthStatus,
+        error: error instanceof Error ? error.message : 'Database connection failed'
       });
     }
   });
