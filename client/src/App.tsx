@@ -35,6 +35,9 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
+      <Route path="/dashboard" component={Dashboard} />
+      <Route path="/profile" component={Dashboard} />
+      <Route path="/workouts" component={Dashboard} />
       <Route component={Dashboard} />
     </Switch>
   );

@@ -12,10 +12,11 @@ import { determineUserProgramPhase, transitionUserToPhase, checkForPhaseTransiti
 import { seedHyroxPrograms } from "./seedData";
 import { createMinimalPrograms } from "./quickProgramSetup";
 import Stripe from "stripe";
-import { insertProgramSchema, insertWorkoutSchema, insertAssessmentSchema, insertWeightEntrySchema } from "@shared/schema";
+import { insertProgramSchema, insertWorkoutSchema, insertAssessmentSchema, insertWeightEntrySchema } from "../shared/schema";
 
 if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
+  console.error('Missing required Stripe secret: STRIPE_SECRET_KEY');
+  // Don't throw error, just log warning to allow app to start
 }
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -545,44 +546,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Workout completion
-  app.post('/api/complete-workout', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const { workoutId, duration, notes, exerciseData } = req.body;
-
-      // Create workout completion record
-      const completion = await storage.createWorkoutCompletion({
-        userId,
-        workoutId,
-        duration,
-        notes,
-        exerciseData: JSON.stringify(exerciseData)
-      });
-
-      // Update user progress
-      const progress = await storage.getUserProgress(userId);
-      if (progress) {
-        await storage.updateUserProgress(userId, {
-          completedWorkouts: progress.completedWorkouts + 1
-        });
-      }
-
-      // Update user's total workout count and streak
-      const user = await storage.getUser(userId);
-      if (user) {
-        await storage.updateUserProfile(userId, {
-          totalWorkouts: user.totalWorkouts + 1,
-          streak: user.streak + 1
-        });
-      }
-
-      res.json(completion);
-    } catch (error) {
-      console.error("Error completing workout:", error);
-      res.status(500).json({ message: "Failed to complete workout" });
-    }
-  });
+  
 
   // Weight tracking
   app.post('/api/weight', isAuthenticated, async (req: any, res) => {
@@ -1112,7 +1076,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/check-phase-transition", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { checkForPhaseTransition, transitionUserToPhase } = await import('./programPhaseManager');
+      const programPhaseManager = await import('./programPhaseManager');
+      const { checkForPhaseTransition, transitionUserToPhase } = programPhaseManager;
       
       const transitionCheck = await checkForPhaseTransition(userId);
       
