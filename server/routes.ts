@@ -1845,7 +1845,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin: Upload program from CSV
-  app.post('/api/admin/upload-program', isAuthenticated, requireAdmin, upload.single('csvFile'), async (req: any, res) => {
+  app.post('/api/admin/upload-program', isAuthenticated, requireAdmin, upload.single('file'), async (req: any, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ message: "No CSV file uploaded" });

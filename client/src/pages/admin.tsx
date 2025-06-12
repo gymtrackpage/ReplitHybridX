@@ -138,7 +138,7 @@ export default function Admin() {
     }
 
     const formData = new FormData();
-    formData.append("csvFile", file);
+    formData.append("file", file);
     formData.append("name", uploadForm.name);
     formData.append("description", uploadForm.description);
     formData.append("difficulty", uploadForm.difficulty);

@@ -22,7 +22,7 @@ import {
   type InsertWeightEntry,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, asc, gte, lte } from "drizzle-orm";
+import { eq, and, desc, asc, gte, lte, sql, isNotNull } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (required for Replit Auth)
@@ -82,7 +82,7 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
-  // User operations
+  // User operations (required for Replit Auth)
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user;
@@ -106,10 +106,7 @@ export class DatabaseStorage implements IStorage {
   async updateUser(id: string, updates: Partial<User>): Promise<User> {
     const [user] = await db
       .update(users)
-      .set({
-        ...updates,
-        updatedAt: new Date(),
-      })
+      .set({ ...updates, updatedAt: new Date() })
       .where(eq(users.id, id))
       .returning();
     return user;
@@ -121,8 +118,7 @@ export class DatabaseStorage implements IStorage {
       .set({
         stripeCustomerId: customerId,
         stripeSubscriptionId: subscriptionId,
-        subscriptionStatus: "active",
-        updatedAt: new Date(),
+        updatedAt: new Date()
       })
       .where(eq(users.id, userId))
       .returning();
@@ -134,7 +130,7 @@ export class DatabaseStorage implements IStorage {
       .update(users)
       .set({
         subscriptionStatus: status,
-        updatedAt: new Date(),
+        updatedAt: new Date()
       })
       .where(eq(users.id, userId))
       .returning();
@@ -146,7 +142,7 @@ export class DatabaseStorage implements IStorage {
       .update(users)
       .set({
         currentProgramId: programId,
-        updatedAt: new Date(),
+        updatedAt: new Date()
       })
       .where(eq(users.id, userId))
       .returning();
@@ -158,8 +154,7 @@ export class DatabaseStorage implements IStorage {
       .update(users)
       .set({
         fitnessLevel,
-        assessmentCompleted: true,
-        updatedAt: new Date(),
+        updatedAt: new Date()
       })
       .where(eq(users.id, userId))
       .returning();
@@ -169,10 +164,7 @@ export class DatabaseStorage implements IStorage {
   async updateUserProfile(userId: string, profileData: Partial<UpsertUser>): Promise<User> {
     const [user] = await db
       .update(users)
-      .set({
-        ...profileData,
-        updatedAt: new Date(),
-      })
+      .set({ ...profileData, updatedAt: new Date() })
       .where(eq(users.id, userId))
       .returning();
     return user;
@@ -180,7 +172,7 @@ export class DatabaseStorage implements IStorage {
 
   // Program operations
   async getPrograms(): Promise<Program[]> {
-    return await db.select().from(programs).where(eq(programs.isActive, true)).orderBy(asc(programs.name));
+    return await db.select().from(programs).where(eq(programs.isActive, true)).orderBy(desc(programs.createdAt));
   }
 
   async getProgram(id: number): Promise<Program | undefined> {
@@ -196,14 +188,15 @@ export class DatabaseStorage implements IStorage {
   async updateProgram(id: number, program: Partial<InsertProgram>): Promise<Program> {
     const [updatedProgram] = await db
       .update(programs)
-      .set({ ...program, updatedAt: new Date() })
+      .set(program)
       .where(eq(programs.id, id))
       .returning();
     return updatedProgram;
   }
 
   async deleteProgram(id: number): Promise<void> {
-    await db.update(programs).set({ isActive: false }).where(eq(programs.id, id));
+    await db.delete(workouts).where(eq(workouts.programId, id));
+    await db.delete(programs).where(eq(programs.id, id));
   }
 
   // Workout operations
@@ -237,16 +230,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTodaysWorkout(userId: string): Promise<Workout | undefined> {
-    // Get user's current progress
     const progress = await this.getUserProgress(userId);
-    if (!progress) return undefined;
+    if (!progress || !progress.programId) {
+      return undefined;
+    }
 
-    // Calculate which workout should be shown today based on schedule
-    let currentWeek = progress.currentWeek;
-    let currentDay = progress.currentDay;
+    let currentWeek = 1;
+    let currentDay = 1;
 
-    // Use the stored progress values directly - they are already calculated correctly
-    // when the program is scheduled, taking into account event dates
     currentWeek = progress.currentWeek;
     currentDay = progress.currentDay;
 
@@ -287,7 +278,7 @@ export class DatabaseStorage implements IStorage {
     const [progress] = await db
       .select()
       .from(userProgress)
-      .where(and(eq(userProgress.userId, userId), eq(userProgress.isActive, true)));
+      .where(eq(userProgress.userId, userId));
     return progress;
   }
 
@@ -299,8 +290,8 @@ export class DatabaseStorage implements IStorage {
   async updateUserProgress(userId: string, updates: Partial<InsertUserProgress>): Promise<UserProgress> {
     const [updatedProgress] = await db
       .update(userProgress)
-      .set({ ...updates, updatedAt: new Date() })
-      .where(and(eq(userProgress.userId, userId), eq(userProgress.isActive, true)))
+      .set(updates)
+      .where(eq(userProgress.userId, userId))
       .returning();
     return updatedProgress;
   }
@@ -315,19 +306,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getWeeklyCompletions(userId: string): Promise<WorkoutCompletion[]> {
-    const now = new Date();
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - now.getDay()); // Sunday
-    startOfWeek.setHours(0, 0, 0, 0);
-
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    
     return await db
       .select()
       .from(workoutCompletions)
       .where(
         and(
           eq(workoutCompletions.userId, userId),
-          gte(workoutCompletions.completedAt, startOfWeek),
-          eq(workoutCompletions.skipped, false) // Only count completed workouts, not skipped ones
+          gte(workoutCompletions.completedAt, oneWeekAgo)
         )
       )
       .orderBy(desc(workoutCompletions.completedAt));
@@ -349,7 +337,7 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(assessments)
       .where(eq(assessments.userId, userId))
-      .orderBy(desc(assessments.completedAt));
+      .orderBy(desc(assessments.createdAt));
     return assessment;
   }
 
@@ -365,44 +353,6 @@ export class DatabaseStorage implements IStorage {
   async createWeightEntry(entry: InsertWeightEntry): Promise<WeightEntry> {
     const [newEntry] = await db.insert(weightEntries).values(entry).returning();
     return newEntry;
-  }
-
-  // Admin operations
-  async getAllUsers(): Promise<User[]> {
-    return await db.select().from(users).orderBy(desc(users.createdAt));
-  }
-
-  async updateUserAdmin(userId: string, isAdmin: boolean): Promise<User> {
-    const [user] = await db
-      .update(users)
-      .set({ isAdmin, updatedAt: new Date() })
-      .where(eq(users.id, userId))
-      .returning();
-    return user;
-  }
-
-  // Additional methods needed by routes
-  async disconnectStrava(userId: string): Promise<User> {
-    const [user] = await db
-      .update(users)
-      .set({
-        stravaUserId: null,
-        stravaAccessToken: null,
-        stravaRefreshToken: null,
-        stravaTokenExpiry: null,
-        stravaConnected: false,
-        updatedAt: new Date()
-      })
-      .where(eq(users.id, userId))
-      .returning();
-    return user;
-  }
-
-  async pushWorkoutToStrava(userId: string, workoutData: any): Promise<boolean> {
-    // This would typically integrate with Strava API
-    // For now, just return true as placeholder
-    console.log(`Pushing workout to Strava for user ${userId}:`, workoutData);
-    return true;
   }
 
   // Admin operations
@@ -429,46 +379,69 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTotalUsers(): Promise<number> {
-    const result = await db.select({ count: db.count() }).from(users);
+    const result = await db.select({ count: sql<number>`count(*)` }).from(users);
     return result[0]?.count || 0;
   }
 
   async getActiveSubscriptions(): Promise<number> {
     const result = await db
-      .select({ count: db.count() })
+      .select({ count: sql<number>`count(*)` })
       .from(users)
-      .where(users.stripeSubscriptionId);
+      .where(isNotNull(users.stripeSubscriptionId));
     return result[0]?.count || 0;
   }
 
   async getTotalPrograms(): Promise<number> {
-    const result = await db.select({ count: db.count() }).from(programs);
+    const result = await db.select({ count: sql<number>`count(*)` }).from(programs);
     return result[0]?.count || 0;
   }
 
   async getTotalWorkouts(): Promise<number> {
-    const result = await db.select({ count: db.count() }).from(workouts);
+    const result = await db.select({ count: sql<number>`count(*)` }).from(workouts);
     return result[0]?.count || 0;
   }
 
   async getAllProgramsWithWorkoutCount(): Promise<(Program & { workoutCount: number })[]> {
     const programsData = await db.select().from(programs).orderBy(desc(programs.createdAt));
     
-    const programsWithCount = await Promise.all(
-      programsData.map(async (program) => {
-        const workoutCount = await db
-          .select({ count: db.count() })
+    const result = await Promise.all(
+      programsData.map(async (program: Program) => {
+        const workoutCountResult = await db
+          .select({ count: sql<number>`count(*)` })
           .from(workouts)
           .where(eq(workouts.programId, program.id));
         
         return {
           ...program,
-          workoutCount: workoutCount[0]?.count || 0
+          workoutCount: workoutCountResult[0]?.count || 0
         };
       })
     );
     
-    return programsWithCount;
+    return result;
+  }
+
+  // Additional methods needed by routes
+  async disconnectStrava(userId: string): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({
+        stravaConnected: false,
+        stravaUserId: null,
+        stravaAccessToken: null,
+        stravaRefreshToken: null,
+        updatedAt: new Date()
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    return user;
+  }
+
+  async pushWorkoutToStrava(userId: string, workoutData: any): Promise<boolean> {
+    // This would typically integrate with Strava API
+    // For now, just return true as placeholder
+    console.log(`Pushing workout to Strava for user ${userId}:`, workoutData);
+    return true;
   }
 }
 
