@@ -10,7 +10,7 @@ export async function performStartupChecks() {
 
   // Check environment variables
   console.log("1. Checking environment variables...");
-  const requiredVars = ['DATABASE_URL', 'REPLIT_DB_URL'];
+  const requiredVars = ['DATABASE_URL'];
   const optionalVars = ['STRIPE_SECRET_KEY', 'STRAVA_CLIENT_ID', 'STRAVA_CLIENT_SECRET'];
   
   for (const varName of requiredVars) {

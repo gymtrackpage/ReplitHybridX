@@ -25,7 +25,6 @@ const asyncHandler = (fn: Function) => (req: Request, res: Response, next: NextF
 // Environment validation
 const requiredEnvVars = {
   DATABASE_URL: process.env.DATABASE_URL,
-  REPLIT_DB_URL: process.env.REPLIT_DB_URL,
 };
 
 const optionalEnvVars = {
@@ -98,7 +97,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         stripe: stripe ? 'initialized' : 'not_configured',
         environment: {
           DATABASE_URL: !!process.env.DATABASE_URL,
-          REPLIT_DB_URL: !!process.env.REPLIT_DB_URL,
           NODE_ENV: process.env.NODE_ENV || 'development'
         }
       }
