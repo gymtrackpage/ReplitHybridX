@@ -233,6 +233,178 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Additional API endpoints for frontend data
+  app.get('/api/today-workout', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const todaysWorkout = await storage.getTodaysWorkout(userId);
+      res.json(todaysWorkout);
+    } catch (error) {
+      console.error("Error fetching today's workout:", error);
+      res.status(500).json({ message: "Failed to fetch today's workout" });
+    }
+  });
+
+  app.get('/api/user-progress', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const progress = await storage.getUserProgress(userId);
+      const user = await storage.getUser(userId);
+      const completions = await storage.getWorkoutCompletions(userId);
+      
+      res.json({
+        ...progress,
+        streak: user?.streak || 0,
+        totalWorkouts: completions.length,
+        weeklyCompleted: await storage.getWeeklyCompletions(userId).then(comps => comps.length)
+      });
+    } catch (error) {
+      console.error("Error fetching user progress:", error);
+      res.status(500).json({ message: "Failed to fetch user progress" });
+    }
+  });
+
+  app.get('/api/weekly-stats', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const weeklyCompletions = await storage.getWeeklyCompletions(userId);
+      
+      res.json({
+        completed: weeklyCompletions.length,
+        target: 6, // Assuming 6 workouts per week target
+        percentage: Math.round((weeklyCompletions.length / 6) * 100)
+      });
+    } catch (error) {
+      console.error("Error fetching weekly stats:", error);
+      res.status(500).json({ message: "Failed to fetch weekly stats" });
+    }
+  });
+
+  app.get('/api/recent-activity', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const completions = await storage.getWorkoutCompletions(userId);
+      
+      // Get workout details for recent completions
+      const recentActivity = await Promise.all(
+        completions.slice(0, 10).map(async (completion) => {
+          const workout = await storage.getWorkout(completion.workoutId);
+          return {
+            id: completion.id,
+            name: workout?.name || 'Workout',
+            completedAt: completion.completedAt,
+            duration: completion.duration || workout?.estimatedDuration || 0,
+            status: 'completed'
+          };
+        })
+      );
+      
+      res.json(recentActivity);
+    } catch (error) {
+      console.error("Error fetching recent activity:", error);
+      res.status(500).json({ message: "Failed to fetch recent activity" });
+    }
+  });
+
+  app.get('/api/user-stats', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const completions = await storage.getWorkoutCompletions(userId);
+      const weeklyCompletions = await storage.getWeeklyCompletions(userId);
+      
+      res.json({
+        totalWorkouts: completions.length,
+        currentStreak: user?.streak || 0,
+        weeklyAverage: Math.round(weeklyCompletions.length / 4), // Approximate weekly average
+        memberSince: user?.createdAt
+      });
+    } catch (error) {
+      console.error("Error fetching user stats:", error);
+      res.status(500).json({ message: "Failed to fetch user stats" });
+    }
+  });
+
+  app.get('/api/progress-stats', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const completions = await storage.getWorkoutCompletions(userId);
+      const user = await storage.getUser(userId);
+      
+      // Generate chart data for last 8 weeks
+      const chartData = [];
+      for (let i = 7; i >= 0; i--) {
+        const weekStart = new Date();
+        weekStart.setDate(weekStart.getDate() - (i * 7));
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekEnd.getDate() + 6);
+        
+        const weekCompletions = completions.filter(c => {
+          const completedDate = new Date(c.completedAt);
+          return completedDate >= weekStart && completedDate <= weekEnd;
+        });
+        
+        chartData.push({
+          week: 8 - i,
+          completed: weekCompletions.length
+        });
+      }
+      
+      res.json({
+        totalWorkouts: completions.length,
+        weeklyCompleted: await storage.getWeeklyCompletions(userId).then(comps => comps.length),
+        totalMinutes: completions.reduce((sum, c) => sum + (c.duration || 0), 0),
+        achievements: [], // Placeholder for achievements
+        chartData
+      });
+    } catch (error) {
+      console.error("Error fetching progress stats:", error);
+      res.status(500).json({ message: "Failed to fetch progress stats" });
+    }
+  });
+
+  app.get('/api/workout-history', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const completions = await storage.getWorkoutCompletions(userId);
+      
+      const workoutHistory = await Promise.all(
+        completions.map(async (completion) => {
+          const workout = await storage.getWorkout(completion.workoutId);
+          return {
+            id: completion.id,
+            name: workout?.name || 'Workout',
+            completedAt: completion.completedAt,
+            week: workout?.week || 0,
+            day: workout?.day || 0,
+            estimatedDuration: workout?.estimatedDuration || 0,
+            status: 'completed'
+          };
+        })
+      );
+      
+      res.json(workoutHistory);
+    } catch (error) {
+      console.error("Error fetching workout history:", error);
+      res.status(500).json({ message: "Failed to fetch workout history" });
+    }
+  });
+
+  app.get('/api/subscription-status', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      res.json({
+        status: user?.subscriptionStatus || 'inactive',
+        nextBillingDate: null // Would be populated from Stripe in production
+      });
+    } catch (error) {
+      console.error("Error fetching subscription status:", error);
+      res.status(500).json({ message: "Failed to fetch subscription status" });
+    }
+  });
+
   // Programs routes
   app.get('/api/programs', async (req, res) => {
     try {
