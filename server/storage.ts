@@ -200,12 +200,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Workout operations
-  async getWorkoutsByProgram(programId: number): Promise<Workout[]> {
-    return await db
-      .select()
-      .from(workouts)
-      .where(eq(workouts.programId, programId))
-      .orderBy(asc(workouts.week), asc(workouts.day));
+  async getWorkoutsByProgram(programId: number) {
+    console.log("Storage: Fetching workouts for program ID:", programId);
+    const result = await db.select().from(workouts).where(eq(workouts.programId, programId));
+    console.log("Storage: Found", result.length, "workouts for program", programId);
+    return result;
   }
 
   async getProgramWorkouts(programId: number): Promise<Workout[]> {
@@ -308,7 +307,7 @@ export class DatabaseStorage implements IStorage {
   async getWeeklyCompletions(userId: string): Promise<WorkoutCompletion[]> {
     const oneWeekAgo = new Date();
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-    
+
     return await db
       .select()
       .from(workoutCompletions)
@@ -403,21 +402,21 @@ export class DatabaseStorage implements IStorage {
 
   async getAllProgramsWithWorkoutCount(): Promise<(Program & { workoutCount: number })[]> {
     const programsData = await db.select().from(programs).orderBy(desc(programs.createdAt));
-    
+
     const result = await Promise.all(
       programsData.map(async (program: Program) => {
         const workoutCountResult = await db
           .select({ count: sql<number>`count(*)` })
           .from(workouts)
           .where(eq(workouts.programId, program.id));
-        
+
         return {
           ...program,
           workoutCount: workoutCountResult[0]?.count || 0
         };
       })
     );
-    
+
     return result;
   }
 

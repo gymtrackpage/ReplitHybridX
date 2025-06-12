@@ -356,42 +356,45 @@ export default function Admin() {
                       {expandedPrograms.has(program.id) && (
                         <div className="mt-4 border-t pt-4">
                           <h4 className="font-medium text-gray-900 mb-3">Program Workouts</h4>
-                          {programWorkouts[program.id] && Array.isArray(programWorkouts[program.id]) && programWorkouts[program.id].length > 0 ? (
-                            <div className="space-y-2">
-                              {programWorkouts[program.id].map((workout: any) => (
-                                <div key={workout.id} className="bg-gray-50 rounded-lg p-3">
-                                  <div className="flex justify-between items-start">
-                                    <div className="flex-1">
-                                      <div className="flex items-center gap-2">
-                                        <span className="font-medium text-sm">Week {workout.week}, Day {workout.day}</span>
-                                        <span className="text-gray-600 text-sm">•</span>
-                                        <span className="text-gray-900 font-medium">{workout.name}</span>
+                          {programWorkouts[program.id] !== undefined ? (
+                            Array.isArray(programWorkouts[program.id]) && programWorkouts[program.id].length > 0 ? (
+                              <div className="space-y-2">
+                                {programWorkouts[program.id].map((workout: any) => (
+                                  <div key={workout.id} className="bg-gray-50 rounded-lg p-3">
+                                    <div className="flex justify-between items-start">
+                                      <div className="flex-1">
+                                        <div className="flex items-center gap-2">
+                                          <span className="font-medium text-sm">Week {workout.week}, Day {workout.day}</span>
+                                          <span className="text-gray-600 text-sm">•</span>
+                                          <span className="text-gray-900 font-medium">{workout.name}</span>
+                                        </div>
+                                        {workout.description && (
+                                          <p className="text-gray-600 text-sm mt-1 line-clamp-2">{workout.description}</p>
+                                        )}
+                                        <div className="flex gap-3 mt-2 text-xs text-gray-500">
+                                          <span>{workout.estimatedDuration || 60}min</span>
+                                          <span>•</span>
+                                          <span>{Array.isArray(workout.exercises) ? workout.exercises.length : 0} exercises</span>
+                                        </div>
                                       </div>
-                                      {workout.description && (
-                                        <p className="text-gray-600 text-sm mt-1 line-clamp-2">{workout.description}</p>
-                                      )}
-                                      <div className="flex gap-3 mt-2 text-xs text-gray-500">
-                                        <span>{workout.estimatedDuration || 60}min</span>
-                                        <span>•</span>
-                                        <span>{Array.isArray(workout.exercises) ? workout.exercises.length : 0} exercises</span>
+                                      <div className="flex gap-1 ml-2">
+                                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                          <Edit3 className="w-3 h-3" />
+                                        </Button>
+                                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-500 hover:text-red-700">
+                                          <Trash2 className="w-3 h-3" />
+                                        </Button>
                                       </div>
-                                    </div>
-                                    <div className="flex gap-1 ml-2">
-                                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                                        <Edit3 className="w-3 h-3" />
-                                      </Button>
-                                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-500 hover:text-red-700">
-                                        <Trash2 className="w-3 h-3" />
-                                      </Button>
                                     </div>
                                   </div>
-                                </div>
-                              ))}
-                            </div>
-                          ) : programWorkouts[program.id] && Array.isArray(programWorkouts[program.id]) && programWorkouts[program.id].length === 0 ? (
-                            <div className="text-center py-4 text-gray-500">
-                              <p className="text-sm">No workouts found for this program</p>
-                            </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-center py-4 text-gray-500">
+                                <p className="text-sm">No workouts found for this program</p>
+                                <p className="text-xs mt-1">Upload a CSV file or manually add workouts to get started</p>
+                              </div>
+                            )
                           ) : (
                             <div className="text-center py-4 text-gray-500">
                               <div className="animate-spin w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-2"></div>

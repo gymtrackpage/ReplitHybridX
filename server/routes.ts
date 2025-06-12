@@ -1851,8 +1851,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/admin/programs/:id/workouts', isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const programId = parseInt(req.params.id);
+      console.log("Fetching workouts for program ID:", programId);
+      
       const workouts = await storage.getWorkoutsByProgram(programId);
-      res.json(workouts);
+      console.log("Found workouts:", workouts.length, "workouts for program", programId);
+      
+      // Ensure we always return an array
+      const workoutArray = Array.isArray(workouts) ? workouts : [];
+      res.json(workoutArray);
     } catch (error) {
       console.error("Error fetching program workouts:", error);
       res.status(500).json({ message: "Failed to fetch workouts" });
