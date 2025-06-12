@@ -1844,6 +1844,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin: Get program workouts
+  app.get('/api/admin/programs/:id/workouts', isAuthenticated, requireAdmin, async (req, res) => {
+    try {
+      const programId = parseInt(req.params.id);
+      const workouts = await storage.getWorkoutsByProgram(programId);
+      res.json(workouts);
+    } catch (error) {
+      console.error("Error fetching program workouts:", error);
+      res.status(500).json({ message: "Failed to fetch workouts" });
+    }
+  });
+
   // Admin: Upload program from CSV
   app.post('/api/admin/upload-program', isAuthenticated, requireAdmin, upload.single('file'), async (req: any, res) => {
     try {

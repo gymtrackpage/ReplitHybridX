@@ -35,6 +35,8 @@ export default function Admin() {
   const [editingUser, setEditingUser] = useState(false);
   const [expandedPrograms, setExpandedPrograms] = useState<Set<number>>(new Set());
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [editingProgram, setEditingProgram] = useState<any>(null);
+  const [programWorkouts, setProgramWorkouts] = useState<{[key: number]: any[]}>({});
   const [uploadForm, setUploadForm] = useState({
     name: "",
     description: "",
@@ -128,6 +130,27 @@ export default function Admin() {
     },
   });
 
+  const updateProgramMutation = useMutation({
+    mutationFn: async (programData: { id: number; [key: string]: any }) => {
+      return apiRequest("PUT", `/api/admin/programs/${programData.id}`, programData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/programs"] });
+      setEditingProgram(null);
+      toast({
+        title: "Success",
+        description: "Program updated successfully",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to update program",
+        variant: "destructive",
+      });
+    }
+  });
+
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -149,12 +172,26 @@ export default function Admin() {
     uploadProgramMutation.mutate(formData);
   };
 
-  const toggleProgramExpansion = (programId: number) => {
+  const toggleProgramExpansion = async (programId: number) => {
     const newExpanded = new Set(expandedPrograms);
     if (newExpanded.has(programId)) {
       newExpanded.delete(programId);
     } else {
       newExpanded.add(programId);
+      // Fetch workouts for this program if not already loaded
+      if (!programWorkouts[programId]) {
+        try {
+          const workouts = await apiRequest("GET", `/api/admin/programs/${programId}/workouts`);
+          setProgramWorkouts(prev => ({ ...prev, [programId]: workouts as any[] }));
+        } catch (error) {
+          console.error("Failed to fetch workouts:", error);
+          toast({
+            title: "Error",
+            description: "Failed to load workouts for this program",
+            variant: "destructive"
+          });
+        }
+      }
     }
     setExpandedPrograms(newExpanded);
   };
@@ -272,7 +309,12 @@ export default function Admin() {
                           <Button variant="outline" size="sm" className="gap-1">
                             <Plus className="w-3 h-3" />
                           </Button>
-                          <Button variant="outline" size="sm" className="gap-1">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="gap-1"
+                            onClick={() => setEditingProgram(program)}
+                          >
                             <Edit3 className="w-3 h-3" />
                           </Button>
                           <Button 
@@ -297,6 +339,51 @@ export default function Admin() {
                         <span className="text-gray-600">{program.category || "Hyrox"}</span>
                         <span className="text-gray-600">Workouts: {program.workoutCount || 0}</span>
                       </div>
+
+                      {/* Expanded Workouts View */}
+                      {expandedPrograms.has(program.id) && (
+                        <div className="mt-4 border-t pt-4">
+                          <h4 className="font-medium text-gray-900 mb-3">Program Workouts</h4>
+                          {programWorkouts[program.id] ? (
+                            <div className="space-y-2">
+                              {programWorkouts[program.id].map((workout: any) => (
+                                <div key={workout.id} className="bg-gray-50 rounded-lg p-3">
+                                  <div className="flex justify-between items-start">
+                                    <div className="flex-1">
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-medium text-sm">Week {workout.week}, Day {workout.day}</span>
+                                        <span className="text-gray-600 text-sm">•</span>
+                                        <span className="text-gray-900 font-medium">{workout.name}</span>
+                                      </div>
+                                      {workout.description && (
+                                        <p className="text-gray-600 text-sm mt-1 line-clamp-2">{workout.description}</p>
+                                      )}
+                                      <div className="flex gap-3 mt-2 text-xs text-gray-500">
+                                        <span>{workout.estimatedDuration || 60}min</span>
+                                        <span>•</span>
+                                        <span>{Array.isArray(workout.exercises) ? workout.exercises.length : 0} exercises</span>
+                                      </div>
+                                    </div>
+                                    <div className="flex gap-1 ml-2">
+                                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                        <Edit3 className="w-3 h-3" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-500 hover:text-red-700">
+                                        <Trash2 className="w-3 h-3" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-center py-4 text-gray-500">
+                              <div className="animate-spin w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-2"></div>
+                              Loading workouts...
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </Card>
                 ))
