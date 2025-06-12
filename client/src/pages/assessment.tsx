@@ -91,8 +91,8 @@ export default function Assessment() {
       const response = await apiRequest("POST", "/api/get-program-recommendation", data);
       return response;
     },
-    onSuccess: (data) => {
-      setRecommendation(data);
+    onSuccess: (data: any) => {
+      setRecommendation(data as ProgramRecommendation);
       setCurrentStep(3);
     },
     onError: () => {
