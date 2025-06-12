@@ -219,3 +219,20 @@ export type Assessment = typeof assessments.$inferSelect;
 export type InsertAssessment = z.infer<typeof insertAssessmentSchema>;
 export type WeightEntry = typeof weightEntries.$inferSelect;
 export type InsertWeightEntry = z.infer<typeof insertWeightEntrySchema>;
+
+// Additional interface for API responses
+export interface ApiResponse<T = any> {
+  data?: T;
+  message?: string;
+  error?: string;
+}
+
+export interface ProgramWithWorkouts extends Program {
+  workouts: Workout[];
+  workoutCount: number;
+}
+
+export interface UserWithProgress extends User {
+  progress?: UserProgress;
+  completions?: WorkoutCompletion[];
+}

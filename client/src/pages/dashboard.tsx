@@ -14,20 +14,24 @@ export default function Dashboard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: todayWorkout } = useQuery({
+  const { data: todayWorkout, isLoading: workoutLoading, error: workoutError } = useQuery({
     queryKey: ["/api/today-workout"],
+    retry: 1,
   });
 
-  const { data: userProgress } = useQuery({
+  const { data: userProgress, isLoading: progressLoading, error: progressError } = useQuery({
     queryKey: ["/api/user-progress"],
+    retry: 1,
   });
 
-  const { data: weeklyStats } = useQuery({
+  const { data: weeklyStats, isLoading: statsLoading, error: statsError } = useQuery({
     queryKey: ["/api/weekly-stats"],
+    retry: 1,
   });
 
-  const { data: recentActivity } = useQuery({
+  const { data: recentActivity, isLoading: activityLoading, error: activityError } = useQuery({
     queryKey: ["/api/recent-activity"],
+    retry: 1,
   });
 
   const completeWorkoutMutation = useMutation({
@@ -42,8 +46,50 @@ export default function Dashboard() {
       queryClient.invalidateQueries({ queryKey: ["/api/today-workout"] });
       queryClient.invalidateQueries({ queryKey: ["/api/weekly-stats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/recent-activity"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/user-progress"] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to complete workout. Please try again.",
+        variant: "destructive",
+      });
     },
   });
+
+  // Show loading state if any critical data is loading
+  if (workoutLoading || progressLoading || statsLoading) {
+    return (
+      <MobileLayout>
+        <div className="space-y-4">
+          {/* Loading skeleton for Today's Workout */}
+          <Card className="bg-gradient-to-r from-yellow-50 to-orange-50 border-yellow-200">
+            <CardContent className="p-6">
+              <div className="animate-pulse">
+                <div className="h-4 bg-gray-300 rounded w-3/4 mb-2"></div>
+                <div className="h-3 bg-gray-200 rounded w-1/2 mb-4"></div>
+                <div className="h-10 bg-gray-300 rounded"></div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          {/* Loading skeleton for stats */}
+          <div className="grid grid-cols-2 gap-3">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Card key={i}>
+                <CardContent className="p-4">
+                  <div className="animate-pulse">
+                    <div className="h-3 bg-gray-300 rounded w-1/2 mb-2"></div>
+                    <div className="h-6 bg-gray-200 rounded w-3/4"></div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </MobileLayout>
+    );
+  }
 
   return (
     <MobileLayout>
