@@ -1537,13 +1537,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/admin/programs', requireAdmin, async (req: any, res) => {
     try {
       const programs = await storage.getPrograms();
-      const programsWithWorkouts = await Promise.all(
+      const programsWithWorkoutCounts = await Promise.all(
         programs.map(async (program) => {
           const workouts = await storage.getWorkoutsByProgram(program.id);
-          return { ...program, workouts };
+          return { 
+            ...program, 
+            workoutCount: workouts.length
+          };
         })
       );
-      res.json(programsWithWorkouts);
+      res.json(programsWithWorkoutCounts);
     } catch (error) {
       console.error("Error fetching admin programs:", error);
       res.status(500).json({ message: "Failed to fetch programs" });

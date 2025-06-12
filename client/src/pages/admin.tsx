@@ -182,11 +182,21 @@ export default function Admin() {
       if (!programWorkouts[programId]) {
         try {
           const workouts = await apiRequest("GET", `/api/admin/programs/${programId}/workouts`);
-          // Ensure workouts is an array
-          const workoutArray = Array.isArray(workouts) ? workouts : [];
+          console.log("Fetched workouts for program", programId, ":", workouts);
+          // Ensure workouts is an array and handle various response formats
+          let workoutArray = [];
+          if (Array.isArray(workouts)) {
+            workoutArray = workouts;
+          } else if (workouts && Array.isArray(workouts.data)) {
+            workoutArray = workouts.data;
+          } else if (workouts && typeof workouts === 'object') {
+            // If it's an object, try to extract array from common properties
+            workoutArray = workouts.workouts || [];
+          }
           setProgramWorkouts(prev => ({ ...prev, [programId]: workoutArray }));
         } catch (error) {
           console.error("Failed to fetch workouts:", error);
+          setProgramWorkouts(prev => ({ ...prev, [programId]: [] }));
           toast({
             title: "Error",
             description: "Failed to load workouts for this program",
@@ -346,7 +356,7 @@ export default function Admin() {
                       {expandedPrograms.has(program.id) && (
                         <div className="mt-4 border-t pt-4">
                           <h4 className="font-medium text-gray-900 mb-3">Program Workouts</h4>
-                          {programWorkouts[program.id] && Array.isArray(programWorkouts[program.id]) ? (
+                          {programWorkouts[program.id] && Array.isArray(programWorkouts[program.id]) && programWorkouts[program.id].length > 0 ? (
                             <div className="space-y-2">
                               {programWorkouts[program.id].map((workout: any) => (
                                 <div key={workout.id} className="bg-gray-50 rounded-lg p-3">
@@ -377,6 +387,10 @@ export default function Admin() {
                                   </div>
                                 </div>
                               ))}
+                            </div>
+                          ) : programWorkouts[program.id] && Array.isArray(programWorkouts[program.id]) && programWorkouts[program.id].length === 0 ? (
+                            <div className="text-center py-4 text-gray-500">
+                              <p className="text-sm">No workouts found for this program</p>
                             </div>
                           ) : (
                             <div className="text-center py-4 text-gray-500">
