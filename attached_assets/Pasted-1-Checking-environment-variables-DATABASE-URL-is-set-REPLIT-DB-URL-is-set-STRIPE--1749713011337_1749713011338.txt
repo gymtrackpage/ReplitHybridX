@@ -1,0 +1,54 @@
+1. Checking environment variables...
+   ✅ DATABASE_URL is set
+   ✅ REPLIT_DB_URL is set
+   ✅ STRIPE_SECRET_KEY is set
+   ✅ STRAVA_CLIENT_ID is set
+   ✅ STRAVA_CLIENT_SECRET is set
+
+2. Checking dependencies...
+   ✅ Database dependencies loaded
+
+3. Testing database connection...
+✅ Database connection test passed
+
+🎉 All startup checks passed!
+✅ Routes registered successfully
+🔧 Setting up Vite development server...
+✅ Vite development server ready
+🎉 HybridX server is running!
+7:19:25 AM [express] serving on port 5000
+🌐 App available at: http://0.0.0.0:5000
+7:20:17 AM [express] GET /api/auth/user 401 in 2ms :: {"message":"Unauthorized"}
+express deprecated req.host: Use req.hostname instead file:/home/runner/workspace/node_modules/openid-client/build/passport.js:165:49
+7:20:21 AM [express] GET /api/login 302 in 425ms
+file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1345
+o?t(o):n(u)},"cb"),s=new r(function(o,u){n=o,t=u}).catch(o=>{throw Error.captureStackTrace(
+                                                                         ^
+
+error: column "strava_connected" of relation "users" does not exist
+    at file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1345:74
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async NeonPreparedQuery.execute (/home/runner/workspace/node_modules/src/neon-serverless/session.ts:102:18)
+    at async DatabaseStorage.upsertUser (/home/runner/workspace/server/storage.ts:84:20)
+    at async upsertUser (/home/runner/workspace/server/replitAuth.ts:60:3)
+    at async Strategy.verify (/home/runner/workspace/server/replitAuth.ts:83:5) {
+  length: 135,
+  severity: 'ERROR',
+  code: '42703',
+  detail: undefined,
+  hint: undefined,
+  position: '244',
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'parse_target.c',
+  line: '1066',
+  routine: 'checkInsertTargets'
+}
+
+Node.js v20.18.1
