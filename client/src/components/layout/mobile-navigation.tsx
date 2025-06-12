@@ -27,7 +27,7 @@ export function MobileNavigation() {
   ];
 
   // Add admin navigation for administrators
-  const navItems = user?.isAdmin 
+  const navItems = (user as any)?.isAdmin 
     ? [...baseNavItems.slice(0, -1), { icon: Shield, label: "Admin", path: "/admin" }, baseNavItems[baseNavItems.length - 1]]
     : baseNavItems;
 

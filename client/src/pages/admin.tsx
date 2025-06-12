@@ -45,7 +45,7 @@ export default function Admin() {
   });
 
   // Redirect non-admin users
-  if (!user?.isAdmin) {
+  if (!(user as any)?.isAdmin) {
     setLocation("/");
     return null;
   }
@@ -246,7 +246,7 @@ export default function Admin() {
               {programsLoading ? (
                 <div className="text-center py-8">Loading programs...</div>
               ) : (
-                programs.map((program: any) => (
+                (programs as any[]).map((program: any) => (
                   <Card key={program.id} className="overflow-hidden">
                     <div className="p-4">
                       <div className="flex items-center justify-between">
@@ -328,7 +328,7 @@ export default function Admin() {
                           <td colSpan={5} className="text-center py-8">Loading users...</td>
                         </tr>
                       ) : (
-                        users.map((user: any) => (
+                        (users as any[]).map((user: any) => (
                           <tr key={user.id} className="border-b hover:bg-gray-50">
                             <td className="p-4">
                               <div>
