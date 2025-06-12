@@ -1848,121 +1848,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/admin/upload-program', isAuthenticated, requireAdmin, upload.single('file'), async (req: any, res) => {
     try {
       if (!req.file) {
-        return res.status(400).json({ message: "No CSV file uploaded" });
+        return res.status(400).json({ message: "No file uploaded" });
       }
 
-      const csvContent = req.file.buffer.toString('utf8');
-      const lines = csvContent.split('\n').filter(line => line.trim());
-      
-      if (lines.length < 2) {
-        return res.status(400).json({ message: "CSV file must contain header and data rows" });
-      }
+      const programData = {
+        name: req.body.name,
+        description: req.body.description,
+        difficulty: req.body.difficulty,
+        category: req.body.category,
+        duration: parseInt(req.body.duration) || 12,
+        frequency: parseInt(req.body.frequency) || 4
+      };
 
-      // Parse header
-      const header = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
-      const requiredColumns = ['week', 'day', 'name', 'description', 'duration', 'exercises'];
-      
-      for (const col of requiredColumns) {
-        if (!header.includes(col)) {
-          return res.status(400).json({ message: `Missing required column: ${col}` });
-        }
-      }
-
-      // Parse data rows
-      const workoutData = [];
-      for (let i = 1; i < lines.length; i++) {
-        const row = lines[i];
-        if (!row.trim()) continue;
-        
-        const values = [];
-        let current = '';
-        let inQuotes = false;
-        
-        for (let j = 0; j < row.length; j++) {
-          const char = row[j];
-          if (char === '"') {
-            inQuotes = !inQuotes;
-          } else if (char === ',' && !inQuotes) {
-            values.push(current.trim());
-            current = '';
-          } else {
-            current += char;
-          }
-        }
-        values.push(current.trim());
-        
-        if (values.length >= requiredColumns.length) {
-          const workout: any = {};
-          header.forEach((col, index) => {
-            workout[col] = values[index] || '';
-          });
-          workoutData.push(workout);
-        }
-      }
-
-      if (workoutData.length === 0) {
-        return res.status(400).json({ message: "No valid workout data found in CSV" });
-      }
-
-      // Determine program name from first workout or use filename
-      const programName = workoutData[0]?.programName || 
-                         req.file.originalname.replace('.csv', '').replace(/[^a-zA-Z0-9\s]/g, ' ').trim();
-      
-      // Create program
-      const program = await storage.createProgram({
-        name: programName,
-        description: `Imported from CSV: ${req.file.originalname}`,
-        difficulty: 'intermediate',
-        duration: Math.max(...workoutData.map((w: any) => parseInt(w.week) || 1)),
-        frequency: 4,
-        category: 'hyrox',
-        isActive: true
-      });
-
-      // Create workouts
-      let workoutCount = 0;
-      for (const workout of workoutData) {
-        try {
-          let exercises = [];
-          if (workout.exercises) {
-            try {
-              exercises = JSON.parse(workout.exercises.replace(/"/g, '"'));
-            } catch {
-              exercises = [{
-                name: workout.exercises,
-                type: "general",
-                description: workout.exercises
-              }];
-            }
-          }
-
-          await storage.createWorkout({
-            programId: program.id,
-            name: workout.name || 'Workout',
-            description: workout.description || '',
-            week: parseInt(workout.week) || 1,
-            day: parseInt(workout.day) || 1,
-            estimatedDuration: parseInt(workout.duration) || 60,
-            exercises: exercises,
-            difficulty: 'intermediate',
-            workoutType: 'mixed'
-          });
-          
-          workoutCount++;
-        } catch (error) {
-          console.warn(`Error creating workout: ${workout.name}`, error);
-        }
-      }
+      const { handleCSVUpload } = await import('./csvUploadHandler');
+      const result = await handleCSVUpload(req.file.buffer, req.file.originalname, programData);
 
       res.json({ 
-        message: "Program uploaded successfully",
-        programId: program.id,
-        programName: program.name,
-        workoutCount
+        message: `Program created successfully with ${result.workoutCount} workouts`,
+        programId: result.programId,
+        workoutCount: result.workoutCount
       });
     } catch (error) {
       console.error("Error uploading program:", error);
-      res.status(500).json({ message: "Failed to upload program" });
+      res.status(500).json({ message: error instanceof Error ? error.message : "Failed to upload program" });
     }
   });
 

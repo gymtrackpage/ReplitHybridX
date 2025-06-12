@@ -1,6 +1,6 @@
-import * as XLSX from "xlsx";
 import { storage } from "./storage";
-import { InsertProgram, InsertWorkout } from "../shared/schema";
+import { InsertProgram, InsertWorkout } from "@shared/schema";
+import * as XLSX from "xlsx";
 
 interface ProgramUploadData {
   name: string;
@@ -59,14 +59,12 @@ export async function handleCSVUpload(
     try {
       const workoutInsert: InsertWorkout = {
         programId: program.id,
+        name: workoutData.name,
         week: workoutData.week,
         day: workoutData.day,
-        name: workoutData.name,
         description: workoutData.description,
         estimatedDuration: workoutData.duration,
-        exercises: typeof workoutData.exercises === 'string' 
-          ? JSON.parse(workoutData.exercises) 
-          : workoutData.exercises
+        exercises: workoutData.exercises
       };
 
       await storage.createWorkout(workoutInsert);
@@ -80,7 +78,7 @@ export async function handleCSVUpload(
 }
 
 function parseCSVFile(buffer: Buffer): WorkoutData[] {
-  const csvContent = buffer.toString('utf8');
+  const csvContent = buffer.toString('utf-8');
   const lines = csvContent.split('\n').filter(line => line.trim());
   
   if (lines.length < 2) {
@@ -98,27 +96,42 @@ function parseCSVFile(buffer: Buffer): WorkoutData[] {
   }
 
   const workouts: WorkoutData[] = [];
-  
+
+  // Parse data rows
   for (let i = 1; i < lines.length; i++) {
     const row = lines[i];
     if (!row.trim()) continue;
     
     const values = parseCSVLine(row);
     
-    if (values.length >= requiredColumns.length) {
-      const workout: any = {};
-      header.forEach((col, index) => {
-        workout[col] = values[index] || '';
-      });
-      
-      workouts.push({
-        week: parseInt(workout.week) || 1,
-        day: parseInt(workout.day) || 1,
-        name: workout.name || 'Unnamed Workout',
+    if (values.length < header.length) continue;
+
+    const workout: any = {};
+    header.forEach((col, index) => {
+      workout[col] = values[index]?.trim() || '';
+    });
+
+    // Validate required fields
+    if (!workout.week || !workout.day || !workout.name) {
+      console.warn(`Skipping row ${i + 1}: Missing required fields`);
+      continue;
+    }
+
+    try {
+      const workoutData: WorkoutData = {
+        week: parseInt(workout.week),
+        day: parseInt(workout.day),
+        name: workout.name,
         description: workout.description || '',
         duration: parseInt(workout.duration) || 60,
-        exercises: parseExercises(workout.exercises || '[]')
-      });
+        exercises: parseExercises(workout.exercises)
+      };
+
+      if (workoutData.week > 0 && workoutData.day > 0 && workoutData.day <= 7) {
+        workouts.push(workoutData);
+      }
+    } catch (error) {
+      console.warn(`Failed to parse row ${i + 1}:`, error);
     }
   }
 
@@ -130,13 +143,13 @@ function parseXLSXFile(buffer: Buffer): WorkoutData[] {
   const sheetName = workbook.SheetNames[0];
   const worksheet = workbook.Sheets[sheetName];
   
-  const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+  const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
   
-  if (jsonData.length < 2) {
+  if (data.length < 2) {
     throw new Error('XLSX file must contain header and data rows');
   }
 
-  const header = (jsonData[0] as string[]).map(h => h?.toString().toLowerCase().trim());
+  const header = data[0] as string[];
   const requiredColumns = ['week', 'day', 'name', 'description', 'duration', 'exercises'];
   
   for (const col of requiredColumns) {
@@ -146,56 +159,84 @@ function parseXLSXFile(buffer: Buffer): WorkoutData[] {
   }
 
   const workouts: WorkoutData[] = [];
-  
-  for (let i = 1; i < jsonData.length; i++) {
-    const row = jsonData[i] as any[];
+
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i] as any[];
     if (!row || row.length === 0) continue;
-    
+
     const workout: any = {};
     header.forEach((col, index) => {
-      workout[col] = row[index]?.toString() || '';
+      workout[col] = row[index] || '';
     });
-    
-    workouts.push({
-      week: parseInt(workout.week) || 1,
-      day: parseInt(workout.day) || 1,
-      name: workout.name || 'Unnamed Workout',
-      description: workout.description || '',
-      duration: parseInt(workout.duration) || 60,
-      exercises: parseExercises(workout.exercises || '[]')
-    });
+
+    // Validate required fields
+    if (!workout.week || !workout.day || !workout.name) {
+      console.warn(`Skipping row ${i + 1}: Missing required fields`);
+      continue;
+    }
+
+    try {
+      const workoutData: WorkoutData = {
+        week: parseInt(workout.week),
+        day: parseInt(workout.day),
+        name: workout.name,
+        description: workout.description || '',
+        duration: parseInt(workout.duration) || 60,
+        exercises: parseExercises(workout.exercises)
+      };
+
+      if (workoutData.week > 0 && workoutData.day > 0 && workoutData.day <= 7) {
+        workouts.push(workoutData);
+      }
+    } catch (error) {
+      console.warn(`Failed to parse row ${i + 1}:`, error);
+    }
   }
 
   return workouts;
 }
 
 function parseCSVLine(line: string): string[] {
-  const values = [];
+  const fields: string[] = [];
   let current = '';
   let inQuotes = false;
   
   for (let i = 0; i < line.length; i++) {
     const char = line[i];
+    
     if (char === '"') {
       inQuotes = !inQuotes;
     } else if (char === ',' && !inQuotes) {
-      values.push(current.trim().replace(/^"|"$/g, ''));
+      fields.push(current.trim().replace(/^"|"$/g, ''));
       current = '';
     } else {
       current += char;
     }
   }
-  values.push(current.trim().replace(/^"|"$/g, ''));
   
-  return values;
+  fields.push(current.trim().replace(/^"|"$/g, ''));
+  return fields;
 }
 
 function parseExercises(exerciseStr: string): any {
-  try {
-    // Try to parse as JSON first
-    return JSON.parse(exerciseStr);
-  } catch {
-    // If not JSON, treat as plain text description
-    return exerciseStr;
+  if (!exerciseStr || exerciseStr.trim() === '') {
+    return [];
   }
+
+  // Try to parse as JSON first
+  try {
+    const parsed = JSON.parse(exerciseStr);
+    if (Array.isArray(parsed)) {
+      return parsed;
+    }
+  } catch (error) {
+    // If JSON parsing fails, treat as plain text description
+  }
+
+  // Return as simple text description
+  return [{
+    name: "General Workout",
+    description: exerciseStr.trim(),
+    type: "general"
+  }];
 }
