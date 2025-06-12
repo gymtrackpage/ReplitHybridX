@@ -42,7 +42,7 @@ function Router() {
   }
 
   // Check if user needs to complete assessment
-  if (userStatus && !userStatus.assessmentCompleted) {
+  if (userStatus && !(userStatus as any).assessmentCompleted) {
     return (
       <Switch>
         <Route path="/assessment" component={Assessment} />

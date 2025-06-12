@@ -1,414 +1,690 @@
 import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "@tanstack/react-query";
-import { z } from "zod";
-import { MainLayout } from "@/components/layout/main-layout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
+import { MobileLayout } from "@/components/layout/mobile-layout";
 import { Button } from "@/components/ui/button";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { 
+  ChevronRight, 
+  ChevronLeft, 
+  Check, 
+  Trophy, 
+  Target, 
+  Calendar,
+  CreditCard,
+  Zap
+} from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { CheckCircle, Target, Users, Clock, Trophy } from "lucide-react";
 
-const assessmentSchema = z.object({
-  hyroxEventsCompleted: z.coerce.number().min(0).default(0),
-  bestFinishTime: z.string().optional(),
-  generalFitnessYears: z.coerce.number().min(0).max(50).default(0),
-  primaryTrainingBackground: z.string().min(1, "Please select your training background"),
-  weeklyTrainingDays: z.coerce.number().min(1).max(7).default(3),
-  avgSessionLength: z.coerce.number().min(15).max(180).default(60),
-  competitionFormat: z.string().min(1, "Please select competition format"),
-  age: z.coerce.number().min(16).max(80).default(25),
-  injuryHistory: z.boolean().default(false),
-  injuryRecent: z.boolean().default(false),
-  kilometerRunTime: z.coerce.number().min(180).max(1800).default(300),
-  squatMaxReps: z.coerce.number().min(0).max(200).default(20),
-  goals: z.array(z.string()).default([]),
-  equipmentAccess: z.string().min(1, "Please select equipment access"),
-});
+interface AssessmentData {
+  hyroxEventsCompleted?: number;
+  bestFinishTime?: string;
+  generalFitnessYears?: number;
+  primaryTrainingBackground?: string;
+  weeklyTrainingDays?: number;
+  avgSessionLength?: number;
+  competitionFormat?: string;
+  age?: number;
+  injuryHistory?: boolean;
+  injuryRecent?: boolean;
+  kilometerRunTime?: number;
+  squatMaxReps?: number;
+  goals?: string[];
+  equipmentAccess?: string;
+}
 
-type AssessmentData = z.infer<typeof assessmentSchema>;
+interface ProgramRecommendation {
+  recommendedProgram: {
+    id: number;
+    name: string;
+    description: string;
+    difficulty: string;
+    targetEventWeeks: number;
+    category: string;
+  };
+  modifications: string[];
+  reasoningExplanation: string;
+  experienceLevel: string;
+  trainingBackground: string;
+  timeAvailability: string;
+  specialCategory: string;
+}
+
+const assessmentSteps = [
+  {
+    title: "Experience Level",
+    description: "Tell us about your HYROX background"
+  },
+  {
+    title: "Training History", 
+    description: "Your fitness and training experience"
+  },
+  {
+    title: "Current Fitness",
+    description: "Help us assess your current level"
+  },
+  {
+    title: "Goals & Equipment",
+    description: "What you want to achieve"
+  },
+  {
+    title: "Program Recommendation",
+    description: "Your personalized training plan"
+  },
+  {
+    title: "Subscription",
+    description: "Choose your plan"
+  }
+];
 
 export default function Assessment() {
+  const [currentStep, setCurrentStep] = useState(0);
+  const [assessmentData, setAssessmentData] = useState<AssessmentData>({});
+  const [recommendation, setRecommendation] = useState<ProgramRecommendation | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [step, setStep] = useState(1);
-  const [goals, setGoals] = useState<string[]>([]);
-  const totalSteps = 4;
+  const queryClient = useQueryClient();
 
-  const form = useForm<AssessmentData>({
-    resolver: zodResolver(assessmentSchema),
-    defaultValues: {
-      hyroxEventsCompleted: 0,
-      generalFitnessYears: 0,
-      weeklyTrainingDays: 3,
-      avgSessionLength: 60,
-      age: 25,
-      injuryHistory: false,
-      injuryRecent: false,
-      kilometerRunTime: 300,
-      squatMaxReps: 20,
-      goals: [],
-    },
-  });
-
-  const submitAssessmentMutation = useMutation({
+  const getRecommendationMutation = useMutation({
     mutationFn: async (data: AssessmentData) => {
-      const response = await apiRequest("POST", "/api/fitness-assessment", { 
-        ...data, 
-        goals 
-      });
-      return response.json();
+      const response = await apiRequest("POST", "/api/get-program-recommendation", data);
+      return response;
     },
-    onSuccess: (result) => {
-      toast({
-        title: "Assessment Complete!",
-        description: `Recommended program: ${result.recommendedProgram?.name}`,
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/user-onboarding-status"] });
-      window.location.href = "/programs";
+    onSuccess: (data) => {
+      setRecommendation(data);
+      setCurrentStep(4);
     },
-    onError: (error: any) => {
+    onError: () => {
       toast({
-        title: "Assessment Failed",
-        description: error.message || "Please try again",
+        title: "Error",
+        description: "Failed to get program recommendation. Please try again.",
         variant: "destructive",
       });
     },
   });
 
-  const onSubmit = (data: AssessmentData) => {
-    submitAssessmentMutation.mutate({ ...data, goals });
+  const completeAssessmentMutation = useMutation({
+    mutationFn: async (data: { assessmentData: AssessmentData; programId: number; subscriptionChoice: string }) => {
+      await apiRequest("POST", "/api/complete-assessment", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user-onboarding-status"] });
+      toast({
+        title: "Assessment Complete!",
+        description: "Your training program has been set up successfully.",
+      });
+      setLocation("/");
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to complete assessment. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const createSubscriptionMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/create-subscription");
+      return response;
+    },
+    onSuccess: (data) => {
+      if (data.paymentUrl) {
+        window.location.href = data.paymentUrl;
+      } else {
+        completeAssessmentMutation.mutate({
+          assessmentData,
+          programId: recommendation!.recommendedProgram.id,
+          subscriptionChoice: "subscribed"
+        });
+      }
+    },
+  });
+
+  const updateAssessmentData = (updates: Partial<AssessmentData>) => {
+    setAssessmentData(prev => ({ ...prev, ...updates }));
   };
 
   const nextStep = () => {
-    if (step < totalSteps) setStep(step + 1);
+    if (currentStep === 3) {
+      setIsSubmitting(true);
+      getRecommendationMutation.mutate(assessmentData);
+    } else if (currentStep < assessmentSteps.length - 1) {
+      setCurrentStep(prev => prev + 1);
+    }
   };
 
   const prevStep = () => {
-    if (step > 1) setStep(step - 1);
+    if (currentStep > 0) {
+      setCurrentStep(prev => prev - 1);
+    }
   };
 
-  const toggleGoal = (goal: string) => {
-    setGoals(prev => 
-      prev.includes(goal) 
-        ? prev.filter(g => g !== goal)
-        : [...prev, goal]
-    );
+  const handleSubscribe = () => {
+    createSubscriptionMutation.mutate();
   };
 
-  const goalOptions = [
-    "Complete first Hyrox race",
-    "Improve race time",
-    "Build functional strength",
-    "Increase cardiovascular endurance", 
-    "Lose weight",
-    "Gain muscle mass",
-    "Improve overall fitness",
-    "Compete professionally"
-  ];
+  const handleFreeTrial = () => {
+    completeAssessmentMutation.mutate({
+      assessmentData,
+      programId: recommendation!.recommendedProgram.id,
+      subscriptionChoice: "free_trial"
+    });
+  };
 
-  return (
-    <MainLayout>
-      <div className="max-w-2xl mx-auto space-y-6">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold mb-2">Fitness Assessment</h1>
-          <p className="text-muted-foreground">
-            Help us create the perfect training program for you
-          </p>
-          <div className="flex justify-center mt-4">
-            <div className="flex space-x-2">
-              {[...Array(totalSteps)].map((_, i) => (
-                <div
-                  key={i}
-                  className={`h-2 w-8 rounded-full ${
-                    i + 1 <= step ? "bg-yellow-400" : "bg-gray-200"
-                  }`}
+  const renderStepContent = () => {
+    switch (currentStep) {
+      case 0:
+        return (
+          <Card className="mobile-card">
+            <CardHeader>
+              <CardTitle className="mobile-header">HYROX Experience</CardTitle>
+              <CardDescription>Help us understand your competitive background</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label className="text-base font-medium">How many HYROX events have you completed?</Label>
+                <RadioGroup
+                  value={assessmentData.hyroxEventsCompleted?.toString()}
+                  onValueChange={(value) => updateAssessmentData({ hyroxEventsCompleted: parseInt(value) })}
+                  className="mt-2"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="0" id="events-0" />
+                    <Label htmlFor="events-0">None - I'm new to HYROX</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="1" id="events-1" />
+                    <Label htmlFor="events-1">1-2 events</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="3" id="events-3" />
+                    <Label htmlFor="events-3">3-5 events</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="6" id="events-6" />
+                    <Label htmlFor="events-6">6+ events (experienced)</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              {assessmentData.hyroxEventsCompleted && assessmentData.hyroxEventsCompleted > 0 && (
+                <div>
+                  <Label htmlFor="finish-time">Best finish time (if known)</Label>
+                  <Input
+                    id="finish-time"
+                    placeholder="e.g., 1:30:00"
+                    value={assessmentData.bestFinishTime || ""}
+                    onChange={(e) => updateAssessmentData({ bestFinishTime: e.target.value })}
+                  />
+                </div>
+              )}
+
+              <div>
+                <Label className="text-base font-medium">Competition format preference</Label>
+                <RadioGroup
+                  value={assessmentData.competitionFormat}
+                  onValueChange={(value) => updateAssessmentData({ competitionFormat: value })}
+                  className="mt-2"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="singles" id="singles" />
+                    <Label htmlFor="singles">Singles</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="doubles" id="doubles" />
+                    <Label htmlFor="doubles">Doubles (with partner)</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="both" id="both" />
+                    <Label htmlFor="both">Both formats</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+            </CardContent>
+          </Card>
+        );
+
+      case 1:
+        return (
+          <Card className="mobile-card">
+            <CardHeader>
+              <CardTitle className="mobile-header">Training Background</CardTitle>
+              <CardDescription>Tell us about your fitness journey</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="fitness-years">Years of general fitness training</Label>
+                <Input
+                  id="fitness-years"
+                  type="number"
+                  placeholder="e.g., 5"
+                  value={assessmentData.generalFitnessYears || ""}
+                  onChange={(e) => updateAssessmentData({ generalFitnessYears: parseInt(e.target.value) })}
                 />
-              ))}
-            </div>
-          </div>
-        </div>
+              </div>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  {step === 1 && <Trophy className="h-5 w-5" />}
-                  {step === 2 && <Users className="h-5 w-5" />}
-                  {step === 3 && <Clock className="h-5 w-5" />}
-                  {step === 4 && <Target className="h-5 w-5" />}
-                  
-                  {step === 1 && "Hyrox Experience"}
-                  {step === 2 && "Training Background"}
-                  {step === 3 && "Physical Assessment"}
-                  {step === 4 && "Goals & Equipment"}
+              <div>
+                <Label htmlFor="age">Age</Label>
+                <Input
+                  id="age"
+                  type="number"
+                  placeholder="e.g., 30"
+                  value={assessmentData.age || ""}
+                  onChange={(e) => updateAssessmentData({ age: parseInt(e.target.value) })}
+                />
+              </div>
+
+              <div>
+                <Label className="text-base font-medium">Primary training background</Label>
+                <RadioGroup
+                  value={assessmentData.primaryTrainingBackground}
+                  onValueChange={(value) => updateAssessmentData({ primaryTrainingBackground: value })}
+                  className="mt-2"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="crossfit" id="crossfit" />
+                    <Label htmlFor="crossfit">CrossFit</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="powerlifting" id="powerlifting" />
+                    <Label htmlFor="powerlifting">Powerlifting/Strength Training</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="running" id="running" />
+                    <Label htmlFor="running">Running/Endurance</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="general" id="general" />
+                    <Label htmlFor="general">General Fitness</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="beginner" id="beginner" />
+                    <Label htmlFor="beginner">Beginner/New to structured training</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              <div>
+                <Label htmlFor="weekly-days">Training days per week</Label>
+                <Input
+                  id="weekly-days"
+                  type="number"
+                  placeholder="e.g., 4"
+                  value={assessmentData.weeklyTrainingDays || ""}
+                  onChange={(e) => updateAssessmentData({ weeklyTrainingDays: parseInt(e.target.value) })}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="session-length">Average session length (minutes)</Label>
+                <Input
+                  id="session-length"
+                  type="number"
+                  placeholder="e.g., 60"
+                  value={assessmentData.avgSessionLength || ""}
+                  onChange={(e) => updateAssessmentData({ avgSessionLength: parseInt(e.target.value) })}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        );
+
+      case 2:
+        return (
+          <Card className="mobile-card">
+            <CardHeader>
+              <CardTitle className="mobile-header">Current Fitness Level</CardTitle>
+              <CardDescription>Help us assess your current capabilities</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="run-time">1km run time (minutes:seconds)</Label>
+                <Input
+                  id="run-time"
+                  placeholder="e.g., 4:30"
+                  value={assessmentData.kilometerRunTime || ""}
+                  onChange={(e) => updateAssessmentData({ kilometerRunTime: parseFloat(e.target.value) })}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="squat-reps">Maximum bodyweight squats (continuous)</Label>
+                <Input
+                  id="squat-reps"
+                  type="number"
+                  placeholder="e.g., 50"
+                  value={assessmentData.squatMaxReps || ""}
+                  onChange={(e) => updateAssessmentData({ squatMaxReps: parseInt(e.target.value) })}
+                />
+              </div>
+
+              <div>
+                <Label className="text-base font-medium">Injury considerations</Label>
+                <div className="space-y-2 mt-2">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="injury-history"
+                      checked={assessmentData.injuryHistory || false}
+                      onCheckedChange={(checked) => updateAssessmentData({ injuryHistory: checked as boolean })}
+                    />
+                    <Label htmlFor="injury-history">I have a history of injuries</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="injury-recent"
+                      checked={assessmentData.injuryRecent || false}
+                      onCheckedChange={(checked) => updateAssessmentData({ injuryRecent: checked as boolean })}
+                    />
+                    <Label htmlFor="injury-recent">I'm currently recovering from an injury</Label>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
+
+      case 3:
+        return (
+          <Card className="mobile-card">
+            <CardHeader>
+              <CardTitle className="mobile-header">Goals & Equipment</CardTitle>
+              <CardDescription>What do you want to achieve?</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label className="text-base font-medium">Equipment access</Label>
+                <RadioGroup
+                  value={assessmentData.equipmentAccess}
+                  onValueChange={(value) => updateAssessmentData({ equipmentAccess: value })}
+                  className="mt-2"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="full_gym" id="full-gym" />
+                    <Label htmlFor="full-gym">Full gym with all HYROX equipment</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="home_basic" id="home-basic" />
+                    <Label htmlFor="home-basic">Home gym with basic equipment</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="minimal" id="minimal" />
+                    <Label htmlFor="minimal">Minimal equipment (bodyweight focus)</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              <div>
+                <Label className="text-base font-medium">Primary goals (select all that apply)</Label>
+                <div className="space-y-2 mt-2">
+                  {[
+                    "Complete my first HYROX event",
+                    "Improve my HYROX time",
+                    "Build general fitness",
+                    "Increase strength",
+                    "Improve endurance",
+                    "Weight loss",
+                    "Muscle building"
+                  ].map((goal) => (
+                    <div key={goal} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={goal}
+                        checked={assessmentData.goals?.includes(goal) || false}
+                        onCheckedChange={(checked) => {
+                          const currentGoals = assessmentData.goals || [];
+                          if (checked) {
+                            updateAssessmentData({ goals: [...currentGoals, goal] });
+                          } else {
+                            updateAssessmentData({ goals: currentGoals.filter(g => g !== goal) });
+                          }
+                        }}
+                      />
+                      <Label htmlFor={goal}>{goal}</Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
+
+      case 4:
+        return recommendation ? (
+          <Card className="mobile-card">
+            <CardHeader>
+              <CardTitle className="mobile-header flex items-center gap-2">
+                <Trophy className="h-5 w-5 text-yellow-500" />
+                Your Recommended Program
+              </CardTitle>
+              <CardDescription>Based on your assessment responses</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="p-4 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg border-2 border-yellow-200">
+                <h3 className="text-xl font-bold text-yellow-800 mb-2">{recommendation.recommendedProgram.name}</h3>
+                <p className="text-sm text-yellow-700 mb-3">{recommendation.recommendedProgram.description}</p>
+                
+                <div className="flex flex-wrap gap-2 mb-3">
+                  <Badge className="bg-yellow-100 text-yellow-800">
+                    {recommendation.recommendedProgram.difficulty}
+                  </Badge>
+                  <Badge className="bg-blue-100 text-blue-800">
+                    <Calendar className="h-3 w-3 mr-1" />
+                    {recommendation.recommendedProgram.targetEventWeeks} weeks
+                  </Badge>
+                  <Badge className="bg-green-100 text-green-800">
+                    {recommendation.recommendedProgram.category}
+                  </Badge>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-semibold mb-2">Why this program?</h4>
+                <p className="text-sm text-muted-foreground">{recommendation.reasoningExplanation}</p>
+              </div>
+
+              {recommendation.modifications.length > 0 && (
+                <div>
+                  <h4 className="font-semibold mb-2">Personalized modifications:</h4>
+                  <ul className="space-y-1">
+                    {recommendation.modifications.map((mod, index) => (
+                      <li key={index} className="text-sm text-muted-foreground flex items-start gap-2">
+                        <Check className="h-3 w-3 text-green-500 mt-0.5 flex-shrink-0" />
+                        {mod}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4 text-center">
+                <div className="p-3 bg-muted rounded-lg">
+                  <p className="text-xs text-muted-foreground">Experience</p>
+                  <p className="font-semibold">{recommendation.experienceLevel}</p>
+                </div>
+                <div className="p-3 bg-muted rounded-lg">
+                  <p className="text-xs text-muted-foreground">Background</p>
+                  <p className="font-semibold">{recommendation.trainingBackground}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ) : null;
+
+      case 5:
+        return (
+          <div className="space-y-4">
+            <Card className="mobile-card bg-gradient-to-r from-yellow-50 to-orange-50 border-yellow-200">
+              <CardHeader className="text-center">
+                <CardTitle className="mobile-header text-yellow-800">
+                  <CreditCard className="h-6 w-6 mx-auto mb-2" />
+                  Choose Your Plan
                 </CardTitle>
-                <CardDescription>
-                  Step {step} of {totalSteps}
+                <CardDescription className="text-yellow-700">
+                  Get full access to your personalized training program
                 </CardDescription>
               </CardHeader>
-              
               <CardContent className="space-y-4">
-                {step === 1 && (
-                  <>
-                    <FormField
-                      control={form.control}
-                      name="hyroxEventsCompleted"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>How many Hyrox events have you completed?</FormLabel>
-                          <FormControl>
-                            <Input type="number" min="0" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="bestFinishTime"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Best Hyrox finish time (optional)</FormLabel>
-                          <FormControl>
-                            <Input placeholder="e.g., 1:30:00" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="competitionFormat"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Preferred competition format</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select format" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="individual">Individual</SelectItem>
-                              <SelectItem value="doubles">Doubles</SelectItem>
-                              <SelectItem value="both">Both</SelectItem>
-                              <SelectItem value="undecided">Not sure yet</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </>
-                )}
-
-                {step === 2 && (
-                  <>
-                    <FormField
-                      control={form.control}
-                      name="generalFitnessYears"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Years of general fitness training</FormLabel>
-                          <FormControl>
-                            <Input type="number" min="0" max="50" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="primaryTrainingBackground"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Primary training background</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select background" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="crossfit">CrossFit</SelectItem>
-                              <SelectItem value="running">Running</SelectItem>
-                              <SelectItem value="weightlifting">Weightlifting</SelectItem>
-                              <SelectItem value="bodybuilding">Bodybuilding</SelectItem>
-                              <SelectItem value="calisthenics">Calisthenics</SelectItem>
-                              <SelectItem value="martial_arts">Martial Arts</SelectItem>
-                              <SelectItem value="team_sports">Team Sports</SelectItem>
-                              <SelectItem value="general_fitness">General Fitness</SelectItem>
-                              <SelectItem value="beginner">Complete Beginner</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="weeklyTrainingDays"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Days per week you can train</FormLabel>
-                          <FormControl>
-                            <Input type="number" min="1" max="7" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="avgSessionLength"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Average session length (minutes)</FormLabel>
-                          <FormControl>
-                            <Input type="number" min="15" max="180" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </>
-                )}
-
-                {step === 3 && (
-                  <>
-                    <FormField
-                      control={form.control}
-                      name="age"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Age</FormLabel>
-                          <FormControl>
-                            <Input type="number" min="16" max="80" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="kilometerRunTime"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>1km run time (seconds)</FormLabel>
-                          <FormControl>
-                            <Input type="number" min="180" max="1800" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="squatMaxReps"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Maximum bodyweight squats</FormLabel>
-                          <FormControl>
-                            <Input type="number" min="0" max="200" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </>
-                )}
-
-                {step === 4 && (
-                  <>
+                <div className="bg-white rounded-lg p-4 border-2 border-yellow-300">
+                  <div className="flex items-center justify-between mb-3">
                     <div>
-                      <FormLabel className="text-base font-medium">What are your main goals?</FormLabel>
-                      <div className="grid grid-cols-2 gap-2 mt-2">
-                        {goalOptions.map((goal) => (
-                          <Button
-                            key={goal}
-                            type="button"
-                            variant={goals.includes(goal) ? "default" : "outline"}
-                            className="justify-start text-left h-auto p-3"
-                            onClick={() => toggleGoal(goal)}
-                          >
-                            {goals.includes(goal) && <CheckCircle className="h-4 w-4 mr-2" />}
-                            {goal}
-                          </Button>
-                        ))}
-                      </div>
+                      <h3 className="text-lg font-bold text-gray-900">Full Access Plan</h3>
+                      <p className="text-sm text-gray-600">Complete HYROX training experience</p>
                     </div>
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-gray-900">£5</p>
+                      <p className="text-sm text-gray-600">/month</p>
+                    </div>
+                  </div>
+                  
+                  <ul className="space-y-2 mb-4">
+                    {[
+                      "Personalized training programs",
+                      "Full workout library access",
+                      "Progress tracking & analytics",
+                      "Calendar scheduling",
+                      "Program modifications",
+                      "Expert support"
+                    ].map((feature) => (
+                      <li key={feature} className="flex items-center gap-2 text-sm">
+                        <Check className="h-4 w-4 text-green-500" />
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
 
-                    <FormField
-                      control={form.control}
-                      name="equipmentAccess"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Equipment access</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select equipment access" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="full_gym">Full Gym</SelectItem>
-                              <SelectItem value="home_basic">Home Basic (dumbbells, etc.)</SelectItem>
-                              <SelectItem value="bodyweight_only">Bodyweight Only</SelectItem>
-                              <SelectItem value="outdoor_only">Outdoor Only</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </>
-                )}
+                  <Button 
+                    className="w-full bg-yellow-500 hover:bg-yellow-600 text-white"
+                    onClick={handleSubscribe}
+                    disabled={createSubscriptionMutation.isPending}
+                  >
+                    {createSubscriptionMutation.isPending ? "Processing..." : "Subscribe Now"}
+                  </Button>
+                </div>
+
+                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <h3 className="text-lg font-bold text-gray-700">Limited Access</h3>
+                      <p className="text-sm text-gray-600">Try the workout generator only</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-gray-700">Free</p>
+                    </div>
+                  </div>
+                  
+                  <ul className="space-y-2 mb-4">
+                    {[
+                      "Random workout generator",
+                      "Basic workout tracking"
+                    ].map((feature) => (
+                      <li key={feature} className="flex items-center gap-2 text-sm text-gray-600">
+                        <Zap className="h-4 w-4 text-gray-400" />
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={handleFreeTrial}
+                    disabled={completeAssessmentMutation.isPending}
+                  >
+                    {completeAssessmentMutation.isPending ? "Setting up..." : "Continue with Limited Access"}
+                  </Button>
+                </div>
               </CardContent>
             </Card>
+          </div>
+        );
 
-            <div className="flex justify-between">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={prevStep}
-                disabled={step === 1}
-              >
-                Previous
-              </Button>
-              
-              {step < totalSteps ? (
-                <Button type="button" onClick={nextStep}>
-                  Next
-                </Button>
-              ) : (
-                <Button 
-                  type="submit" 
-                  disabled={submitAssessmentMutation.isPending}
-                  className="bg-yellow-400 hover:bg-yellow-500 text-black"
-                >
-                  {submitAssessmentMutation.isPending ? (
-                    <div className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full mr-2" />
-                  ) : null}
-                  Complete Assessment
-                </Button>
-              )}
+      default:
+        return null;
+    }
+  };
+
+  const canProceed = () => {
+    switch (currentStep) {
+      case 0:
+        return assessmentData.hyroxEventsCompleted !== undefined && assessmentData.competitionFormat;
+      case 1:
+        return assessmentData.generalFitnessYears && assessmentData.age && 
+               assessmentData.primaryTrainingBackground && assessmentData.weeklyTrainingDays &&
+               assessmentData.avgSessionLength;
+      case 2:
+        return assessmentData.kilometerRunTime && assessmentData.squatMaxReps;
+      case 3:
+        return assessmentData.equipmentAccess && assessmentData.goals && assessmentData.goals.length > 0;
+      case 4:
+        return recommendation !== null;
+      default:
+        return true;
+    }
+  };
+
+  return (
+    <MobileLayout>
+      <div className="space-y-4">
+        {/* Progress Header */}
+        <Card className="mobile-card">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <h1 className="text-lg font-bold">Initial Assessment</h1>
+              <Badge variant="secondary">
+                Step {currentStep + 1} of {assessmentSteps.length}
+              </Badge>
             </div>
-          </form>
-        </Form>
+            <Progress value={((currentStep + 1) / assessmentSteps.length) * 100} className="h-2" />
+            <div className="mt-2">
+              <p className="text-sm font-medium">{assessmentSteps[currentStep].title}</p>
+              <p className="text-xs text-muted-foreground">{assessmentSteps[currentStep].description}</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Step Content */}
+        {renderStepContent()}
+
+        {/* Navigation */}
+        {currentStep < 5 && (
+          <div className="flex gap-3">
+            {currentStep > 0 && (
+              <Button 
+                variant="outline" 
+                onClick={prevStep}
+                className="flex-1"
+              >
+                <ChevronLeft className="h-4 w-4 mr-2" />
+                Back
+              </Button>
+            )}
+            
+            <Button 
+              onClick={nextStep}
+              disabled={!canProceed() || isSubmitting || getRecommendationMutation.isPending}
+              className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white"
+            >
+              {currentStep === 3 ? (
+                getRecommendationMutation.isPending ? "Analyzing..." : "Get Recommendation"
+              ) : (
+                <>
+                  Next
+                  <ChevronRight className="h-4 w-4 ml-2" />
+                </>
+              )}
+            </Button>
+          </div>
+        )}
       </div>
-    </MainLayout>
+    </MobileLayout>
   );
 }

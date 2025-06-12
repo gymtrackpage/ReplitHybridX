@@ -161,55 +161,16 @@ export default function Dashboard() {
             <Button className="w-full" variant="outline">
               <Calendar className="mr-2 h-4 w-4" />
               Calendar
-                </Button>
-              </Link>
-              <Link href="/programs">
-                <Button className="w-full justify-start" variant="outline">
-                  <Target className="mr-2 h-4 w-4" />
-                  Browse Programs
-                </Button>
-              </Link>
-              <Link href="/progress">
-                <Button className="w-full justify-start" variant="outline">
-                  <TrendingUp className="mr-2 h-4 w-4" />
-                  Track Progress
-                </Button>
-              </Link>
-              <Link href="/workouts">
-                <Button className="w-full justify-start" variant="outline">
-                  <Dumbbell className="mr-2 h-4 w-4" />
-                  Browse Workouts
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
+            </Button>
+          </Link>
+          <Link href="/programs">
+            <Button className="w-full" variant="outline">
+              <Target className="mr-2 h-4 w-4" />
+              Programs
+            </Button>
+          </Link>
         </div>
-
-        {/* No Program Selected State */}
-        {!todayWorkout && (
-          <Card className="text-center py-12">
-            <CardContent>
-              <Target className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Ready to Start Training?</h3>
-              <p className="text-muted-foreground mb-4">
-                Select a training program to get your personalized workout schedule.
-              </p>
-              <div className="flex gap-2 justify-center">
-                <Link href="/programs">
-                  <Button className="bg-yellow-400 hover:bg-yellow-500 text-black">
-                    Browse Programs
-                  </Button>
-                </Link>
-                <Link href="/assessment">
-                  <Button variant="outline">
-                    Take Assessment
-                  </Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-        )}
       </div>
-    </MainLayout>
+    </MobileLayout>
   );
 }
