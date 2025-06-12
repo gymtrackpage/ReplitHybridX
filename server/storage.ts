@@ -437,7 +437,7 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .select({ count: db.count() })
       .from(users)
-      .where(eq(users.stripeSubscriptionId, users.stripeSubscriptionId));
+      .where(users.stripeSubscriptionId);
     return result[0]?.count || 0;
   }
 
