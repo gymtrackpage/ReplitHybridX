@@ -1853,12 +1853,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const programId = parseInt(req.params.id);
       console.log("Fetching workouts for program ID:", programId);
       
-      const workouts = await storage.getWorkoutsByProgram(programId);
-      console.log("Found workouts:", workouts.length, "workouts for program", programId);
+      if (isNaN(programId)) {
+        return res.status(400).json({ message: "Invalid program ID" });
+      }
       
-      // Ensure we always return an array
+      const workouts = await storage.getWorkoutsByProgram(programId);
+      console.log("Raw workouts result:", workouts);
+      console.log("Found workouts:", Array.isArray(workouts) ? workouts.length : 'Not an array', "workouts for program", programId);
+      
+      // Ensure we always return an array, and sort by week/day
       const workoutArray = Array.isArray(workouts) ? workouts : [];
-      res.json(workoutArray);
+      const sortedWorkouts = workoutArray.sort((a, b) => {
+        if (a.week !== b.week) return a.week - b.week;
+        return a.day - b.day;
+      });
+      
+      res.json(sortedWorkouts);
     } catch (error) {
       console.error("Error fetching program workouts:", error);
       res.status(500).json({ message: "Failed to fetch workouts" });

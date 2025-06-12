@@ -181,8 +181,11 @@ export default function Admin() {
       // Fetch workouts for this program if not already loaded
       if (!programWorkouts[programId]) {
         try {
+          console.log("Fetching workouts for program:", programId);
           const workouts = await apiRequest("GET", `/api/admin/programs/${programId}/workouts`);
-          console.log("Fetched workouts for program", programId, ":", workouts);
+          console.log("API Response for program", programId, ":", workouts);
+          console.log("Response type:", typeof workouts, "Is array:", Array.isArray(workouts));
+          
           // Ensure workouts is an array and handle various response formats
           let workoutArray = [];
           if (Array.isArray(workouts)) {
@@ -192,10 +195,15 @@ export default function Admin() {
           } else if (workouts && typeof workouts === 'object') {
             // If it's an object, try to extract array from common properties
             workoutArray = workouts.workouts || [];
+          } else {
+            console.warn("Unexpected workout data format:", workouts);
+            workoutArray = [];
           }
+          
+          console.log("Final workout array for program", programId, ":", workoutArray);
           setProgramWorkouts(prev => ({ ...prev, [programId]: workoutArray }));
         } catch (error) {
-          console.error("Failed to fetch workouts:", error);
+          console.error("Failed to fetch workouts for program", programId, ":", error);
           setProgramWorkouts(prev => ({ ...prev, [programId]: [] }));
           toast({
             title: "Error",

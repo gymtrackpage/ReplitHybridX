@@ -202,9 +202,15 @@ export class DatabaseStorage implements IStorage {
   // Workout operations
   async getWorkoutsByProgram(programId: number) {
     console.log("Storage: Fetching workouts for program ID:", programId);
-    const result = await db.select().from(workouts).where(eq(workouts.programId, programId));
-    console.log("Storage: Found", result.length, "workouts for program", programId);
-    return result;
+    try {
+      const result = await db.select().from(workouts).where(eq(workouts.programId, programId)).orderBy(asc(workouts.week), asc(workouts.day));
+      console.log("Storage: Found", result.length, "workouts for program", programId);
+      console.log("Storage: Sample workout data:", result.length > 0 ? result[0] : "No workouts found");
+      return result;
+    } catch (error) {
+      console.error("Storage error fetching workouts for program", programId, ":", error);
+      return [];
+    }
   }
 
   async getProgramWorkouts(programId: number): Promise<Workout[]> {
