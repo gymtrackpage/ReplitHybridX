@@ -591,6 +591,104 @@ export default function Admin() {
         </div>
       )}
 
+      {/* Edit Program Dialog */}
+      {editingProgram && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Edit Program</h3>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="edit-name">Program Name</Label>
+                <Input
+                  id="edit-name"
+                  defaultValue={editingProgram.name}
+                  onChange={(e) => setEditingProgram({...editingProgram, name: e.target.value})}
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="edit-description">Description</Label>
+                <Textarea
+                  id="edit-description"
+                  defaultValue={editingProgram.description}
+                  onChange={(e) => setEditingProgram({...editingProgram, description: e.target.value})}
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-difficulty">Difficulty</Label>
+                  <Select value={editingProgram.difficulty} onValueChange={(value) => setEditingProgram({...editingProgram, difficulty: value})}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Beginner">Beginner</SelectItem>
+                      <SelectItem value="Intermediate">Intermediate</SelectItem>
+                      <SelectItem value="Advanced">Advanced</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div>
+                  <Label htmlFor="edit-category">Category</Label>
+                  <Select value={editingProgram.category} onValueChange={(value) => setEditingProgram({...editingProgram, category: value})}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Hyrox">Hyrox</SelectItem>
+                      <SelectItem value="CrossFit">CrossFit</SelectItem>
+                      <SelectItem value="Running">Running</SelectItem>
+                      <SelectItem value="Strength">Strength</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-duration">Duration (weeks)</Label>
+                  <Input
+                    id="edit-duration"
+                    type="number"
+                    defaultValue={editingProgram.duration}
+                    onChange={(e) => setEditingProgram({...editingProgram, duration: parseInt(e.target.value) || 12})}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="edit-frequency">Frequency (days/week)</Label>
+                  <Input
+                    id="edit-frequency"
+                    type="number"
+                    defaultValue={editingProgram.frequency}
+                    onChange={(e) => setEditingProgram({...editingProgram, frequency: parseInt(e.target.value) || 4})}
+                  />
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex gap-2 mt-6">
+              <Button 
+                variant="outline" 
+                className="flex-1"
+                onClick={() => setEditingProgram(null)}
+              >
+                Cancel
+              </Button>
+              <Button 
+                className="flex-1 bg-blue-600 hover:bg-blue-700"
+                onClick={() => updateProgramMutation.mutate(editingProgram)}
+                disabled={updateProgramMutation.isPending}
+              >
+                {updateProgramMutation.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Bottom Navigation Spacer */}
       <div className="h-20"></div>
     </div>
