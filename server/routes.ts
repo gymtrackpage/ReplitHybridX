@@ -760,6 +760,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get program recommendation (without saving assessment)
+  app.post('/api/get-program-recommendation', isAuthenticated, async (req: any, res) => {
+    try {
+      console.log("Getting program recommendation for assessment data:", req.body);
+      
+      // Use your program selection algorithm
+      const programRecommendation = selectHyroxProgram(req.body);
+      console.log("Generated program recommendation:", programRecommendation);
+      
+      res.json({
+        programRecommendation,
+        success: true
+      });
+    } catch (error) {
+      console.error("Error generating program recommendation:", error);
+      res.status(500).json({ message: "Failed to generate program recommendation" });
+    }
+  });
+
   // Assessment routes
   app.post('/api/assessment', isAuthenticated, async (req: any, res) => {
     try {

@@ -88,17 +88,30 @@ export default function Assessment() {
 
   const getRecommendationMutation = useMutation({
     mutationFn: async (data: AssessmentData) => {
+      console.log("Sending assessment data:", data);
       const response = await apiRequest("POST", "/api/get-program-recommendation", data);
+      console.log("Received recommendation response:", response);
       return response;
     },
     onSuccess: (data: any) => {
-      setRecommendation(data as ProgramRecommendation);
-      setCurrentStep(3);
+      console.log("Assessment completed successfully:", data);
+      if (data && data.programRecommendation) {
+        setRecommendation(data.programRecommendation as ProgramRecommendation);
+        setCurrentStep(3);
+      } else {
+        console.error("No program recommendation in response:", data);
+        toast({
+          title: "Error",
+          description: "No program recommendation received. Please try again.",
+          variant: "destructive",
+        });
+      }
     },
-    onError: () => {
+    onError: (error: any) => {
+      console.error("Assessment error:", error);
       toast({
-        title: "Error",
-        description: "Failed to get program recommendation. Please try again.",
+        title: "Error", 
+        description: error.message || "Failed to get program recommendation. Please try again.",
         variant: "destructive",
       });
     },
