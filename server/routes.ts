@@ -14,9 +14,12 @@ import { createMinimalPrograms } from "./quickProgramSetup";
 import Stripe from "stripe";
 import { insertProgramSchema, insertWorkoutSchema, insertAssessmentSchema, insertWeightEntrySchema } from "../shared/schema";
 
-// Async error wrapper
+// Enhanced async error wrapper with logging
 const asyncHandler = (fn: Function) => (req: Request, res: Response, next: NextFunction) => {
-  Promise.resolve(fn(req, res, next)).catch(next);
+  Promise.resolve(fn(req, res, next)).catch((error) => {
+    console.error(`Error in ${req.method} ${req.path}:`, error);
+    next(error);
+  });
 };
 
 // Environment validation

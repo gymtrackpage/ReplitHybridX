@@ -617,7 +617,7 @@ export default function Admin() {
                 <Label htmlFor="edit-name">Program Name</Label>
                 <Input
                   id="edit-name"
-                  defaultValue={editingProgram.name}
+                  defaultValue={editingProgram.name || ""}
                   onChange={(e) => setEditingProgram({...editingProgram, name: e.target.value})}
                 />
               </div>
@@ -626,7 +626,7 @@ export default function Admin() {
                 <Label htmlFor="edit-description">Description</Label>
                 <Textarea
                   id="edit-description"
-                  defaultValue={editingProgram.description}
+                  defaultValue={editingProgram.description || ""}
                   onChange={(e) => setEditingProgram({...editingProgram, description: e.target.value})}
                 />
               </div>

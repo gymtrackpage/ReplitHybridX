@@ -18,7 +18,7 @@ export function MobileLayout({ children }: MobileLayoutProps) {
 
       {/* Main Content - Scrollable with fixed padding */}
       <main className="flex-1 overflow-y-auto pt-14 pb-16 bg-background">
-        <div className="mobile-container">
+        <div className="mobile-container min-h-full">
           {children}
         </div>
       </main>
