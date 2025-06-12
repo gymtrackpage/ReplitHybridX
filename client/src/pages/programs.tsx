@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { MainLayout } from "@/components/layout/main-layout";
+import { MobileLayout } from "@/components/layout/mobile-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -42,10 +42,10 @@ export default function Programs() {
 
   if (isLoading) {
     return (
-      <MainLayout>
-        <div className="space-y-6">
+      <MobileLayout>
+        <div className="space-y-4">
           <div className="h-8 bg-gray-200 rounded animate-pulse" />
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4">
             {[...Array(6)].map((_, i) => (
               <Card key={i} className="h-64 animate-pulse">
                 <CardContent className="p-0 h-full bg-gray-100 rounded" />
@@ -53,7 +53,7 @@ export default function Programs() {
             ))}
           </div>
         </div>
-      </MainLayout>
+      </MobileLayout>
     );
   }
 
@@ -76,7 +76,7 @@ export default function Programs() {
   };
 
   return (
-    <MainLayout>
+    <MobileLayout>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>

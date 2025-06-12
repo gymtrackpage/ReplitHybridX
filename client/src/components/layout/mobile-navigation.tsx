@@ -24,7 +24,7 @@ export function MobileNavigation() {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 dark:bg-gray-900 dark:border-gray-700">
+    <nav className="bg-white/95 backdrop-blur-sm border-t border-gray-200 shadow-lg">
       <div className="grid grid-cols-5 h-16">
         {navItems.map((item) => {
           const Icon = item.icon;
@@ -33,13 +33,13 @@ export function MobileNavigation() {
           return (
             <Link key={item.path} href={item.path}>
               <a className={cn(
-                "flex flex-col items-center justify-center h-full text-xs font-medium transition-colors",
+                "flex flex-col items-center justify-center h-full text-xs font-medium transition-all duration-200 ease-in-out",
                 isActive 
-                  ? "text-yellow-500 bg-yellow-50 dark:bg-yellow-900/20" 
-                  : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  ? "text-yellow-500 bg-yellow-50/80 scale-105" 
+                  : "text-gray-500 hover:text-gray-700 hover:bg-gray-50/50 active:scale-95"
               )}>
-                <Icon className={cn("h-5 w-5 mb-1", isActive && "text-yellow-500")} />
-                <span className={cn("text-xs", isActive && "text-yellow-500")}>{item.label}</span>
+                <Icon className={cn("h-5 w-5 mb-1 transition-colors", isActive && "text-yellow-500")} />
+                <span className={cn("text-xs font-medium", isActive && "text-yellow-500")}>{item.label}</span>
               </a>
             </Link>
           );
