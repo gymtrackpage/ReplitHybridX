@@ -40,15 +40,15 @@ export function MobileNavigation() {
           
           return (
             <Link key={item.path} href={item.path}>
-              <a className={cn(
-                "flex flex-col items-center justify-center h-full text-xs font-medium transition-all duration-200 ease-in-out",
+              <div className={cn(
+                "flex flex-col items-center justify-center h-full text-xs font-medium transition-all duration-200 ease-in-out cursor-pointer",
                 isActive 
                   ? "text-yellow-500 bg-yellow-50/80 scale-105" 
                   : "text-gray-500 hover:text-gray-700 hover:bg-gray-50/50 active:scale-95"
               )}>
                 <Icon className={cn("h-5 w-5 mb-1 transition-colors", isActive && "text-yellow-500")} />
                 <span className={cn("text-xs font-medium", isActive && "text-yellow-500")}>{item.label}</span>
-              </a>
+              </div>
             </Link>
           );
         })}

@@ -10,26 +10,45 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/useAuth";
+import { useLocation } from "wouter";
 import { 
-  Shield, 
   Users, 
-  Edit, 
-  Trash2, 
+  Database, 
   Upload, 
+  Edit3,
+  Trash2,
+  Plus,
+  ChevronDown,
+  ChevronRight,
   Crown,
-  CreditCard,
-  Dumbbell,
-  FileText
+  Settings
 } from "lucide-react";
 
 export default function Admin() {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const [_, setLocation] = useLocation();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [activeTab, setActiveTab] = useState("programs");
   const [selectedUser, setSelectedUser] = useState<any>(null);
-  const [selectedProgram, setSelectedProgram] = useState<any>(null);
   const [editingUser, setEditingUser] = useState(false);
-  const [editingProgram, setEditingProgram] = useState(false);
-  const [activeTab, setActiveTab] = useState("overview");
+  const [expandedPrograms, setExpandedPrograms] = useState<Set<number>>(new Set());
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [uploadForm, setUploadForm] = useState({
+    name: "",
+    description: "",
+    difficulty: "Beginner",
+    category: "Hyrox",
+    duration: 12,
+    frequency: 4
+  });
+
+  // Redirect non-admin users
+  if (!user?.isAdmin) {
+    setLocation("/");
+    return null;
+  }
 
   // Queries
   const { data: users = [], isLoading: usersLoading } = useQuery({
@@ -54,34 +73,6 @@ export default function Admin() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
       setEditingUser(false);
       setSelectedUser(null);
-    },
-    onError: (error: any) => {
-      toast({ title: "Update Failed", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const deleteUserMutation = useMutation({
-    mutationFn: async (userId: string) => {
-      await apiRequest("DELETE", `/api/admin/users/${userId}`);
-    },
-    onSuccess: () => {
-      toast({ title: "User Deleted", description: "User has been deleted successfully." });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-    },
-    onError: (error: any) => {
-      toast({ title: "Delete Failed", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const updateProgramMutation = useMutation({
-    mutationFn: async (programData: any) => {
-      await apiRequest("PUT", `/api/admin/programs/${programData.id}`, programData);
-    },
-    onSuccess: () => {
-      toast({ title: "Program Updated", description: "Program has been updated successfully." });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/programs"] });
-      setEditingProgram(false);
-      setSelectedProgram(null);
     },
     onError: (error: any) => {
       toast({ title: "Update Failed", description: error.message, variant: "destructive" });
@@ -119,6 +110,15 @@ export default function Admin() {
         description: `Successfully uploaded program with ${data.workoutCount} workouts.` 
       });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/programs"] });
+      setUploadModalOpen(false);
+      setUploadForm({
+        name: "",
+        description: "",
+        difficulty: "Beginner",
+        category: "Hyrox",
+        duration: 12,
+        frequency: 4
+      });
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
@@ -132,452 +132,380 @@ export default function Admin() {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (!file.name.endsWith('.csv')) {
-      toast({ title: "Invalid File", description: "Please upload a CSV file.", variant: "destructive" });
+    if (!file.name.endsWith('.csv') && !file.name.endsWith('.xlsx')) {
+      toast({ title: "Invalid File", description: "Please upload a CSV or XLSX file.", variant: "destructive" });
       return;
     }
 
     const formData = new FormData();
     formData.append("csvFile", file);
+    formData.append("name", uploadForm.name);
+    formData.append("description", uploadForm.description);
+    formData.append("difficulty", uploadForm.difficulty);
+    formData.append("category", uploadForm.category);
+    formData.append("duration", uploadForm.duration.toString());
+    formData.append("frequency", uploadForm.frequency.toString());
+    
     uploadProgramMutation.mutate(formData);
   };
 
-  const getSubscriptionStatus = (user: any) => {
-    if (!user.stripeSubscriptionId) return { status: "Free", color: "bg-gray-100 text-gray-800" };
-    return { status: "Premium", color: "bg-green-100 text-green-800" };
+  const toggleProgramExpansion = (programId: number) => {
+    const newExpanded = new Set(expandedPrograms);
+    if (newExpanded.has(programId)) {
+      newExpanded.delete(programId);
+    } else {
+      newExpanded.add(programId);
+    }
+    setExpandedPrograms(newExpanded);
+  };
+
+  const makeUserAdmin = (userId: string) => {
+    updateUserMutation.mutate({ id: userId, isAdmin: true });
+  };
+
+  const removeAdmin = (userId: string) => {
+    updateUserMutation.mutate({ id: userId, isAdmin: false });
   };
 
   return (
-    <MobileLayout>
-      <div className="space-y-6">
-        {/* Admin Header */}
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Shield className="h-8 w-8 text-red-600" />
-            <div>
-              <h1 className="text-3xl font-bold">Admin Panel</h1>
-              <p className="text-muted-foreground">System administration and management</p>
+            <div className="w-8 h-8 bg-black text-white rounded flex items-center justify-center font-bold text-sm">
+              HX
             </div>
+            <h1 className="text-xl font-semibold">Admin Panel</h1>
           </div>
-          <Badge className="bg-red-100 text-red-800 gap-1">
-            <Crown className="h-3 w-3" />
-            Administrator
-          </Badge>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+              Admin
+            </div>
+            <Button variant="outline" size="sm" onClick={() => setLocation("/")}>
+              Logout
+            </Button>
+          </div>
         </div>
+      </div>
 
-        {/* System Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-2xl font-bold">{systemStats?.totalUsers || 0}</div>
-              <p className="text-xs text-muted-foreground">Total Users</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-2xl font-bold">{systemStats?.activeSubscriptions || 0}</div>
-              <p className="text-xs text-muted-foreground">Active Subscriptions</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-2xl font-bold">{systemStats?.totalPrograms || 0}</div>
-              <p className="text-xs text-muted-foreground">Total Programs</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-2xl font-bold">{systemStats?.totalWorkouts || 0}</div>
-              <p className="text-xs text-muted-foreground">Total Workouts</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Navigation Tabs */}
-        <div className="flex space-x-1 bg-muted p-1 rounded-lg">
+      {/* Navigation Tabs */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="flex">
           <button
-            onClick={() => setActiveTab("overview")}
-            className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-              activeTab === "overview" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
+            onClick={() => setActiveTab("programs")}
+            className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === "programs" 
+                ? "border-yellow-500 text-yellow-600 bg-yellow-50" 
+                : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50"
             }`}
           >
-            Overview
+            <Database className="w-4 h-4" />
+            Programs
           </button>
           <button
             onClick={() => setActiveTab("users")}
-            className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-              activeTab === "users" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
+            className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === "users" 
+                ? "border-yellow-500 text-yellow-600 bg-yellow-50" 
+                : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50"
             }`}
           >
-            <Users className="h-4 w-4 inline mr-1" />
+            <Users className="w-4 h-4" />
             Users
           </button>
-          <button
-            onClick={() => setActiveTab("programs")}
-            className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-              activeTab === "programs" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
-            }`}
-          >
-            <Dumbbell className="h-4 w-4 inline mr-1" />
-            Programs
-          </button>
         </div>
+      </div>
 
-        {/* Tab Content */}
-        {activeTab === "overview" && (
-          <div className="space-y-6">
+      {/* Content */}
+      <div className="p-4">
+        {activeTab === "programs" && (
+          <div className="space-y-4">
+            {/* Training Programs Header */}
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold">Training Programs</h2>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  className="gap-2"
+                  onClick={() => setUploadModalOpen(true)}
+                >
+                  <Upload className="w-4 h-4" />
+                  Upload CSV/XLSX
+                </Button>
+                <Button className="gap-2 bg-yellow-500 hover:bg-yellow-600 text-black">
+                  <Plus className="w-4 h-4" />
+                  Add Program
+                </Button>
+              </div>
+            </div>
+
+            {/* Programs List */}
+            <div className="space-y-3">
+              {programsLoading ? (
+                <div className="text-center py-8">Loading programs...</div>
+              ) : (
+                programs.map((program: any) => (
+                  <Card key={program.id} className="overflow-hidden">
+                    <div className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3 flex-1">
+                          <button
+                            onClick={() => toggleProgramExpansion(program.id)}
+                            className="text-gray-400 hover:text-gray-600"
+                          >
+                            {expandedPrograms.has(program.id) ? (
+                              <ChevronDown className="w-5 h-5" />
+                            ) : (
+                              <ChevronRight className="w-5 h-5" />
+                            )}
+                          </button>
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-lg">{program.name}</h3>
+                            {expandedPrograms.has(program.id) && (
+                              <p className="text-gray-600 mt-1 text-sm">{program.description}</p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <Button variant="outline" size="sm" className="gap-1">
+                            <Plus className="w-3 h-3" />
+                          </Button>
+                          <Button variant="outline" size="sm" className="gap-1">
+                            <Edit3 className="w-3 h-3" />
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="gap-1"
+                            onClick={() => deleteProgramMutation.mutate(program.id)}
+                            disabled={deleteProgramMutation.isPending}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Program Details */}
+                      <div className="flex gap-4 mt-3 text-sm">
+                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                          {program.difficulty}
+                        </Badge>
+                        <span className="text-gray-600">{program.duration || 12} weeks</span>
+                        <span className="text-gray-600">{program.frequency || 4}x/week</span>
+                        <span className="text-gray-600">{program.category || "Hyrox"}</span>
+                        <span className="text-gray-600">Workouts: {program.workoutCount || 0}</span>
+                      </div>
+                    </div>
+                  </Card>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === "users" && (
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold">User Management</h2>
+            
             <Card>
-              <CardHeader>
-                <CardTitle>System Overview</CardTitle>
-                <CardDescription>Quick actions and system status</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex gap-4">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".csv"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                  />
-                  <Button 
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploadProgramMutation.isPending}
-                    className="gap-2"
-                  >
-                    <Upload className="h-4 w-4" />
-                    Upload Program CSV
-                  </Button>
-                  <Button variant="outline" className="gap-2">
-                    <FileText className="h-4 w-4" />
-                    Export Data
-                  </Button>
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  <p><strong>CSV Format:</strong> week, day, name, description, duration, exercises</p>
-                  <p>Exercise data should be JSON formatted or plain text description</p>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 border-b">
+                      <tr>
+                        <th className="text-left p-4 font-medium text-gray-600">User</th>
+                        <th className="text-left p-4 font-medium text-gray-600">Email</th>
+                        <th className="text-left p-4 font-medium text-gray-600">Admin</th>
+                        <th className="text-left p-4 font-medium text-gray-600">Program</th>
+                        <th className="text-left p-4 font-medium text-gray-600">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {usersLoading ? (
+                        <tr>
+                          <td colSpan={5} className="text-center py-8">Loading users...</td>
+                        </tr>
+                      ) : (
+                        users.map((user: any) => (
+                          <tr key={user.id} className="border-b hover:bg-gray-50">
+                            <td className="p-4">
+                              <div>
+                                <div className="font-medium">
+                                  {user.firstName} {user.lastName}
+                                  {user.isAdmin && <Crown className="inline w-4 h-4 ml-1 text-yellow-500" />}
+                                </div>
+                                <div className="text-sm text-gray-500">
+                                  ID: {user.id?.slice(0, 8)}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="p-4 text-gray-600">{user.email}</td>
+                            <td className="p-4">
+                              {user.isAdmin ? (
+                                <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300">
+                                  Admin
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline">User</Badge>
+                              )}
+                            </td>
+                            <td className="p-4 text-gray-600">
+                              {user.currentProgramId ? `Program ${user.currentProgramId}` : "None"}
+                            </td>
+                            <td className="p-4">
+                              {user.isAdmin ? (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={() => removeAdmin(user.id)}
+                                  disabled={updateUserMutation.isPending}
+                                >
+                                  Remove Admin
+                                </Button>
+                              ) : (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={() => makeUserAdmin(user.id)}
+                                  disabled={updateUserMutation.isPending}
+                                >
+                                  Make Admin
+                                </Button>
+                              )}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </CardContent>
             </Card>
           </div>
         )}
+      </div>
 
-        {activeTab === "users" && (
-          <Card>
+      {/* Upload Modal */}
+      {uploadModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md">
             <CardHeader>
-              <CardTitle>User Management</CardTitle>
-              <CardDescription>View and manage all registered users</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {usersLoading ? (
-                  <div className="text-center py-8">Loading users...</div>
-                ) : (
-                  users.map((user: any) => {
-                    const subscription = getSubscriptionStatus(user);
-                    return (
-                      <div key={user.id} className="flex items-center justify-between p-4 border rounded-lg">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3">
-                            <div>
-                              <div className="font-medium">
-                                {user.firstName} {user.lastName}
-                                {user.isAdmin && <Crown className="inline h-4 w-4 ml-1 text-yellow-600" />}
-                              </div>
-                              <div className="text-sm text-muted-foreground">{user.email}</div>
-                            </div>
-                          </div>
-                          <div className="flex gap-2 mt-2">
-                            <Badge className={subscription.color}>
-                              <CreditCard className="h-3 w-3 mr-1" />
-                              {subscription.status}
-                            </Badge>
-                            {user.fitnessLevel && (
-                              <Badge variant="outline">{user.fitnessLevel}</Badge>
-                            )}
-                            {user.currentProgramId && (
-                              <Badge variant="outline">Program Active</Badge>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => {
-                              setSelectedUser(user);
-                              setEditingUser(true);
-                            }}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => deleteUserMutation.mutate(user.id)}
-                            disabled={deleteUserMutation.isPending}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
+              <div className="flex items-center justify-between">
+                <CardTitle>Upload Program from CSV/XLSX</CardTitle>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setUploadModalOpen(false)}
+                >
+                  ×
+                </Button>
               </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {activeTab === "programs" && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Program Management</CardTitle>
-              <CardDescription>Manage training programs and workouts</CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {programsLoading ? (
-                  <div className="text-center py-8">Loading programs...</div>
-                ) : (
-                  programs.map((program: any) => (
-                    <div key={program.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex-1">
-                        <div className="font-medium">{program.name}</div>
-                        <div className="text-sm text-muted-foreground">{program.description}</div>
-                        <div className="flex gap-2 mt-2">
-                          <Badge variant="outline">{program.difficulty}</Badge>
-                          <Badge variant="outline">{program.duration} weeks</Badge>
-                          <Badge variant="outline">{program.workoutCount || 0} workouts</Badge>
-                          {!program.isActive && <Badge variant="destructive">Inactive</Badge>}
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => {
-                            setSelectedProgram(program);
-                            setEditingProgram(true);
-                          }}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => deleteProgramMutation.mutate(program.id)}
-                          disabled={deleteProgramMutation.isPending}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))
-                )}
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="programName">Program Name</Label>
+                <Input
+                  id="programName"
+                  placeholder="e.g., Advanced Hyrox Program"
+                  value={uploadForm.name}
+                  onChange={(e) => setUploadForm({...uploadForm, name: e.target.value})}
+                />
               </div>
+              
+              <div>
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  placeholder="Detailed program description..."
+                  value={uploadForm.description}
+                  onChange={(e) => setUploadForm({...uploadForm, description: e.target.value})}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="difficulty">Difficulty</Label>
+                  <Select value={uploadForm.difficulty} onValueChange={(value) => setUploadForm({...uploadForm, difficulty: value})}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Beginner">Beginner</SelectItem>
+                      <SelectItem value="Intermediate">Intermediate</SelectItem>
+                      <SelectItem value="Advanced">Advanced</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div>
+                  <Label htmlFor="category">Category</Label>
+                  <Select value={uploadForm.category} onValueChange={(value) => setUploadForm({...uploadForm, category: value})}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Hyrox">Hyrox</SelectItem>
+                      <SelectItem value="Strength">Strength</SelectItem>
+                      <SelectItem value="Cardio">Cardio</SelectItem>
+                      <SelectItem value="Mixed">Mixed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="duration">Duration (weeks)</Label>
+                  <Input
+                    id="duration"
+                    type="number"
+                    value={uploadForm.duration}
+                    onChange={(e) => setUploadForm({...uploadForm, duration: parseInt(e.target.value) || 12})}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="frequency">Frequency (days/week)</Label>
+                  <Input
+                    id="frequency"
+                    type="number"
+                    value={uploadForm.frequency}
+                    onChange={(e) => setUploadForm({...uploadForm, frequency: parseInt(e.target.value) || 4})}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="csvFile">CSV/XLSX File</Label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv,.xlsx"
+                  onChange={handleFileUpload}
+                  className="w-full mt-1 p-2 border border-gray-300 rounded-md"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Upload CSV or XLSX file with columns: week, day, name, description, duration, exercises
+                </p>
+              </div>
+
+              <Button 
+                className="w-full bg-yellow-500 hover:bg-yellow-600 text-black"
+                disabled={uploadProgramMutation.isPending || !uploadForm.name}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                Upload Program
+              </Button>
             </CardContent>
           </Card>
-        )}
-
-        {/* Edit User Modal */}
-        {editingUser && selectedUser && (
-          <Card className="fixed inset-4 z-50 bg-background border shadow-lg">
-            <CardHeader>
-              <CardTitle>Edit User</CardTitle>
-              <CardDescription>Update user information and settings</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <UserEditForm 
-                user={selectedUser} 
-                onSubmit={(userData) => updateUserMutation.mutate(userData)}
-                onCancel={() => {
-                  setEditingUser(false);
-                  setSelectedUser(null);
-                }}
-                isLoading={updateUserMutation.isPending}
-              />
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Edit Program Modal */}
-        {editingProgram && selectedProgram && (
-          <Card className="fixed inset-4 z-50 bg-background border shadow-lg">
-            <CardHeader>
-              <CardTitle>Edit Program</CardTitle>
-              <CardDescription>Update program information</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ProgramEditForm 
-                program={selectedProgram} 
-                onSubmit={(programData) => updateProgramMutation.mutate(programData)}
-                onCancel={() => {
-                  setEditingProgram(false);
-                  setSelectedProgram(null);
-                }}
-                isLoading={updateProgramMutation.isPending}
-              />
-            </CardContent>
-          </Card>
-        )}
-      </div>
-    </MobileLayout>
-  );
-}
-
-// User Edit Form Component
-function UserEditForm({ user, onSubmit, onCancel, isLoading }: any) {
-  const [formData, setFormData] = useState({
-    firstName: user?.firstName || "",
-    lastName: user?.lastName || "",
-    email: user?.email || "",
-    fitnessLevel: user?.fitnessLevel || "",
-    isAdmin: user?.isAdmin || false,
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSubmit({ ...formData, id: user.id });
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="firstName">First Name</Label>
-          <Input
-            id="firstName"
-            value={formData.firstName}
-            onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-          />
         </div>
-        <div>
-          <Label htmlFor="lastName">Last Name</Label>
-          <Input
-            id="lastName"
-            value={formData.lastName}
-            onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-          />
-        </div>
-      </div>
-      <div>
-        <Label htmlFor="email">Email</Label>
-        <Input
-          id="email"
-          type="email"
-          value={formData.email}
-          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-        />
-      </div>
-      <div>
-        <Label htmlFor="fitnessLevel">Fitness Level</Label>
-        <Select value={formData.fitnessLevel} onValueChange={(value) => setFormData({ ...formData, fitnessLevel: value })}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select fitness level" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="beginner">Beginner</SelectItem>
-            <SelectItem value="intermediate">Intermediate</SelectItem>
-            <SelectItem value="advanced">Advanced</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="flex items-center space-x-2">
-        <input
-          type="checkbox"
-          id="isAdmin"
-          checked={formData.isAdmin}
-          onChange={(e) => setFormData({ ...formData, isAdmin: e.target.checked })}
-        />
-        <Label htmlFor="isAdmin">Administrator</Label>
-      </div>
-      <div className="flex gap-2">
-        <Button type="submit" disabled={isLoading}>
-          {isLoading ? "Updating..." : "Update User"}
-        </Button>
-        <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
-        </Button>
-      </div>
-    </form>
-  );
-}
+      )}
 
-// Program Edit Form Component
-function ProgramEditForm({ program, onSubmit, onCancel, isLoading }: any) {
-  const [formData, setFormData] = useState({
-    name: program?.name || "",
-    description: program?.description || "",
-    difficulty: program?.difficulty || "",
-    duration: program?.duration || "",
-    isActive: program?.isActive ?? true,
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSubmit({ ...formData, id: program.id });
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <Label htmlFor="name">Program Name</Label>
-        <Input
-          id="name"
-          value={formData.name}
-          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-        />
-      </div>
-      <div>
-        <Label htmlFor="description">Description</Label>
-        <Textarea
-          id="description"
-          value={formData.description}
-          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-        />
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="difficulty">Difficulty</Label>
-          <Select value={formData.difficulty} onValueChange={(value) => setFormData({ ...formData, difficulty: value })}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select difficulty" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="beginner">Beginner</SelectItem>
-              <SelectItem value="intermediate">Intermediate</SelectItem>
-              <SelectItem value="advanced">Advanced</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label htmlFor="duration">Duration (weeks)</Label>
-          <Input
-            id="duration"
-            type="number"
-            value={formData.duration}
-            onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
-          />
-        </div>
-      </div>
-      <div className="flex items-center space-x-2">
-        <input
-          type="checkbox"
-          id="isActive"
-          checked={formData.isActive}
-          onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-        />
-        <Label htmlFor="isActive">Active Program</Label>
-      </div>
-      <div className="flex gap-2">
-        <Button type="submit" disabled={isLoading}>
-          {isLoading ? "Updating..." : "Update Program"}
-        </Button>
-        <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
-        </Button>
-      </div>
-    </form>
+      {/* Bottom Navigation Spacer */}
+      <div className="h-20"></div>
+    </div>
   );
 }
