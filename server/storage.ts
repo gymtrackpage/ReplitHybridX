@@ -72,7 +72,13 @@ export interface IStorage {
 
   // Admin operations
   getAllUsers(): Promise<User[]>;
-  updateUserAdmin(userId: string, isAdmin: boolean): Promise<User>;
+  updateUserAdmin(userId: string, updates: Partial<User>): Promise<User>;
+  deleteUser(userId: string): Promise<void>;
+  getTotalUsers(): Promise<number>;
+  getActiveSubscriptions(): Promise<number>;
+  getTotalPrograms(): Promise<number>;
+  getTotalWorkouts(): Promise<number>;
+  getAllProgramsWithWorkoutCount(): Promise<(Program & { workoutCount: number })[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -397,6 +403,72 @@ export class DatabaseStorage implements IStorage {
     // For now, just return true as placeholder
     console.log(`Pushing workout to Strava for user ${userId}:`, workoutData);
     return true;
+  }
+
+  // Admin operations
+  async getAllUsers(): Promise<User[]> {
+    return await db.select().from(users).orderBy(desc(users.createdAt));
+  }
+
+  async updateUserAdmin(userId: string, updates: Partial<User>): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(users.id, userId))
+      .returning();
+    return user;
+  }
+
+  async deleteUser(userId: string): Promise<void> {
+    // Delete user and related data
+    await db.delete(workoutCompletions).where(eq(workoutCompletions.userId, userId));
+    await db.delete(userProgress).where(eq(userProgress.userId, userId));
+    await db.delete(assessments).where(eq(assessments.userId, userId));
+    await db.delete(weightEntries).where(eq(weightEntries.userId, userId));
+    await db.delete(users).where(eq(users.id, userId));
+  }
+
+  async getTotalUsers(): Promise<number> {
+    const result = await db.select({ count: db.count() }).from(users);
+    return result[0]?.count || 0;
+  }
+
+  async getActiveSubscriptions(): Promise<number> {
+    const result = await db
+      .select({ count: db.count() })
+      .from(users)
+      .where(eq(users.stripeSubscriptionId, users.stripeSubscriptionId));
+    return result[0]?.count || 0;
+  }
+
+  async getTotalPrograms(): Promise<number> {
+    const result = await db.select({ count: db.count() }).from(programs);
+    return result[0]?.count || 0;
+  }
+
+  async getTotalWorkouts(): Promise<number> {
+    const result = await db.select({ count: db.count() }).from(workouts);
+    return result[0]?.count || 0;
+  }
+
+  async getAllProgramsWithWorkoutCount(): Promise<(Program & { workoutCount: number })[]> {
+    const programsData = await db.select().from(programs).orderBy(desc(programs.createdAt));
+    
+    const programsWithCount = await Promise.all(
+      programsData.map(async (program) => {
+        const workoutCount = await db
+          .select({ count: db.count() })
+          .from(workouts)
+          .where(eq(workouts.programId, program.id));
+        
+        return {
+          ...program,
+          workoutCount: workoutCount[0]?.count || 0
+        };
+      })
+    );
+    
+    return programsWithCount;
   }
 }
 

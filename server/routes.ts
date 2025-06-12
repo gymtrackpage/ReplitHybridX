@@ -1747,6 +1747,225 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== ADMIN ENDPOINTS =====
+  // Admin: Get system statistics
+  app.get('/api/admin/stats', isAuthenticated, requireAdmin, async (req: any, res) => {
+    try {
+      const [totalUsers, activeSubscriptions, totalPrograms, totalWorkouts] = await Promise.all([
+        storage.getTotalUsers(),
+        storage.getActiveSubscriptions(),
+        storage.getTotalPrograms(),
+        storage.getTotalWorkouts()
+      ]);
+
+      res.json({
+        totalUsers,
+        activeSubscriptions,
+        totalPrograms,
+        totalWorkouts
+      });
+    } catch (error) {
+      console.error("Error fetching admin stats:", error);
+      res.status(500).json({ message: "Failed to fetch statistics" });
+    }
+  });
+
+  // Admin: Get all users
+  app.get('/api/admin/users', isAuthenticated, requireAdmin, async (req: any, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      res.json(users);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  // Admin: Update user
+  app.put('/api/admin/users/:userId', isAuthenticated, requireAdmin, async (req: any, res) => {
+    try {
+      const { userId } = req.params;
+      const updateData = req.body;
+      
+      await storage.updateUserAdmin(userId, updateData);
+      res.json({ message: "User updated successfully" });
+    } catch (error) {
+      console.error("Error updating user:", error);
+      res.status(500).json({ message: "Failed to update user" });
+    }
+  });
+
+  // Admin: Delete user
+  app.delete('/api/admin/users/:userId', isAuthenticated, requireAdmin, async (req: any, res) => {
+    try {
+      const { userId } = req.params;
+      await storage.deleteUser(userId);
+      res.json({ message: "User deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      res.status(500).json({ message: "Failed to delete user" });
+    }
+  });
+
+  // Admin: Get all programs with workout count
+  app.get('/api/admin/programs', isAuthenticated, requireAdmin, async (req: any, res) => {
+    try {
+      const programs = await storage.getAllProgramsWithWorkoutCount();
+      res.json(programs);
+    } catch (error) {
+      console.error("Error fetching programs:", error);
+      res.status(500).json({ message: "Failed to fetch programs" });
+    }
+  });
+
+  // Admin: Update program
+  app.put('/api/admin/programs/:programId', isAuthenticated, requireAdmin, async (req: any, res) => {
+    try {
+      const { programId } = req.params;
+      const updateData = req.body;
+      
+      await storage.updateProgram(parseInt(programId), updateData);
+      res.json({ message: "Program updated successfully" });
+    } catch (error) {
+      console.error("Error updating program:", error);
+      res.status(500).json({ message: "Failed to update program" });
+    }
+  });
+
+  // Admin: Delete program
+  app.delete('/api/admin/programs/:programId', isAuthenticated, requireAdmin, async (req: any, res) => {
+    try {
+      const { programId } = req.params;
+      await storage.deleteProgram(parseInt(programId));
+      res.json({ message: "Program deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting program:", error);
+      res.status(500).json({ message: "Failed to delete program" });
+    }
+  });
+
+  // Admin: Upload program from CSV
+  app.post('/api/admin/upload-program', isAuthenticated, requireAdmin, upload.single('csvFile'), async (req: any, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No CSV file uploaded" });
+      }
+
+      const csvContent = req.file.buffer.toString('utf8');
+      const lines = csvContent.split('\n').filter(line => line.trim());
+      
+      if (lines.length < 2) {
+        return res.status(400).json({ message: "CSV file must contain header and data rows" });
+      }
+
+      // Parse header
+      const header = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+      const requiredColumns = ['week', 'day', 'name', 'description', 'duration', 'exercises'];
+      
+      for (const col of requiredColumns) {
+        if (!header.includes(col)) {
+          return res.status(400).json({ message: `Missing required column: ${col}` });
+        }
+      }
+
+      // Parse data rows
+      const workoutData = [];
+      for (let i = 1; i < lines.length; i++) {
+        const row = lines[i];
+        if (!row.trim()) continue;
+        
+        const values = [];
+        let current = '';
+        let inQuotes = false;
+        
+        for (let j = 0; j < row.length; j++) {
+          const char = row[j];
+          if (char === '"') {
+            inQuotes = !inQuotes;
+          } else if (char === ',' && !inQuotes) {
+            values.push(current.trim());
+            current = '';
+          } else {
+            current += char;
+          }
+        }
+        values.push(current.trim());
+        
+        if (values.length >= requiredColumns.length) {
+          const workout: any = {};
+          header.forEach((col, index) => {
+            workout[col] = values[index] || '';
+          });
+          workoutData.push(workout);
+        }
+      }
+
+      if (workoutData.length === 0) {
+        return res.status(400).json({ message: "No valid workout data found in CSV" });
+      }
+
+      // Determine program name from first workout or use filename
+      const programName = workoutData[0]?.programName || 
+                         req.file.originalname.replace('.csv', '').replace(/[^a-zA-Z0-9\s]/g, ' ').trim();
+      
+      // Create program
+      const program = await storage.createProgram({
+        name: programName,
+        description: `Imported from CSV: ${req.file.originalname}`,
+        difficulty: 'intermediate',
+        duration: Math.max(...workoutData.map((w: any) => parseInt(w.week) || 1)),
+        frequency: 4,
+        category: 'hyrox',
+        isActive: true
+      });
+
+      // Create workouts
+      let workoutCount = 0;
+      for (const workout of workoutData) {
+        try {
+          let exercises = [];
+          if (workout.exercises) {
+            try {
+              exercises = JSON.parse(workout.exercises.replace(/"/g, '"'));
+            } catch {
+              exercises = [{
+                name: workout.exercises,
+                type: "general",
+                description: workout.exercises
+              }];
+            }
+          }
+
+          await storage.createWorkout({
+            programId: program.id,
+            name: workout.name || 'Workout',
+            description: workout.description || '',
+            week: parseInt(workout.week) || 1,
+            day: parseInt(workout.day) || 1,
+            estimatedDuration: parseInt(workout.duration) || 60,
+            exercises: exercises,
+            difficulty: 'intermediate',
+            workoutType: 'mixed'
+          });
+          
+          workoutCount++;
+        } catch (error) {
+          console.warn(`Error creating workout: ${workout.name}`, error);
+        }
+      }
+
+      res.json({ 
+        message: "Program uploaded successfully",
+        programId: program.id,
+        programName: program.name,
+        workoutCount
+      });
+    } catch (error) {
+      console.error("Error uploading program:", error);
+      res.status(500).json({ message: "Failed to upload program" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
