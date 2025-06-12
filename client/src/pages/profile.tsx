@@ -78,7 +78,7 @@ export default function Profile() {
 
   if (isLoading) {
     return (
-      <MainLayout>
+      <MobileLayout>
         <div className="space-y-6">
           <div className="h-8 bg-gray-200 rounded animate-pulse" />
           <div className="grid gap-6 md:grid-cols-2">
@@ -89,12 +89,12 @@ export default function Profile() {
             ))}
           </div>
         </div>
-      </MainLayout>
+      </MobileLayout>
     );
   }
 
   return (
-    <MainLayout>
+    <MobileLayout>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>

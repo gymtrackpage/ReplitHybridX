@@ -19,7 +19,7 @@ export default function Progress() {
 
   if (isLoading) {
     return (
-      <MainLayout>
+      <MobileLayout>
         <div className="space-y-6">
           <div className="h-8 bg-gray-200 rounded animate-pulse" />
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -30,12 +30,12 @@ export default function Progress() {
             ))}
           </div>
         </div>
-      </MainLayout>
+      </MobileLayout>
     );
   }
 
   return (
-    <MainLayout>
+    <MobileLayout>
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold">Progress Tracking</h1>
