@@ -1179,7 +1179,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // CSV/XLSX upload endpoint for programs
   app.post('/api/admin/upload-program', isAuthenticated, requireAdmin, upload.single('file'), async (req, res) => {
     try {
-      const { name, description, difficulty, duration, frequency, category } = req.body;
+      const { name, description, difficulty, duration, frequency, category, racecategory } = req.body;
       const file = req.file;
 
       if (!file) {
@@ -1218,7 +1218,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         difficulty,
         duration: parseInt(duration),
         frequency: parseInt(frequency),
-        category
+        category,
+        racecategory
       });
 
       // Process workout data

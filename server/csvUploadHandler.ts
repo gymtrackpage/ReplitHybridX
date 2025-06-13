@@ -9,6 +9,7 @@ interface ProgramUploadData {
   category: string;
   duration: number;
   frequency: number;
+  racecategory: string;
 }
 
 interface WorkoutData {
@@ -48,7 +49,8 @@ export async function handleCSVUpload(
     category: programData.category,
     duration: programData.duration,
     targetEventWeeks: programData.duration,
-    isActive: true
+    isActive: true,
+    racecategory: programData.racecategory
   };
 
   const program = await storage.createProgram(programInsert);

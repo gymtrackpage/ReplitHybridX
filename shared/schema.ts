@@ -63,6 +63,7 @@ export const programs = pgTable("programs", {
   difficulty: varchar("difficulty"), // beginner, intermediate, advanced
   frequency: integer("frequency"), // workouts per week
   category: varchar("category").default("hyrox"), // hyrox, strength, conditioning
+  racecategory: varchar("racecategory").default("Singles"), // Singles, Doubles/Relay
   targetEventWeeks: integer("target_event_weeks"), // weeks until event
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),

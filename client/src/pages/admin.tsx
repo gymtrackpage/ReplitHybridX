@@ -44,7 +44,8 @@ export default function Admin() {
     difficulty: "Beginner",
     category: "Hyrox",
     duration: 12,
-    frequency: 4
+    frequency: 4,
+    racecategory: "Singles"
   });
 
   // Redirect non-admin users
@@ -120,7 +121,8 @@ export default function Admin() {
         difficulty: "Beginner",
         category: "Hyrox",
         duration: 12,
-        frequency: 4
+        frequency: 4,
+        racecategory: "Singles"
       });
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
@@ -169,6 +171,7 @@ export default function Admin() {
     formData.append("category", uploadForm.category);
     formData.append("duration", uploadForm.duration.toString());
     formData.append("frequency", uploadForm.frequency.toString());
+    formData.append("racecategory", uploadForm.racecategory);
     
     uploadProgramMutation.mutate(formData);
   };
@@ -578,6 +581,19 @@ export default function Admin() {
                     onChange={(e) => setUploadForm({...uploadForm, frequency: parseInt(e.target.value) || 4})}
                   />
                 </div>
+              </div>
+
+              <div>
+                <Label htmlFor="racecategory">Race Category</Label>
+                <Select value={uploadForm.racecategory} onValueChange={(value) => setUploadForm({...uploadForm, racecategory: value})}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Singles">Singles</SelectItem>
+                    <SelectItem value="Doubles/Relay">Doubles/Relay</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>
