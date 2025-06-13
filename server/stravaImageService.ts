@@ -1,16 +1,21 @@
-import puppeteer from 'puppeteer';
 import * as fs from 'fs';
 import * as path from 'path';
 
 export class StravaImageService {
-  private static browser: puppeteer.Browser | null = null;
+  private static browser: any = null;
 
   static async initBrowser() {
     if (!this.browser) {
-      this.browser = await puppeteer.launch({
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
-      });
+      try {
+        const puppeteer = await import('puppeteer');
+        this.browser = await puppeteer.default.launch({
+          headless: true,
+          args: ['--no-sandbox', '--disable-setuid-sandbox']
+        });
+      } catch (error) {
+        console.error('Failed to initialize browser:', error);
+        throw new Error('Browser initialization failed');
+      }
     }
     return this.browser;
   }

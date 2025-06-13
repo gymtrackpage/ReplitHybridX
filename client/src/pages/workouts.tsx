@@ -17,6 +17,7 @@ import {
   TrendingUp,
   Calendar
 } from "lucide-react";
+import { ShareToStravaButton } from "@/components/ShareToStravaButton";
 
 export default function Workouts() {
   const { toast } = useToast();
@@ -397,6 +398,14 @@ export default function Workouts() {
                         >
                           {workout.status}
                         </Badge>
+                        {workout.status === "completed" && (
+                          <ShareToStravaButton 
+                            workoutId={workout.workoutId}
+                            workoutName={workout.name}
+                            defaultDuration={workout.duration}
+                            className="mt-1"
+                          />
+                        )}
                       </div>
                     </div>
                   );
