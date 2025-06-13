@@ -2,9 +2,7 @@ import axios from 'axios';
 import { storage } from './storage';
 import FormData from 'form-data';
 
-if (!process.env.STRAVA_CLIENT_ID || !process.env.STRAVA_CLIENT_SECRET) {
-  throw new Error('STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET environment variables must be set');
-}
+// Environment variables will be checked in individual methods rather than at module load
 
 const STRAVA_BASE_URL = 'https://www.strava.com/api/v3';
 const STRAVA_AUTH_URL = 'https://www.strava.com/oauth/token';
@@ -36,8 +34,8 @@ export interface WorkoutData {
 
 export class StravaService {
   static getAuthorizationUrl(): string {
-    if (!process.env.STRAVA_CLIENT_ID) {
-      throw new Error('STRAVA_CLIENT_ID environment variable is not set');
+    if (!process.env.STRAVA_CLIENT_ID || !process.env.STRAVA_CLIENT_SECRET) {
+      throw new Error('STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET environment variables must be set');
     }
     
     console.log("Strava Client ID:", process.env.STRAVA_CLIENT_ID ? "Set" : "Not set");

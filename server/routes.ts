@@ -1872,7 +1872,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!process.env.STRAVA_CLIENT_ID || !process.env.STRAVA_CLIENT_SECRET) {
         console.error("Strava environment variables not configured");
-        return res.status(500).json({ 
+        return res.status(400).json({ 
           message: "Strava integration not configured. Please set STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET in Secrets.",
           configured: false
         });
@@ -1883,7 +1883,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ authUrl, configured: true });
     } catch (error) {
       console.error("Error getting Strava auth URL:", error);
-      res.status(500).json({ 
+      res.status(400).json({ 
         message: "Failed to get Strava authorization URL: " + (error as Error).message,
         configured: false
       });
