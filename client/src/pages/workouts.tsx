@@ -273,34 +273,47 @@ export default function Workouts() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Calendar className="h-5 w-5" />
-                Upcoming Workouts
+                Next 3 Days
               </CardTitle>
-              <CardDescription>Your next scheduled training sessions</CardDescription>
+              <CardDescription>Your upcoming training sessions</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {upcomingWorkouts?.length > 0 ? (
-                upcomingWorkouts.slice(0, 5).map((workout: any, index: number) => (
-                  <div 
-                    key={workout.id}
-                    className="flex justify-between items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer"
-                    onClick={() => setSelectedWorkout(workout)}
-                  >
-                    <div>
-                      <div className="font-medium text-sm">{workout.name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        Week {workout.week}, Day {workout.day}
+                upcomingWorkouts.map((workout: any, index: number) => {
+                  const dayLabels = ['Today', 'Tomorrow', 'Day 3'];
+                  return (
+                    <div 
+                      key={workout.id}
+                      className="flex justify-between items-start p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer"
+                      onClick={() => setSelectedWorkout(workout)}
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Badge variant={index === 0 ? "default" : "outline"} className="text-xs">
+                            {dayLabels[index]}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            Week {workout.week}, Day {workout.day}
+                          </span>
+                        </div>
+                        <div className="font-medium text-sm">{workout.name}</div>
+                        {workout.description && (
+                          <div className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                            {workout.description}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex flex-col items-end gap-1 ml-2">
+                        <Badge variant="outline" className="text-xs">
+                          {workout.estimatedDuration || 60}min
+                        </Badge>
+                        <Badge className={`text-xs ${getWorkoutTypeColor(workout.workoutType)}`}>
+                          {workout.workoutType || 'Training'}
+                        </Badge>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="text-xs">
-                        {workout.estimatedDuration}min
-                      </Badge>
-                      <Badge className={`text-xs ${getWorkoutTypeColor(workout.workoutType)}`}>
-                        {workout.workoutType}
-                      </Badge>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
                   <Calendar className="h-8 w-8 mx-auto mb-2" />
@@ -315,46 +328,67 @@ export default function Workouts() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <TrendingUp className="h-5 w-5" />
-                Recent Activity
+                Last 3 Days
               </CardTitle>
-              <CardDescription>Your completed and skipped workouts</CardDescription>
+              <CardDescription>Your recent workout activity</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {recentWorkouts?.length > 0 ? (
-                recentWorkouts.slice(0, 5).map((workout: any, index: number) => (
-                  <div 
-                    key={workout.id}
-                    className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"
-                  >
-                    <div className="flex items-center gap-3">
-                      {getStatusIcon(workout.status)}
-                      <div>
-                        <div className="font-medium text-sm">{workout.name}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {new Date(workout.completedAt).toLocaleDateString()}
+                recentWorkouts.map((workout: any, index: number) => {
+                  const completedDate = new Date(workout.completedAt);
+                  const isToday = completedDate.toDateString() === new Date().toDateString();
+                  const isYesterday = completedDate.toDateString() === new Date(Date.now() - 86400000).toDateString();
+                  
+                  let dayLabel = completedDate.toLocaleDateString();
+                  if (isToday) dayLabel = 'Today';
+                  else if (isYesterday) dayLabel = 'Yesterday';
+                  
+                  return (
+                    <div 
+                      key={workout.id}
+                      className="flex justify-between items-start p-3 bg-gray-50 rounded-lg"
+                    >
+                      <div className="flex items-start gap-3 flex-1">
+                        {getStatusIcon(workout.status)}
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs font-medium text-muted-foreground">
+                              {dayLabel}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {completedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                          <div className="font-medium text-sm">{workout.name}</div>
+                          {workout.duration && (
+                            <div className="text-xs text-muted-foreground mt-1">
+                              Completed in {workout.duration} minutes
+                            </div>
+                          )}
                         </div>
                       </div>
+                      <div className="flex flex-col items-end gap-1 ml-2">
+                        <Badge variant="outline" className="text-xs">
+                          {workout.estimatedDuration || 60}min
+                        </Badge>
+                        <Badge 
+                          className={`text-xs ${
+                            workout.status === "completed" 
+                              ? "bg-green-100 text-green-800" 
+                              : "bg-yellow-100 text-yellow-800"
+                          }`}
+                        >
+                          {workout.status}
+                        </Badge>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="text-xs">
-                        {workout.estimatedDuration}min
-                      </Badge>
-                      <Badge 
-                        className={`text-xs ${
-                          workout.status === "completed" 
-                            ? "bg-green-100 text-green-800" 
-                            : "bg-yellow-100 text-yellow-800"
-                        }`}
-                      >
-                        {workout.status}
-                      </Badge>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
                   <TrendingUp className="h-8 w-8 mx-auto mb-2" />
                   <p>No recent activity</p>
+                  <p className="text-xs mt-1">Complete workouts to see them here</p>
                 </div>
               )}
             </CardContent>

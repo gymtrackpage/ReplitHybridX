@@ -13,6 +13,8 @@ import { seedHyroxPrograms } from "./seedData";
 import { createMinimalPrograms } from "./quickProgramSetup";
 import Stripe from "stripe";
 import { insertProgramSchema, insertWorkoutSchema, insertAssessmentSchema, insertWeightEntrySchema } from "../shared/schema";
+import { db } from "./db";
+import { workouts } from "../shared/schema";
 
 // Enhanced async error wrapper with logging
 const asyncHandler = (fn: Function) => (req: Request, res: Response, next: NextFunction) => {
@@ -368,6 +370,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching recent activity:", error);
       res.status(500).json({ message: "Failed to fetch recent activity" });
+    }
+  });
+
+  // Get next 3 days of upcoming workouts
+  app.get('/api/upcoming-workouts', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const progress = await storage.getUserProgress(userId);
+      
+      if (!user?.currentProgramId || !progress) {
+        return res.json([]);
+      }
+
+      const upcomingWorkouts = [];
+      let currentWeek = progress.currentWeek || 1;
+      let currentDay = progress.currentDay || 1;
+
+      // Get next 3 workouts
+      for (let i = 0; i < 3; i++) {
+        const [workout] = await db
+          .select()
+          .from(workouts)
+          .where(
+            and(
+              eq(workouts.programId, progress.programId),
+              eq(workouts.week, currentWeek),
+              eq(workouts.day, currentDay)
+            )
+          );
+
+        if (workout) {
+          upcomingWorkouts.push({
+            ...workout,
+            daysFromNow: i
+          });
+        }
+
+        // Move to next day
+        currentDay++;
+        if (currentDay > 6) { // Assuming 6 training days per week
+          currentDay = 1;
+          currentWeek++;
+        }
+      }
+
+      res.json(upcomingWorkouts);
+    } catch (error) {
+      console.error("Error fetching upcoming workouts:", error);
+      res.status(500).json({ message: "Failed to fetch upcoming workouts" });
+    }
+  });
+
+  // Get recent workouts from last 3 days
+  app.get('/api/recent-workouts', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const threeDaysAgo = new Date();
+      threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+
+      const recentCompletions = await db
+        .select()
+        .from(workoutCompletions)
+        .where(
+          and(
+            eq(workoutCompletions.userId, userId),
+            gte(workoutCompletions.completedAt, threeDaysAgo)
+          )
+        )
+        .orderBy(desc(workoutCompletions.completedAt));
+
+      // Get workout details for recent completions
+      const recentWorkouts = await Promise.all(
+        recentCompletions.map(async (completion) => {
+          const workout = await storage.getWorkout(completion.workoutId);
+          return {
+            id: completion.id,
+            name: workout?.name || 'Workout',
+            completedAt: completion.completedAt,
+            duration: completion.duration || workout?.estimatedDuration || 0,
+            status: completion.skipped ? 'skipped' : 'completed',
+            estimatedDuration: workout?.estimatedDuration || 0,
+            workoutType: workout?.workoutType || 'general'
+          };
+        })
+      );
+
+      res.json(recentWorkouts);
+    } catch (error) {
+      console.error("Error fetching recent workouts:", error);
+      res.status(500).json({ message: "Failed to fetch recent workouts" });
     }
   });
 
