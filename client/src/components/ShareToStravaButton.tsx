@@ -73,14 +73,24 @@ export function ShareToStravaButton({
 
   const connectStravaMutation = useMutation({
     mutationFn: async () => {
+      console.log("Requesting Strava connection...");
       return apiRequest('GET', '/api/strava/connect');
     },
     onSuccess: (data) => {
+      console.log("Strava connect response:", data);
       if (data.authUrl) {
+        console.log("Opening Strava auth URL:", data.authUrl);
         window.open(data.authUrl, '_blank', 'width=600,height=700');
+      } else if (!data.configured) {
+        toast({
+          title: "Configuration Required",
+          description: "Strava integration is not configured. Please contact admin.",
+          variant: "destructive",
+        });
       }
     },
     onError: (error: any) => {
+      console.error("Strava connect error:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to get Strava authorization URL",

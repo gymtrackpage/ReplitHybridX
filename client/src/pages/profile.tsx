@@ -82,17 +82,30 @@ export default function Profile() {
 
   const connectStravaMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("GET", "/api/strava/connect");
-      return response;
+      console.log("Profile: Requesting Strava connection...");
+      return apiRequest('GET', '/api/strava/connect');
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
+      console.log("Profile: Strava connect response:", data);
       if (data.authUrl) {
-        window.open(data.authUrl, '_blank');
+        console.log("Profile: Opening Strava auth URL:", data.authUrl);
+        window.open(data.authUrl, '_blank', 'width=600,height=700');
+        toast({
+          title: "Redirecting to Strava",
+          description: "Please complete the authorization in the new window.",
+        });
+      } else if (!data.configured) {
+        toast({
+          title: "Configuration Required",
+          description: "Strava integration is not configured. Please contact admin.",
+          variant: "destructive",
+        });
       }
     },
     onError: (error: any) => {
+      console.error("Profile: Strava connect error:", error);
       toast({
-        title: "Connection Failed",
+        title: "Error",
         description: error.message || "Failed to connect to Strava",
         variant: "destructive",
       });

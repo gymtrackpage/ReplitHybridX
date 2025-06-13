@@ -8,11 +8,11 @@ if (!process.env.STRAVA_CLIENT_ID || !process.env.STRAVA_CLIENT_SECRET) {
 
 const STRAVA_BASE_URL = 'https://www.strava.com/api/v3';
 const STRAVA_AUTH_URL = 'https://www.strava.com/oauth/token';
-const REDIRECT_URI = process.env.REPL_SLUG ? 
+const REDIRECT_URI = process.env.REPLIT_DEV_DOMAIN ? 
+  `https://${process.env.REPLIT_DEV_DOMAIN}/api/strava/callback` :
+  process.env.REPL_SLUG ? 
   `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co/api/strava/callback` : 
-  process.env.REPLIT_DOMAINS ? 
-  `https://${process.env.REPLIT_DOMAINS.split(',')[0]}/api/strava/callback` : 
-  'http://localhost:5000/api/strava/callback';
+  'https://0fcc3a45-589d-49fb-a059-7d9954da233f-00-8sst6tp6qylm.spock.replit.dev/api/strava/callback';
 
 export interface StravaTokens {
   access_token: string;
@@ -36,11 +36,15 @@ export interface WorkoutData {
 
 export class StravaService {
   static getAuthorizationUrl(): string {
+    if (!process.env.STRAVA_CLIENT_ID) {
+      throw new Error('STRAVA_CLIENT_ID environment variable is not set');
+    }
+    
     console.log("Strava Client ID:", process.env.STRAVA_CLIENT_ID ? "Set" : "Not set");
     console.log("Redirect URI:", REDIRECT_URI);
     
     const params = new URLSearchParams({
-      client_id: process.env.STRAVA_CLIENT_ID!,
+      client_id: process.env.STRAVA_CLIENT_ID,
       response_type: 'code',
       redirect_uri: REDIRECT_URI,
       approval_prompt: 'force',
