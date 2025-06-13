@@ -6,11 +6,10 @@ import FormData from 'form-data';
 
 const STRAVA_BASE_URL = 'https://www.strava.com/api/v3';
 const STRAVA_AUTH_URL = 'https://www.strava.com/oauth/token';
+// Use the current Replit domain for redirect URI
 const REDIRECT_URI = process.env.REPLIT_DEV_DOMAIN ? 
   `https://${process.env.REPLIT_DEV_DOMAIN}/api/strava/callback` :
-  process.env.REPL_SLUG ? 
-  `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co/api/strava/callback` : 
-  'https://0fcc3a45-589d-49fb-a059-7d9954da233f-00-8sst6tp6qylm.spock.replit.dev/api/strava/callback';
+  `https://${process.env.REPL_ID || '0fcc3a45-589d-49fb-a059-7d9954da233f'}-00-${process.env.REPL_OWNER || '8sst6tp6qylm'}.spock.replit.dev/api/strava/callback`;
 
 export interface StravaTokens {
   access_token: string;
@@ -41,12 +40,14 @@ export class StravaService {
     console.log("Strava Client ID:", process.env.STRAVA_CLIENT_ID ? "Set" : "Not set");
     console.log("Redirect URI:", REDIRECT_URI);
     
+    // According to Strava API docs, use approval_prompt=auto for better UX
+    // and include activity:read for better compatibility
     const params = new URLSearchParams({
       client_id: process.env.STRAVA_CLIENT_ID,
       response_type: 'code',
       redirect_uri: REDIRECT_URI,
-      approval_prompt: 'force',
-      scope: 'activity:write'
+      approval_prompt: 'auto',
+      scope: 'activity:write,activity:read'
     });
     
     const authUrl = `https://www.strava.com/oauth/authorize?${params.toString()}`;

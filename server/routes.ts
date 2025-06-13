@@ -1880,31 +1880,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const authUrl = StravaService.getAuthorizationUrl();
       console.log("Generated Strava auth URL:", authUrl);
-      res.json({ authUrl, configured: true });
+      
+      const response = { 
+        authUrl, 
+        configured: true,
+        success: true
+      };
+      console.log("Sending response:", response);
+      
+      res.json(response);
     } catch (error) {
       console.error("Error getting Strava auth URL:", error);
-      res.status(400).json({ 
+      const errorResponse = { 
         message: "Failed to get Strava authorization URL: " + (error as Error).message,
-        configured: false
-      });
+        configured: false,
+        success: false
+      };
+      console.log("Sending error response:", errorResponse);
+      res.status(400).json(errorResponse);
     }
   });
 
   app.get('/api/strava/callback', async (req, res) => {
     try {
-      const { code, state } = req.query;
+      console.log("Strava callback received with query:", req.query);
+      const { code, state, error } = req.query;
+      
+      if (error) {
+        console.error("Strava authorization error:", error);
+        return res.redirect('/profile?strava_error=authorization_denied');
+      }
+      
       if (!code) {
-        return res.status(400).json({ message: "Authorization code not provided" });
+        console.error("No authorization code provided");
+        return res.redirect('/profile?strava_error=no_code');
       }
 
-      // For now, we'll need to associate this with a user session
-      // In a real implementation, you'd pass the user ID in the state parameter
+      // Check if user is authenticated
       if (!req.isAuthenticated()) {
+        console.error("User not authenticated during callback");
         return res.redirect('/profile?strava_error=not_authenticated');
       }
 
       const userId = (req.user as any).claims.sub;
+      console.log("Processing Strava callback for user:", userId);
+      
       const tokens = await StravaService.exchangeCodeForTokens(code as string);
+      console.log("Successfully exchanged code for tokens");
 
       // Store tokens in user record
       await storage.updateUser(userId, {
@@ -1914,7 +1936,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         stravaTokenExpiry: new Date(tokens.expires_at * 1000),
         stravaConnected: true,
       });
-
+      
+      console.log("Successfully stored Strava tokens for user:", userId);
       res.redirect('/profile?strava_connected=true');
     } catch (error) {
       console.error("Error in Strava callback:", error);
