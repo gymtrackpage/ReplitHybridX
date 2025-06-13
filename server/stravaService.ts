@@ -8,7 +8,9 @@ if (!process.env.STRAVA_CLIENT_ID || !process.env.STRAVA_CLIENT_SECRET) {
 
 const STRAVA_BASE_URL = 'https://www.strava.com/api/v3';
 const STRAVA_AUTH_URL = 'https://www.strava.com/oauth/token';
-const REDIRECT_URI = process.env.REPLIT_DOMAINS ? 
+const REDIRECT_URI = process.env.REPL_SLUG ? 
+  `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co/api/strava/callback` : 
+  process.env.REPLIT_DOMAINS ? 
   `https://${process.env.REPLIT_DOMAINS.split(',')[0]}/api/strava/callback` : 
   'http://localhost:5000/api/strava/callback';
 
@@ -34,6 +36,9 @@ export interface WorkoutData {
 
 export class StravaService {
   static getAuthorizationUrl(): string {
+    console.log("Strava Client ID:", process.env.STRAVA_CLIENT_ID ? "Set" : "Not set");
+    console.log("Redirect URI:", REDIRECT_URI);
+    
     const params = new URLSearchParams({
       client_id: process.env.STRAVA_CLIENT_ID!,
       response_type: 'code',
@@ -42,7 +47,9 @@ export class StravaService {
       scope: 'activity:write'
     });
     
-    return `https://www.strava.com/oauth/authorize?${params.toString()}`;
+    const authUrl = `https://www.strava.com/oauth/authorize?${params.toString()}`;
+    console.log("Generated Auth URL:", authUrl);
+    return authUrl;
   }
 
   static async exchangeCodeForTokens(code: string): Promise<StravaTokens> {

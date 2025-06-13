@@ -40,13 +40,10 @@ export function ShareToStravaButton({
       duration: number; 
       notes: string; 
     }) => {
-      return apiRequest('/api/share-to-strava', {
-        method: 'POST',
-        body: JSON.stringify({
-          workoutId,
-          duration: duration * 60, // Convert to seconds
-          notes
-        })
+      return apiRequest('POST', '/api/share-to-strava', {
+        workoutId,
+        duration: duration * 60, // Convert to seconds
+        notes
       });
     },
     onSuccess: (data) => {
@@ -74,22 +71,26 @@ export function ShareToStravaButton({
     },
   });
 
-  const connectStravaQuery = useQuery({
-    queryKey: ['/api/strava/connect'],
-    enabled: false,
-  });
-
-  const handleConnectStrava = async () => {
-    try {
-      const { authUrl } = await connectStravaQuery.refetch().then(result => result.data);
-      window.open(authUrl, '_blank');
-    } catch (error) {
+  const connectStravaMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest('GET', '/api/strava/connect');
+    },
+    onSuccess: (data) => {
+      if (data.authUrl) {
+        window.open(data.authUrl, '_blank', 'width=600,height=700');
+      }
+    },
+    onError: (error: any) => {
       toast({
         title: "Error",
-        description: "Failed to get Strava authorization URL",
+        description: error.message || "Failed to get Strava authorization URL",
         variant: "destructive",
       });
-    }
+    },
+  });
+
+  const handleConnectStrava = () => {
+    connectStravaMutation.mutate();
   };
 
   const handleShare = () => {
@@ -106,10 +107,11 @@ export function ShareToStravaButton({
         variant="outline"
         size="sm"
         onClick={handleConnectStrava}
+        disabled={connectStravaMutation.isPending}
         className={className}
       >
         <ExternalLink className="w-4 h-4 mr-2" />
-        Connect Strava
+        {connectStravaMutation.isPending ? "Connecting..." : "Connect Strava"}
       </Button>
     );
   }
