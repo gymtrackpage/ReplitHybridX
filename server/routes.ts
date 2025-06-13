@@ -546,17 +546,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update user's current program
       await storage.updateUserProgram(userId, programId);
 
-      // Create initial progress tracking
-      await storage.createUserProgress({
-        userId,
-        programId,
-        currentWeek: 1,
-        currentDay: 1,
-        completedWorkouts: 0,
-        totalWorkouts: 0,
-      });
+      // Get program details to calculate total workouts
+      const program = await storage.getProgram(programId);
+      const programWorkouts = await storage.getWorkoutsByProgram(programId);
+      const totalWorkouts = programWorkouts.length;
 
-      res.json({ success: true });
+      // Check if user already has progress
+      const existingProgress = await storage.getUserProgress(userId);
+      
+      if (existingProgress) {
+        // Update existing progress for new program
+        await storage.updateUserProgress(userId, {
+          programId,
+          currentWeek: 1,
+          currentDay: 1,
+          startDate: new Date().toISOString(),
+          completedWorkouts: 0,
+          totalWorkouts,
+        });
+      } else {
+        // Create initial progress tracking
+        await storage.createUserProgress({
+          userId,
+          programId,
+          currentWeek: 1,
+          currentDay: 1,
+          startDate: new Date().toISOString(),
+          completedWorkouts: 0,
+          totalWorkouts,
+        });
+      }
+
+      res.json({ success: true, message: "Program selected successfully" });
     } catch (error) {
       console.error("Error selecting program:", error);
       res.status(500).json({ message: "Failed to select program" });
@@ -1462,6 +1483,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Check for missed workouts based on date logic
+  app.post("/api/check-missed-workouts", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const progress = await storage.getUserProgress(userId);
+      
+      if (!progress || !progress.startDate) {
+        return res.json({ missedWorkouts: [] });
+      }
+
+      const today = new Date();
+      const startDate = new Date(progress.startDate);
+      const daysSinceStart = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+      
+      // Calculate what week/day we should be on based on calendar days
+      const expectedWeek = Math.floor(daysSinceStart / 7) + 1;
+      const expectedDay = (daysSinceStart % 7) + 1;
+      
+      const currentWeek = progress.currentWeek || 1;
+      const currentDay = progress.currentDay || 1;
+      
+      // If we're behind schedule, mark missed workouts
+      const missedWorkouts = [];
+      
+      if (expectedWeek > currentWeek || (expectedWeek === currentWeek && expectedDay > currentDay)) {
+        // We're behind - calculate missed workouts
+        let checkWeek = currentWeek;
+        let checkDay = currentDay;
+        
+        while (checkWeek < expectedWeek || (checkWeek === expectedWeek && checkDay < expectedDay)) {
+          // Find workout for this missed day
+          const [missedWorkout] = await db
+            .select()
+            .from(workouts)
+            .where(
+              and(
+                eq(workouts.programId, progress.programId),
+                eq(workouts.week, checkWeek),
+                eq(workouts.day, checkDay)
+              )
+            );
+            
+          if (missedWorkout) {
+            missedWorkouts.push({
+              workout: missedWorkout,
+              missedDate: new Date(startDate.getTime() + ((checkWeek - 1) * 7 + (checkDay - 1)) * 24 * 60 * 60 * 1000),
+              week: checkWeek,
+              day: checkDay
+            });
+          }
+          
+          checkDay++;
+          if (checkDay > 7) {
+            checkDay = 1;
+            checkWeek++;
+          }
+        }
+      }
+      
+      res.json({ 
+        missedWorkouts,
+        expectedWeek,
+        expectedDay,
+        currentWeek,
+        currentDay,
+        daysSinceStart
+      });
+    } catch (error: any) {
+      console.error("Error checking missed workouts:", error);
+      res.status(500).json({ message: "Failed to check missed workouts" });
+    }
+  });
+
   // Workout completion with progression logic
   app.post("/api/workout-completions", isAuthenticated, async (req: any, res) => {
     try {
@@ -1490,8 +1584,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let nextDay = currentDay + 1;
       let nextWeek = currentWeek;
 
-      // Check if we need to advance to next week (assuming 7 days per week)
-      if (nextDay > 7) {
+      // Check if we need to advance to next week (assuming 6 training days per week, day 7 is rest)
+      if (nextDay > 6) {
         nextDay = 1;
         nextWeek = currentWeek + 1;
       }

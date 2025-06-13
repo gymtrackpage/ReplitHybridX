@@ -235,18 +235,41 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTodaysWorkout(userId: string): Promise<Workout | undefined> {
-    const progress = await this.getUserProgress(userId);
-    if (!progress || !progress.programId) {
+    const user = await this.getUser(userId);
+    if (!user?.currentProgramId) {
       return undefined;
     }
 
-    let currentWeek = 1;
-    let currentDay = 1;
+    let progress = await this.getUserProgress(userId);
+    
+    // If no progress exists, create initial progress
+    if (!progress) {
+      progress = await this.createUserProgress({
+        userId,
+        programId: user.currentProgramId,
+        currentWeek: 1,
+        currentDay: 1,
+        startDate: new Date().toISOString(),
+        completedWorkouts: 0,
+        totalWorkouts: 0
+      });
+    }
 
-    currentWeek = progress.currentWeek;
-    currentDay = progress.currentDay;
+    // If progress exists but for different program, reset to week 1 day 1
+    if (progress.programId !== user.currentProgramId) {
+      progress = await this.updateUserProgress(userId, {
+        programId: user.currentProgramId,
+        currentWeek: 1,
+        currentDay: 1,
+        startDate: new Date().toISOString(),
+        completedWorkouts: 0
+      });
+    }
 
-    // Find the workout for calculated week and day
+    const currentWeek = progress.currentWeek || 1;
+    const currentDay = progress.currentDay || 1;
+
+    // Find the workout for current week and day
     const [workout] = await db
       .select()
       .from(workouts)
@@ -257,6 +280,7 @@ export class DatabaseStorage implements IStorage {
           eq(workouts.day, currentDay)
         )
       );
+    
     return workout;
   }
 

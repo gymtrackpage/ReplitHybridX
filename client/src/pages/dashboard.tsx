@@ -116,7 +116,7 @@ export default function Dashboard() {
                 <div className="flex items-center gap-2 text-xs">
                   <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
                     <Clock className="h-3 w-3 mr-1" />
-                    {(todayWorkout as any)?.duration || 45} min
+                    {(todayWorkout as any)?.estimatedDuration || 45} min
                   </Badge>
                   <Badge variant="secondary" className="bg-blue-100 text-blue-800">
                     {(todayWorkout as any)?.difficulty || 'Intermediate'}
@@ -141,12 +141,35 @@ export default function Dashboard() {
               </div>
             </CardContent>
           </Card>
+        ) : userProgress?.programId ? (
+          <Card className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200">
+            <CardContent className="p-6 text-center">
+              <Dumbbell className="h-8 w-8 mx-auto mb-2 text-blue-500" />
+              <h3 className="font-semibold text-blue-700 mb-1">Program Active</h3>
+              <p className="text-sm text-blue-600 mb-4">
+                You have a training program selected but no workout found for today. 
+                This might be a rest day or there's an issue loading your workout.
+              </p>
+              <div className="flex gap-2 justify-center">
+                <Link href="/workouts">
+                  <Button className="bg-blue-500 hover:bg-blue-600 text-white">
+                    View All Workouts
+                  </Button>
+                </Link>
+                <Link href="/programs">
+                  <Button variant="outline">
+                    Change Program
+                  </Button>
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
         ) : (
           <Card className="bg-gradient-to-r from-gray-50 to-gray-100 border-gray-200">
             <CardContent className="p-6 text-center">
               <Dumbbell className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-              <h3 className="font-semibold text-gray-700 mb-1">No workout scheduled</h3>
-              <p className="text-sm text-gray-500 mb-4">Start your fitness journey today</p>
+              <h3 className="font-semibold text-gray-700 mb-1">No program selected</h3>
+              <p className="text-sm text-gray-500 mb-4">Choose a training program to get started</p>
               <Link href="/programs">
                 <Button className="bg-yellow-500 hover:bg-yellow-600 text-white">
                   Browse Programs
