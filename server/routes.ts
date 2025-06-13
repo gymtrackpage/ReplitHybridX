@@ -388,31 +388,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let currentWeek = progress.currentWeek || 1;
       let currentDay = progress.currentDay || 1;
 
-      // Get next 3 workouts
+      // Get next 3 workouts starting from current position
       for (let i = 0; i < 3; i++) {
+        // For the first iteration, use current position, then advance
+        let searchWeek = currentWeek;
+        let searchDay = currentDay;
+        
+        if (i > 0) {
+          // Calculate the next workout position
+          searchDay = currentDay + i;
+          while (searchDay > 6) { // Assuming 6 training days per week
+            searchDay -= 6;
+            searchWeek++;
+          }
+        }
+
         const [workout] = await db
           .select()
           .from(workouts)
           .where(
             and(
               eq(workouts.programId, progress.programId),
-              eq(workouts.week, currentWeek),
-              eq(workouts.day, currentDay)
+              eq(workouts.week, searchWeek),
+              eq(workouts.day, searchDay)
             )
           );
 
         if (workout) {
           upcomingWorkouts.push({
             ...workout,
-            daysFromNow: i
+            daysFromNow: i,
+            workoutType: workout.workoutType || 'Training'
           });
-        }
-
-        // Move to next day
-        currentDay++;
-        if (currentDay > 6) { // Assuming 6 training days per week
-          currentDay = 1;
-          currentWeek++;
         }
       }
 
@@ -439,7 +446,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             gte(workoutCompletions.completedAt, threeDaysAgo)
           )
         )
-        .orderBy(desc(workoutCompletions.completedAt));
+        .orderBy(desc(workoutCompletions.completedAt))
+        .limit(10);
 
       // Get workout details for recent completions
       const recentWorkouts = await Promise.all(
@@ -447,12 +455,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const workout = await storage.getWorkout(completion.workoutId);
           return {
             id: completion.id,
+            workoutId: completion.workoutId,
             name: workout?.name || 'Workout',
+            description: workout?.description || '',
             completedAt: completion.completedAt,
             duration: completion.duration || workout?.estimatedDuration || 0,
             status: completion.skipped ? 'skipped' : 'completed',
             estimatedDuration: workout?.estimatedDuration || 0,
-            workoutType: workout?.workoutType || 'general'
+            workoutType: workout?.workoutType || 'Training',
+            week: workout?.week || 0,
+            day: workout?.day || 0,
+            rating: completion.rating,
+            notes: completion.notes
           };
         })
       );

@@ -280,17 +280,17 @@ export default function Workouts() {
             <CardContent className="space-y-3">
               {upcomingWorkouts?.length > 0 ? (
                 upcomingWorkouts.map((workout: any, index: number) => {
-                  const dayLabels = ['Today', 'Tomorrow', 'Day 3'];
+                  const dayLabels = ['Today', 'Tomorrow', 'Day After'];
                   return (
                     <div 
                       key={workout.id}
-                      className="flex justify-between items-start p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer"
+                      className="flex justify-between items-start p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors"
                       onClick={() => setSelectedWorkout(workout)}
                     >
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <Badge variant={index === 0 ? "default" : "outline"} className="text-xs">
-                            {dayLabels[index]}
+                            {dayLabels[index] || `Day ${index + 1}`}
                           </Badge>
                           <span className="text-xs text-muted-foreground">
                             Week {workout.week}, Day {workout.day}
@@ -318,6 +318,7 @@ export default function Workouts() {
                 <div className="text-center py-8 text-muted-foreground">
                   <Calendar className="h-8 w-8 mx-auto mb-2" />
                   <p>No upcoming workouts scheduled</p>
+                  <p className="text-xs mt-1">Select a program to see upcoming workouts</p>
                 </div>
               )}
             </CardContent>
@@ -336,17 +337,21 @@ export default function Workouts() {
               {recentWorkouts?.length > 0 ? (
                 recentWorkouts.map((workout: any, index: number) => {
                   const completedDate = new Date(workout.completedAt);
-                  const isToday = completedDate.toDateString() === new Date().toDateString();
-                  const isYesterday = completedDate.toDateString() === new Date(Date.now() - 86400000).toDateString();
+                  const now = new Date();
+                  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                  const workoutDate = new Date(completedDate.getFullYear(), completedDate.getMonth(), completedDate.getDate());
+                  const daysDiff = Math.floor((today.getTime() - workoutDate.getTime()) / (1000 * 60 * 60 * 24));
                   
-                  let dayLabel = completedDate.toLocaleDateString();
-                  if (isToday) dayLabel = 'Today';
-                  else if (isYesterday) dayLabel = 'Yesterday';
+                  let dayLabel = 'Earlier';
+                  if (daysDiff === 0) dayLabel = 'Today';
+                  else if (daysDiff === 1) dayLabel = 'Yesterday';
+                  else if (daysDiff === 2) dayLabel = '2 days ago';
+                  else if (daysDiff === 3) dayLabel = '3 days ago';
                   
                   return (
                     <div 
                       key={workout.id}
-                      className="flex justify-between items-start p-3 bg-gray-50 rounded-lg"
+                      className="flex justify-between items-start p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
                     >
                       <div className="flex items-start gap-3 flex-1">
                         {getStatusIcon(workout.status)}
@@ -358,11 +363,21 @@ export default function Workouts() {
                             <span className="text-xs text-muted-foreground">
                               {completedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
+                            {workout.week && workout.day && (
+                              <span className="text-xs text-muted-foreground">
+                                • W{workout.week}D{workout.day}
+                              </span>
+                            )}
                           </div>
                           <div className="font-medium text-sm">{workout.name}</div>
                           {workout.duration && (
                             <div className="text-xs text-muted-foreground mt-1">
                               Completed in {workout.duration} minutes
+                            </div>
+                          )}
+                          {workout.rating && (
+                            <div className="text-xs text-muted-foreground mt-1">
+                              Rating: {'★'.repeat(workout.rating)}{'☆'.repeat(5 - workout.rating)}
                             </div>
                           )}
                         </div>
@@ -375,7 +390,9 @@ export default function Workouts() {
                           className={`text-xs ${
                             workout.status === "completed" 
                               ? "bg-green-100 text-green-800" 
-                              : "bg-yellow-100 text-yellow-800"
+                              : workout.status === "skipped"
+                              ? "bg-yellow-100 text-yellow-800"
+                              : "bg-gray-100 text-gray-800"
                           }`}
                         >
                           {workout.status}
