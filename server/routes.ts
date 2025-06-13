@@ -784,8 +784,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       
-      // Use your program selection algorithm
-      const programRecommendation = selectHyroxProgram(req.body);
+      // Get available programs from database
+      const programs = await storage.getPrograms();
+      console.log("Available programs:", programs.map(p => ({ id: p.id, name: p.name, difficulty: p.difficulty, category: p.category })));
+      
+      // Convert database programs to metadata format for the new algorithm
+      const { convertProgramToMetadata } = require('./programSelection');
+      const programsWithMetadata = programs.map(program => ({
+        program,
+        metadata: convertProgramToMetadata(program)
+      }));
+      
+      // Use new metadata-based program selection algorithm
+      const programRecommendation = selectHyroxProgram(req.body, programsWithMetadata);
+      
+      console.log("Program recommendation:", {
+        topProgram: programRecommendation.recommendedPrograms[0]?.program?.name,
+        score: programRecommendation.recommendedPrograms[0]?.totalScore,
+        userProfile: programRecommendation.userProfile,
+        reasoning: programRecommendation.reasoningExplanation
+      });
       
       const assessmentData = insertAssessmentSchema.parse({
         ...req.body,
@@ -795,28 +813,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const assessment = await storage.createAssessment(assessmentData);
       
-      // Update user with recommended program
-      const programs = await storage.getPrograms();
-      console.log("Available programs:", programs.map(p => p.name));
-      console.log("Recommended program name:", programRecommendation.recommendedProgram.name);
-      
-      // Map recommendation to actual program names
-      const programNameMapping: { [key: string]: string } = {
-        "Complete Beginner 14-Week Program": "Beginner Program",
-        "Intermediate HYROX 14-Week Program": "Intermediate Program", 
-        "Advanced HYROX 14-Week Program": "Advanced Program",
-        "Advanced Competitor 14-Week Program": "Advanced Program",
-        "Strength-Focused 14-Week Program": "Strength Program",
-        "Running-Focused 14-Week Program": "Runner Program",
-        "HYROX Doubles 14-Week Program": "Doubles Program"
-      };
-      
-      const actualProgramName = programNameMapping[programRecommendation.recommendedProgram.name] || 
-                               programRecommendation.recommendedProgram.name;
-      
-      const recommendedProgram = programs.find(p => p.name === actualProgramName);
-      
-      if (recommendedProgram) {
+      // Get the top recommended program
+      const topRecommendation = programRecommendation.recommendedPrograms[0];
+      if (topRecommendation && topRecommendation.program) {
+        const recommendedProgram = topRecommendation.program;
+        
         await storage.updateUserProgram(userId, recommendedProgram.id);
         
         // Create user progress entry for the program
@@ -838,13 +839,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
         
-        console.log(`Successfully assigned ${actualProgramName} to user ${userId}`);
+        console.log(`Successfully assigned ${recommendedProgram.name} (score: ${topRecommendation.totalScore.toFixed(2)}) to user ${userId}`);
       } else {
-        console.error(`Program not found: ${actualProgramName}. Available programs:`, programs.map(p => p.name));
+        console.error("No valid program recommendation found, using fallback");
+        // Fallback to first available program
+        if (programs.length > 0) {
+          await storage.updateUserProgram(userId, programs[0].id);
+        }
       }
       
       // Update user's fitness level based on program recommendation
-      const fitnessLevel = programRecommendation.experienceLevel;
+      const fitnessLevel = programRecommendation.userProfile?.preferredDifficulty || 'Intermediate';
       await storage.updateUserAssessment(userId, fitnessLevel);
 
       // Update user profile with assessment data

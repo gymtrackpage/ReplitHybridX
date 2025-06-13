@@ -450,17 +450,6 @@ export interface FitnessProfile {
   stationEfficiency: number;
 }
 
-export interface ProgramRecommendation {
-  recommendedProgram: any;
-  modifications: any[];
-  reasoningExplanation: string;
-  experienceLevel: string;
-  trainingBackground: string;
-  timeAvailability: string;
-  specialCategory: string;
-  fitnessProfile: FitnessProfile;
-}
-
 
 
 // Assessment helper functions
@@ -689,7 +678,20 @@ export function recommendPrograms(
     recommendedPrograms: rankedPrograms,
     userProfile,
     modifications,
-    reasoningExplanation
+    reasoningExplanation,
+    // Legacy compatibility fields
+    recommendedProgram: rankedPrograms[0]?.program,
+    experienceLevel: userProfile.preferredDifficulty,
+    trainingBackground: userProfile.preferredCategory,
+    timeAvailability: `${userProfile.availableFrequency} days/week`,
+    specialCategory: userProfile.preferredRaceCategory,
+    fitnessProfile: {
+      runningCapacity: 5,
+      strengthFoundation: 5,
+      movementQuality: 5,
+      workCapacity: 5,
+      stationEfficiency: 5
+    }
   };
 }
 
@@ -895,7 +897,20 @@ export function selectHyroxProgram(
       )],
       userProfile,
       modifications: [],
-      reasoningExplanation: "An error occurred during program selection. A default program has been assigned."
+      reasoningExplanation: "An error occurred during program selection. A default program has been assigned.",
+      // Legacy compatibility fields
+      recommendedProgram: fallbackProgram.program,
+      experienceLevel: userProfile.preferredDifficulty,
+      trainingBackground: userProfile.preferredCategory,
+      timeAvailability: `${userProfile.availableFrequency} days/week`,
+      specialCategory: userProfile.preferredRaceCategory,
+      fitnessProfile: {
+        runningCapacity: 5,
+        strengthFoundation: 5,
+        movementQuality: 5,
+        workCapacity: 5,
+        stationEfficiency: 5
+      }
     };
   }
 }
