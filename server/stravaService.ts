@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { storage } from './storage';
+import FormData from 'form-data';
 
 if (!process.env.STRAVA_CLIENT_ID || !process.env.STRAVA_CLIENT_SECRET) {
   throw new Error('STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET environment variables must be set');
@@ -32,44 +33,6 @@ export interface WorkoutData {
 }
 
 export class StravaService {
-  static getAuthorizationUrl(): string {
-    const clientId = process.env.STRAVA_CLIENT_ID;
-    const redirectUri = process.env.STRAVA_REDIRECT_URI || `${process.env.REPLIT_DEV_DOMAIN}/api/strava/callback`;
-    const scope = 'activity:write,activity:read_all';
-    
-    return `https://www.strava.com/oauth/authorize?client_id=${clientId}&response_type=code&redirect_uri=${redirectUri}&approval_prompt=force&scope=${scope}`;
-  }
-
-  static async exchangeCodeForTokens(code: string): Promise<any> {
-    const response = await fetch('https://www.strava.com/oauth/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        client_id: process.env.STRAVA_CLIENT_ID,
-        client_secret: process.env.STRAVA_CLIENT_SECRET,
-        code,
-        grant_type: 'authorization_code',
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to exchange code for tokens');
-    }
-
-    return await response.json();
-  }
-
-  static async disconnectStrava(userId: string): Promise<void> {
-    const { storage } = await import('./storage');
-    await storage.disconnectStrava(userId);
-  }
-
-  static async pushWorkoutToStrava(userId: string, workoutData: any): Promise<boolean> {
-    const { storage } = await import('./storage');
-    return await storage.pushWorkoutToStrava(userId, workoutData);
-  }
   static getAuthorizationUrl(): string {
     const params = new URLSearchParams({
       client_id: process.env.STRAVA_CLIENT_ID!,
@@ -209,7 +172,6 @@ export class StravaService {
     imageBuffer: Buffer
   ): Promise<void> {
     try {
-      const FormData = require('form-data');
       const form = new FormData();
       
       form.append('file', imageBuffer, {

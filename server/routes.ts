@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { StravaService } from "./stravaService";
+import { StravaImageService } from "./stravaImageService";
 import { generateRandomHyroxWorkout } from "./enhancedHyroxWorkoutGenerator";
 import multer from "multer";
 import * as XLSX from "xlsx";
@@ -2129,6 +2130,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error uploading program:", error);
       res.status(500).json({ message: error instanceof Error ? error.message : "Failed to upload program" });
+    }
+  });
+
+  // Share workout to Strava with image
+  app.post('/api/share-to-strava', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { workoutId, duration, notes } = req.body;
+
+      // Get user's Strava connection status
+      const user = await storage.getUser(userId);
+      if (!user?.stravaConnected || !user.stravaAccessToken) {
+        return res.status(400).json({ 
+          message: "Please connect your Strava account first",
+          needsAuth: true 
+        });
+      }
+
+      // Get workout details
+      const workout = await storage.getWorkout(workoutId);
+      if (!workout) {
+        return res.status(404).json({ message: "Workout not found" });
+      }
+
+      // Generate workout image
+      let imageBuffer;
+      try {
+        imageBuffer = await StravaImageService.generateWorkoutImage(
+          workout.name, 
+          workout.exercises as any[]
+        );
+      } catch (imageError) {
+        console.error('Image generation failed:', imageError);
+        // Continue without image if generation fails
+      }
+
+      // Prepare workout data for Strava
+      const workoutData = {
+        name: workout.name,
+        description: notes || `HybridX Training Session\n\n${workout.description || ''}`,
+        duration: duration || (workout.estimatedDuration || 60) * 60,
+        type: 'workout' as const,
+        start_date_local: new Date().toISOString()
+      };
+
+      // Push to Strava
+      const result = await StravaService.pushWorkoutToStrava(
+        userId, 
+        workoutData, 
+        imageBuffer
+      );
+
+      if (result.success) {
+        res.json({ 
+          success: true, 
+          message: "Workout shared to Strava successfully!",
+          activityId: result.activityId 
+        });
+      } else {
+        res.status(500).json({ 
+          message: "Failed to share workout to Strava" 
+        });
+      }
+    } catch (error) {
+      console.error("Error sharing to Strava:", error);
+      res.status(500).json({ 
+        message: "Failed to share workout to Strava" 
+      });
     }
   });
 
