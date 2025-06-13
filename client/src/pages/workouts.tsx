@@ -18,10 +18,13 @@ import {
   Calendar
 } from "lucide-react";
 import { ShareToStravaButton } from "@/components/ShareToStravaButton";
+import { WorkoutCompletionDialog } from "@/components/WorkoutCompletionDialog";
 
 export default function Workouts() {
   const { toast } = useToast();
   const [selectedWorkout, setSelectedWorkout] = useState<any>(null);
+  const [showCompletionDialog, setShowCompletionDialog] = useState(false);
+  const [workoutToComplete, setWorkoutToComplete] = useState<any>(null);
 
   const { data: todayWorkout } = useQuery({
     queryKey: ["/api/today-workout"],
@@ -182,15 +185,13 @@ export default function Workouts() {
 
               <div className="flex gap-2">
                 <Button
-                  onClick={() => completeWorkoutMutation.mutate(todayWorkout.id)}
-                  disabled={completeWorkoutMutation.isPending}
+                  onClick={() => {
+                    setWorkoutToComplete(todayWorkout);
+                    setShowCompletionDialog(true);
+                  }}
                   className="bg-yellow-400 hover:bg-yellow-500 text-black"
                 >
-                  {completeWorkoutMutation.isPending ? (
-                    <div className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full mr-2" />
-                  ) : (
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                  )}
+                  <CheckCircle className="h-4 w-4 mr-2" />
                   Complete Workout
                 </Button>
                 <Button
@@ -444,6 +445,21 @@ export default function Workouts() {
             </CardContent>
           </Card>
         )}
+
+        {/* Workout Completion Dialog */}
+        <WorkoutCompletionDialog
+          isOpen={showCompletionDialog}
+          onClose={() => {
+            setShowCompletionDialog(false);
+            setWorkoutToComplete(null);
+          }}
+          workout={workoutToComplete}
+          onComplete={(data) => {
+            // The dialog handles the completion internally
+            setShowCompletionDialog(false);
+            setWorkoutToComplete(null);
+          }}
+        />
       </div>
     </MobileLayout>
   );
