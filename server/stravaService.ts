@@ -153,7 +153,11 @@ export class StravaService {
     return user.stravaAccessToken;
   }
 
-  static async pushWorkoutToStrava(userId: string, workoutData: WorkoutData): Promise<boolean> {
+  static async pushWorkoutToStrava(
+    userId: string, 
+    workoutData: WorkoutData, 
+    imageBuffer?: Buffer
+  ): Promise<{ success: boolean; activityId?: number }> {
     try {
       const accessToken = await this.getValidAccessToken(userId);
       if (!accessToken) {
@@ -178,11 +182,58 @@ export class StravaService {
         }
       });
 
-      console.log('Successfully created Strava activity:', response.data.id);
-      return true;
+      const activityId = response.data.id;
+      console.log('Successfully created Strava activity:', activityId);
+
+      // Upload image if provided
+      if (imageBuffer && activityId) {
+        try {
+          await this.uploadActivityPhoto(accessToken, activityId, imageBuffer);
+          console.log('Successfully uploaded workout image to Strava activity');
+        } catch (photoError) {
+          console.error('Failed to upload photo to Strava activity:', photoError);
+          // Don't fail the entire operation if photo upload fails
+        }
+      }
+
+      return { success: true, activityId };
     } catch (error) {
       console.error('Error pushing workout to Strava:', error);
-      return false;
+      return { success: false };
+    }
+  }
+
+  static async uploadActivityPhoto(
+    accessToken: string, 
+    activityId: number, 
+    imageBuffer: Buffer
+  ): Promise<void> {
+    try {
+      const FormData = require('form-data');
+      const form = new FormData();
+      
+      form.append('file', imageBuffer, {
+        filename: 'workout-share.png',
+        contentType: 'image/png'
+      });
+
+      const response = await axios.post(
+        `${STRAVA_BASE_URL}/activities/${activityId}/photos`,
+        form,
+        {
+          headers: {
+            ...form.getHeaders(),
+            'Authorization': `Bearer ${accessToken}`
+          },
+          maxContentLength: Infinity,
+          maxBodyLength: Infinity
+        }
+      );
+
+      console.log('Photo upload response:', response.status);
+    } catch (error) {
+      console.error('Error uploading photo to Strava:', error);
+      throw error;
     }
   }
 
