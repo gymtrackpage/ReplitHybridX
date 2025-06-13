@@ -551,7 +551,7 @@ export default function Admin() {
                     <SelectContent>
                       <SelectItem value="Hyrox">Hyrox</SelectItem>
                       <SelectItem value="Strength">Strength</SelectItem>
-                      <SelectItem value="Cardio">Cardio</SelectItem>
+                      <SelectItem value="Running">Running</SelectItem>
                       <SelectItem value="Mixed">Mixed</SelectItem>
                     </SelectContent>
                   </Select>
