@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { User, Calendar, Target, Trophy, Settings, Save } from "lucide-react";
+import { User, Calendar, Target, Trophy, Settings, Save, ExternalLink } from "lucide-react";
 
 const profileSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -36,6 +36,10 @@ export default function Profile() {
 
   const { data: userStats } = useQuery({
     queryKey: ["/api/user-stats"],
+  });
+
+  const { data: stravaStatus } = useQuery({
+    queryKey: ["/api/strava/status"],
   });
 
   const form = useForm<ProfileData>({
@@ -75,6 +79,25 @@ export default function Profile() {
   const onSubmit = (data: ProfileData) => {
     updateProfileMutation.mutate(data);
   };
+
+  const connectStravaMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("GET", "/api/strava/auth");
+      return response;
+    },
+    onSuccess: (data: any) => {
+      if (data.authUrl) {
+        window.open(data.authUrl, '_blank');
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Connection Failed",
+        description: error.message || "Failed to connect to Strava",
+        variant: "destructive",
+      });
+    },
+  });
 
   if (isLoading) {
     return (
@@ -376,6 +399,47 @@ export default function Profile() {
                 </CardContent>
               </Card>
             )}
+
+            {/* Strava Integration */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ExternalLink className="h-5 w-5" />
+                  Strava Integration
+                </CardTitle>
+                <CardDescription>
+                  Connect your Strava account to share workouts automatically
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {stravaStatus?.connected ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-green-100 text-green-800">Connected</Badge>
+                      <span className="text-sm text-muted-foreground">
+                        Athlete ID: {stravaStatus.athleteId}
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      You can now share completed workouts to Strava with custom notes and images.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      Connect your Strava account to automatically share completed workouts with workout images and detailed exercise information.
+                    </p>
+                    <Button 
+                      onClick={() => connectStravaMutation.mutate()}
+                      disabled={connectStravaMutation.isPending}
+                      className="w-full"
+                    >
+                      {connectStravaMutation.isPending ? "Connecting..." : "Connect to Strava"}
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>

@@ -15,7 +15,8 @@ import { createMinimalPrograms } from "./quickProgramSetup";
 import Stripe from "stripe";
 import { insertProgramSchema, insertWorkoutSchema, insertAssessmentSchema, insertWeightEntrySchema } from "../shared/schema";
 import { db } from "./db";
-import { workouts } from "../shared/schema";
+import { workouts, workoutCompletions, users, programs } from "../shared/schema";
+import { eq, and, gte, desc } from "drizzle-orm";
 
 // Enhanced async error wrapper with logging
 const asyncHandler = (fn: Function) => (req: Request, res: Response, next: NextFunction) => {
