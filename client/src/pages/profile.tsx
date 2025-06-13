@@ -82,7 +82,7 @@ export default function Profile() {
 
   const connectStravaMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("GET", "/api/strava/auth");
+      const response = await apiRequest("GET", "/api/strava/connect");
       return response;
     },
     onSuccess: (data: any) => {
