@@ -297,13 +297,13 @@ export default function Profile() {
                       </div>
                       <div>
                         <label className="text-sm font-medium text-muted-foreground">Fitness Level</label>
-                        <p className="font-medium">
+                        <div className="font-medium">
                           {user?.fitnessLevel ? (
                             <Badge className="capitalize">{user.fitnessLevel}</Badge>
                           ) : (
                             "Not specified"
                           )}
-                        </p>
+                        </div>
                       </div>
                     </div>
 
