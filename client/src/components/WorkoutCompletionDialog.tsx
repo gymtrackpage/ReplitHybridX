@@ -103,8 +103,13 @@ export function WorkoutCompletionDialog({ isOpen, onClose, workout, onComplete }
 
   // Don't render if workout is null - this must come after all hooks
   if (!workout) {
+    console.log("WorkoutCompletionDialog: workout is null/undefined");
     return null;
   }
+
+  // Debug: Log workout data
+  console.log("WorkoutCompletionDialog: workout data:", workout);
+  console.log("WorkoutCompletionDialog: workout.id:", workout.id);
 
   if (showStravaShare) {
     return (
