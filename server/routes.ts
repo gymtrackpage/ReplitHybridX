@@ -2060,27 +2060,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Found workout:", workout.name);
 
       // Prepare workout data for Strava
+      const durationInSeconds = duration || (workout.estimatedDuration || 60) * 60;
       const workoutData = {
         name: workout.name,
         description: notes || `HybridX Training Session\n\n${workout.description || ''}`,
-        duration: duration || (workout.estimatedDuration || 60) * 60, // Ensure duration is in seconds
+        duration: durationInSeconds,
         type: 'workout' as const,
         start_date_local: new Date().toISOString()
       };
 
       console.log("Sending workout data to Strava:", workoutData);
 
+      console.log("Calling StravaService.pushWorkoutToStrava with:", { userId, workoutData });
       const result = await StravaService.pushWorkoutToStrava(userId, workoutData);
       
       console.log("Strava push result:", result);
 
       if (result.success) {
+        console.log("✅ Strava activity created successfully with ID:", result.activityId);
         res.json({ 
           success: true, 
           message: "Workout shared to Strava successfully!",
           activityId: result.activityId 
         });
       } else {
+        console.error("❌ Failed to create Strava activity");
         res.status(500).json({ message: "Failed to share workout to Strava" });
       }
     } catch (error) {

@@ -67,7 +67,7 @@ export function WorkoutCompletionDialog({ isOpen, onClose, workout, onComplete }
         title: "Workout Completed!",
         description: "Great job finishing your workout.",
       });
-      onComplete({ rating, notes });
+      onComplete({ rating, notes, duration });
     },
     onError: (error: any) => {
       console.error("Workout completion error:", error);
@@ -81,10 +81,16 @@ export function WorkoutCompletionDialog({ isOpen, onClose, workout, onComplete }
 
   const shareToStravaMutation = useMutation({
     mutationFn: async (data: { workoutId: number; notes: string; duration: number }) => {
-      const response = await apiRequest("POST", "/api/strava/push-workout", data);
+      console.log("Sharing to Strava:", data);
+      const response = await apiRequest("POST", "/api/strava/push-workout", {
+        workoutId: data.workoutId,
+        notes: data.notes,
+        duration: data.duration * 60 // Convert minutes to seconds for Strava API
+      });
       return response;
     },
     onSuccess: (data: any) => {
+      console.log("Strava share success:", data);
       toast({
         title: "Shared to Strava!",
         description: data?.message || "Your workout has been shared to Strava successfully.",
@@ -125,7 +131,15 @@ export function WorkoutCompletionDialog({ isOpen, onClose, workout, onComplete }
       notes,
       duration: duration || workout.estimatedDuration || 60
     });
-    onClose();
+
+    // After successful completion, check if user wants to share to Strava
+    if (stravaStatus?.connected) {
+      setStravaNote(notes || `Completed ${workout.name} - HybridX Training`);
+      setStravaDuration(duration || workout.estimatedDuration || 60);
+      setShowStravaShare(true);
+    } else {
+      onClose();
+    }
   };
 
   const handleStravaShare = () => {
@@ -236,6 +250,13 @@ export function WorkoutCompletionDialog({ isOpen, onClose, workout, onComplete }
         </DialogHeader>
 
         <div className="space-y-4">
+          {stravaStatus?.connected && (
+            <div className="flex items-center gap-2 p-2 bg-orange-50 rounded-lg border border-orange-200">
+              <Share className="h-4 w-4 text-orange-600" />
+              <span className="text-sm text-orange-700">Strava connected - option to share after completion</span>
+            </div>
+          )}
+          
           <div>
             <Label>Rating (1-10)</Label>
             <div className="flex gap-1 mt-2">

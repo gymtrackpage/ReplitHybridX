@@ -151,6 +151,7 @@ export class StravaService {
         elapsed_time: workoutData.duration,
         description: workoutData.description,
         trainer: true, // Mark as indoor/gym workout
+        commute: false,
         ...(workoutData.distance && { distance: workoutData.distance })
       };
 
