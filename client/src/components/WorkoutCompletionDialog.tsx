@@ -26,13 +26,9 @@ export function WorkoutCompletionDialog({ isOpen, onClose, workout, onComplete }
   const [stravaNote, setStravaNote] = useState("");
   const [stravaDuration, setStravaDuration] = useState(duration);
 
-  // Don't render if workout is null
-  if (!workout) {
-    return null;
-  }
-
   const { data: stravaStatus } = useQuery({
     queryKey: ["/api/strava/status"],
+    enabled: !!workout // Only fetch when workout exists
   });
 
   const completeWorkoutMutation = useMutation({
@@ -104,6 +100,11 @@ export function WorkoutCompletionDialog({ isOpen, onClose, workout, onComplete }
   const handleSkipStrava = () => {
     onClose();
   };
+
+  // Don't render if workout is null - this must come after all hooks
+  if (!workout) {
+    return null;
+  }
 
   if (showStravaShare) {
     return (
