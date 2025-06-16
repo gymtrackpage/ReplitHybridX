@@ -67,7 +67,17 @@ export function WorkoutCompletionDialog({ isOpen, onClose, workout, onComplete }
         title: "Workout Completed!",
         description: "Great job finishing your workout.",
       });
-      onComplete({ rating, notes, duration });
+      
+      // Check if user wants to share to Strava BEFORE calling onComplete
+      if (stravaStatus?.connected) {
+        setStravaNote(notes || `Completed ${workout.name} - HybridX Training`);
+        setStravaDuration(duration || workout.estimatedDuration || 60);
+        setShowStravaShare(true);
+        // Don't call onComplete yet - wait for Strava flow to finish
+      } else {
+        // No Strava connection, proceed normally
+        onComplete({ rating, notes, duration });
+      }
     },
     onError: (error: any) => {
       console.error("Workout completion error:", error);
@@ -96,6 +106,8 @@ export function WorkoutCompletionDialog({ isOpen, onClose, workout, onComplete }
         description: data?.message || "Your workout has been shared to Strava successfully.",
       });
       setShowStravaShare(false);
+      // Now trigger the next workout loading
+      onComplete({ rating, notes, duration });
       onClose();
     },
     onError: (error: any) => {
@@ -131,15 +143,6 @@ export function WorkoutCompletionDialog({ isOpen, onClose, workout, onComplete }
       notes,
       duration: duration || workout.estimatedDuration || 60
     });
-
-    // After successful completion, check if user wants to share to Strava
-    if (stravaStatus?.connected) {
-      setStravaNote(notes || `Completed ${workout.name} - HybridX Training`);
-      setStravaDuration(duration || workout.estimatedDuration || 60);
-      setShowStravaShare(true);
-    } else {
-      onClose();
-    }
   };
 
   const handleStravaShare = () => {
@@ -162,6 +165,8 @@ export function WorkoutCompletionDialog({ isOpen, onClose, workout, onComplete }
   };
 
   const handleSkipStrava = () => {
+    // Call onComplete to trigger next workout loading
+    onComplete({ rating, notes, duration });
     onClose();
   };
 

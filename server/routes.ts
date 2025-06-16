@@ -2042,6 +2042,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Workout ID is required" });
       }
 
+      // Check if Strava environment variables are configured
+      if (!process.env.STRAVA_CLIENT_ID || !process.env.STRAVA_CLIENT_SECRET) {
+        console.error("Strava environment variables not configured");
+        return res.status(400).json({ 
+          message: "Strava integration not configured. Please set STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET.",
+          needsAuth: false
+        });
+      }
+
       // Check if user has Strava connected
       const user = await storage.getUser(userId);
       if (!user?.stravaConnected || !user.stravaAccessToken) {
@@ -2059,7 +2068,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log("Found workout:", workout.name);
 
-      // Prepare workout data for Strava
+      // Prepare workout data for Strava (duration should already be in seconds from frontend)
       const durationInSeconds = duration || (workout.estimatedDuration || 60) * 60;
       const workoutData = {
         name: workout.name,
@@ -2071,7 +2080,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log("Sending workout data to Strava:", workoutData);
 
-      console.log("Calling StravaService.pushWorkoutToStrava with:", { userId, workoutData });
       const result = await StravaService.pushWorkoutToStrava(userId, workoutData);
       
       console.log("Strava push result:", result);
@@ -2085,11 +2093,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } else {
         console.error("❌ Failed to create Strava activity");
-        res.status(500).json({ message: "Failed to share workout to Strava" });
+        res.status(400).json({ 
+          message: "Failed to share workout to Strava. Please check your Strava connection.",
+          success: false
+        });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error pushing workout to Strava:", error);
-      res.status(500).json({ message: "Failed to push workout to Strava: " + (error as Error).message });
+      
+      // More specific error handling
+      if (error.response?.status === 401) {
+        res.status(401).json({ 
+          message: "Strava authorization expired. Please reconnect your account.",
+          needsAuth: true
+        });
+      } else if (error.response?.status === 403) {
+        res.status(403).json({ 
+          message: "Insufficient Strava permissions. Please reconnect your account.",
+          needsAuth: true
+        });
+      } else {
+        res.status(500).json({ 
+          message: "Failed to share workout to Strava: " + (error.message || "Unknown error"),
+          success: false
+        });
+      }
     }
   });
 
