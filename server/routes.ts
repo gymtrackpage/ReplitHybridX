@@ -693,11 +693,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Change program endpoint with date rescheduling
+  // Change program endpoint with start options
   app.put('/api/change-program', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { programId, eventDate } = req.body;
+      const { programId, startOption, eventDate } = req.body;
 
       // Get the new program details
       const program = await storage.getProgram(programId);
@@ -708,50 +708,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update user's current program
       await storage.updateUserProgram(userId, programId);
 
-      // Calculate new program schedule if event date is provided
+      // Get existing progress
+      const existingProgress = await storage.getUserProgress(userId);
+      
       let startDate = new Date();
       let currentWeek = 1;
       let currentDay = 1;
-      let totalWorkouts = (program.duration || 12) * (program.frequency || 6); // Assuming 6 days per week
-      
-      if (eventDate) {
-        const event = new Date(eventDate);
-        const today = new Date();
-        const daysUntilEvent = Math.ceil((event.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
-        const programDuration = program.duration || 12;
-        const totalDaysInProgram = ((programDuration - 1) * 7) + 6; // Week 12, Day 6 = 83 days total
-        
-        if (daysUntilEvent < totalDaysInProgram) {
-          // Event is closer than full program duration - start at appropriate week/day
-          const daysToSkip = totalDaysInProgram - daysUntilEvent;
-          currentWeek = Math.floor(daysToSkip / 7) + 1;
-          currentDay = (daysToSkip % 7) + 1;
-          
-          // Ensure we don't exceed program duration
-          if (currentWeek > programDuration) {
-            currentWeek = programDuration;
-            currentDay = 6;
+      let totalWorkouts = (program.duration || 12) * (program.frequency || 6);
+
+      // Handle different start options
+      switch (startOption) {
+        case "continue":
+          // Keep current week/day if user has existing progress
+          if (existingProgress) {
+            currentWeek = existingProgress.currentWeek || 1;
+            currentDay = existingProgress.currentDay || 1;
           }
+          break;
           
-          startDate = new Date(today);
-        } else {
-          // Event is far enough away - calculate normal start date
-          const startDateMs = event.getTime() - (totalDaysInProgram * 24 * 60 * 60 * 1000);
-          startDate = new Date(startDateMs);
+        case "beginning":
+          // Start from week 1, day 1 (default values already set)
+          break;
           
-          // If calculated start date is in the future (more than 12 weeks), use maintenance program logic
-          if (startDate > today) {
-            // For now, start today at week 1 - maintenance program logic can be added later
-            startDate = new Date(today);
+        case "eventDate":
+          if (eventDate) {
+            const event = new Date(eventDate);
+            const today = new Date();
+            const daysUntilEvent = Math.ceil((event.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+            const programDuration = program.duration || 12;
+            const totalDaysInProgram = ((programDuration - 1) * 7) + 6; // Week 12, Day 6 = 83 days total
+            
+            if (daysUntilEvent < totalDaysInProgram) {
+              // Event is closer than full program duration - start at appropriate week/day
+              const daysToSkip = totalDaysInProgram - daysUntilEvent;
+              currentWeek = Math.floor(daysToSkip / 7) + 1;
+              currentDay = (daysToSkip % 7) + 1;
+              
+              // Ensure we don't exceed program duration
+              if (currentWeek > programDuration) {
+                currentWeek = programDuration;
+                currentDay = 6;
+              }
+              
+              startDate = new Date(today);
+            } else {
+              // Event is far enough away - calculate normal start date
+              const startDateMs = event.getTime() - (totalDaysInProgram * 24 * 60 * 60 * 1000);
+              startDate = new Date(startDateMs);
+              
+              // If calculated start date is in the future, use today
+              if (startDate > today) {
+                startDate = new Date(today);
+              }
+            }
           }
-        }
+          break;
+          
+        default:
+          // Default to beginning
+          break;
       }
 
-      // Get existing progress or create new one
-      const existingProgress = await storage.getUserProgress(userId);
-      
+      // Update or create progress tracking
       if (existingProgress) {
-        // Update existing progress with new program
         await storage.updateUserProgress(userId, {
           programId: programId,
           currentWeek: currentWeek,
@@ -759,10 +778,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           startDate: startDate.toISOString(),
           eventDate: eventDate ? new Date(eventDate).toISOString() : null,
           totalWorkouts: totalWorkouts,
-          completedWorkouts: 0
+          completedWorkouts: startOption === "continue" ? existingProgress.completedWorkouts : 0
         });
       } else {
-        // Create new progress tracking
         await storage.createUserProgress({
           userId,
           programId,

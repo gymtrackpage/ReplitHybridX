@@ -1,9 +1,14 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { MobileLayout } from "@/components/layout/mobile-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Trophy, Clock, Target, Users, Calendar } from "lucide-react";
@@ -11,6 +16,9 @@ import { Trophy, Clock, Target, Users, Calendar } from "lucide-react";
 export default function Programs() {
   const { toast } = useToast();
   const [selectedProgram, setSelectedProgram] = useState<number | null>(null);
+  const [open, setOpen] = useState(false);
+  const [programSelectionMode, setProgramSelectionMode] = useState("continue"); // continue, restart, enddate
+  const [endDate, setEndDate] = useState("");
 
   const { data: programs, isLoading } = useQuery({
     queryKey: ["/api/programs"],
@@ -22,7 +30,7 @@ export default function Programs() {
 
   const selectProgramMutation = useMutation({
     mutationFn: async (programId: number) => {
-      await apiRequest("POST", "/api/select-program", { programId });
+      await apiRequest("POST", "/api/select-program", { programId, mode: programSelectionMode, endDate });
     },
     onSuccess: () => {
       toast({
@@ -30,6 +38,7 @@ export default function Programs() {
         description: "Your training program has been updated successfully.",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/user-onboarding-status"] });
+      setOpen(false);
     },
     onError: (error: any) => {
       toast({
@@ -75,6 +84,15 @@ export default function Programs() {
     }
   };
 
+  const handleProgramSelect = (programId: number) => {
+    setSelectedProgram(programId);
+    setOpen(true);
+  };
+
+  const handleConfirmProgramSelect = () => {
+    selectProgramMutation.mutate(selectedProgram!);
+  };
+
   return (
     <MobileLayout>
       <div className="space-y-6">
@@ -118,7 +136,7 @@ export default function Programs() {
               className={`transition-all hover:shadow-lg cursor-pointer ${
                 selectedProgram === program.id ? "ring-2 ring-yellow-400" : ""
               }`}
-              onClick={() => setSelectedProgram(program.id)}
+              onClick={() => handleProgramSelect(program.id)}
             >
               <CardHeader>
                 <div className="flex justify-between items-start">
@@ -145,7 +163,7 @@ export default function Programs() {
                     <span>{program.frequency}x/week</span>
                   </div>
                 </div>
-                
+
                 {program.targetEventWeeks && (
                   <div className="text-sm text-muted-foreground">
                     Recommended {program.targetEventWeeks} weeks before event
@@ -157,7 +175,7 @@ export default function Programs() {
                   variant={userStatus?.currentProgramId === program.id ? "secondary" : "default"}
                   onClick={(e) => {
                     e.stopPropagation();
-                    selectProgramMutation.mutate(program.id);
+                    handleProgramSelect(program.id);
                   }}
                   disabled={selectProgramMutation.isPending}
                 >
@@ -186,6 +204,52 @@ export default function Programs() {
           </Card>
         )}
       </div>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Program Selection Options</DialogTitle>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-4">
+            <RadioGroup defaultValue="continue" className="flex flex-col space-y-1.5" onValueChange={(value) => setProgramSelectionMode(value)}>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="continue" id="continue" />
+                <Label htmlFor="continue">Continue from the same day</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="restart" id="restart" />
+                <Label htmlFor="restart">Start at the beginning of the program</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="enddate" id="enddate" />
+                <Label htmlFor="enddate">Manually select an end date</Label>
+              </div>
+            </RadioGroup>
+
+            {programSelectionMode === "enddate" && (
+              <div className="grid gap-2">
+                <Label htmlFor="endDate">End Date</Label>
+                <Input
+                  type="date"
+                  id="endDate"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                />
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button type="button" onClick={handleConfirmProgramSelect} disabled={selectProgramMutation.isPending}>
+              {selectProgramMutation.isPending ? (
+                <div className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full mr-2" />
+              ) : null}
+              Confirm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </MobileLayout>
   );
 }
