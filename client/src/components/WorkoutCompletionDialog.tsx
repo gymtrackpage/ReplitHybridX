@@ -76,7 +76,7 @@ export function WorkoutCompletionDialog({ isOpen, onClose, workout, onComplete }
   const shareToStravaMutation = useMutation({
     mutationFn: async (data: { workoutId: number; notes: string; duration: number }) => {
       const response = await apiRequest("POST", "/api/strava/push-workout", data);
-      return await response.json();
+      return response;
     },
     onSuccess: () => {
       toast({
