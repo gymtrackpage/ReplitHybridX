@@ -84,19 +84,29 @@ export function WorkoutCompletionDialog({ isOpen, onClose, workout, onComplete }
       const response = await apiRequest("POST", "/api/strava/push-workout", data);
       return response;
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       toast({
         title: "Shared to Strava!",
-        description: "Your workout has been posted to Strava with an image.",
+        description: data?.message || "Your workout has been shared to Strava successfully.",
       });
+      setShowStravaShare(false);
       onClose();
     },
     onError: (error: any) => {
-      toast({
-        title: "Share Failed",
-        description: error.message || "Failed to share to Strava",
-        variant: "destructive",
-      });
+      console.error("Strava share error:", error);
+      if (error.needsAuth) {
+        toast({
+          title: "Connect Strava",
+          description: error.message || "Please connect your Strava account first",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error sharing to Strava",
+          description: error.message || "Failed to share workout to Strava",
+          variant: "destructive",
+        });
+      }
     },
   });
 

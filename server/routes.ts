@@ -2034,10 +2034,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/strava/push-workout', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { workoutId } = req.body;
+      const { workoutId, duration, notes } = req.body;
+
+      console.log("Strava push-workout request:", { userId, workoutId, duration, notes });
 
       if (!workoutId) {
         return res.status(400).json({ message: "Workout ID is required" });
+      }
+
+      // Check if user has Strava connected
+      const user = await storage.getUser(userId);
+      if (!user?.stravaConnected || !user.stravaAccessToken) {
+        return res.status(400).json({ 
+          message: "Please connect your Strava account first",
+          needsAuth: true 
+        });
       }
 
       // Get workout details
@@ -2046,35 +2057,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Workout not found" });
       }
 
-      // Get completion details
-      const completions = await storage.getWorkoutCompletions(userId);
-      const completion = completions.find(c => c.workoutId === workoutId);
-      
-      if (!completion) {
-        return res.status(400).json({ message: "Workout not completed yet" });
-      }
+      console.log("Found workout:", workout.name);
 
       // Prepare workout data for Strava
       const workoutData = {
         name: workout.name,
-        description: workout.description || `${workout.name} - Hybrid X Training`,
-        duration: completion.duration || (workout.estimatedDuration || 60) * 60, // Convert minutes to seconds
+        description: notes || `HybridX Training Session\n\n${workout.description || ''}`,
+        duration: duration || (workout.estimatedDuration || 60) * 60, // Ensure duration is in seconds
         type: 'workout' as const,
-        start_date_local: completion.completedAt ? 
-          completion.completedAt.toISOString() : 
-          new Date().toISOString()
+        start_date_local: new Date().toISOString()
       };
 
-      const success = await StravaService.pushWorkoutToStrava(userId, workoutData);
+      console.log("Sending workout data to Strava:", workoutData);
+
+      const result = await StravaService.pushWorkoutToStrava(userId, workoutData);
       
-      if (success) {
-        res.json({ success: true, message: "Workout pushed to Strava successfully" });
+      console.log("Strava push result:", result);
+
+      if (result.success) {
+        res.json({ 
+          success: true, 
+          message: "Workout shared to Strava successfully!",
+          activityId: result.activityId 
+        });
       } else {
-        res.status(500).json({ message: "Failed to push workout to Strava" });
+        res.status(500).json({ message: "Failed to share workout to Strava" });
       }
     } catch (error) {
       console.error("Error pushing workout to Strava:", error);
-      res.status(500).json({ message: "Failed to push workout to Strava" });
+      res.status(500).json({ message: "Failed to push workout to Strava: " + (error as Error).message });
     }
   });
 
@@ -2083,9 +2094,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
       
+      let recentActivities = null;
+      if (user?.stravaConnected && user.stravaAccessToken) {
+        try {
+          // Get recent activities to verify connection
+          const accessToken = await StravaService.getValidAccessToken(userId);
+          if (accessToken) {
+            const axios = require('axios');
+            const activitiesResponse = await axios.get('https://www.strava.com/api/v3/athlete/activities?per_page=5', {
+              headers: {
+                'Authorization': `Bearer ${accessToken}`
+              }
+            });
+            recentActivities = activitiesResponse.data.map((activity: any) => ({
+              id: activity.id,
+              name: activity.name,
+              type: activity.type,
+              start_date: activity.start_date,
+              elapsed_time: activity.elapsed_time
+            }));
+          }
+        } catch (activitiesError) {
+          console.error("Error fetching recent activities:", activitiesError);
+        }
+      }
+      
       res.json({
         connected: user?.stravaConnected || false,
-        athleteId: user?.stravaUserId || null
+        athleteId: user?.stravaUserId || null,
+        recentActivities: recentActivities
       });
     } catch (error) {
       console.error("Error getting Strava status:", error);

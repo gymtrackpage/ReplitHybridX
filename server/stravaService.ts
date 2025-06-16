@@ -132,10 +132,16 @@ export class StravaService {
     imageBuffer?: Buffer
   ): Promise<{ success: boolean; activityId?: number }> {
     try {
+      console.log('Attempting to push workout to Strava for user:', userId);
+      console.log('Workout data:', workoutData);
+      
       const accessToken = await this.getValidAccessToken(userId);
       if (!accessToken) {
+        console.error('No valid Strava access token found');
         throw new Error('No valid Strava access token');
       }
+
+      console.log('Valid access token found, preparing activity data');
 
       const activityData = {
         name: workoutData.name,
@@ -148,6 +154,8 @@ export class StravaService {
         ...(workoutData.distance && { distance: workoutData.distance })
       };
 
+      console.log('Activity data to send to Strava:', activityData);
+
       const response = await axios.post(`${STRAVA_BASE_URL}/activities`, activityData, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -156,7 +164,8 @@ export class StravaService {
       });
 
       const activityId = response.data.id;
-      console.log('Successfully created Strava activity:', activityId);
+      console.log('Successfully created Strava activity with ID:', activityId);
+      console.log('Strava response data:', response.data);
 
       // Upload image if provided
       if (imageBuffer && activityId) {
@@ -170,8 +179,10 @@ export class StravaService {
       }
 
       return { success: true, activityId };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error pushing workout to Strava:', error);
+      console.error('Error response data:', error.response?.data);
+      console.error('Error status:', error.response?.status);
       return { success: false };
     }
   }
