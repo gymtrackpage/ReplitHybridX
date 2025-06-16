@@ -42,36 +42,38 @@ export function WorkoutCompletionDialog({ isOpen, onClose, workout, onComplete }
   });
 
   const completeWorkoutMutation = useMutation({
-    mutationFn: async (data: { rating: number; notes: string; duration: number }) => {
-      if (!workout?.id) {
+    mutationFn: async (data: { rating: number; notes: string; duration?: number }) => {
+      console.log("Completing workout with data:", { workoutId: workout.id, ...data });
+
+      if (!workout.id) {
         throw new Error("Workout ID is missing");
       }
-      const response = await apiRequest("POST", "/api/workout-completions", {
+
+      return await apiRequest("POST", "/api/workout-completions", {
         workoutId: workout.id,
         rating: data.rating,
         notes: data.notes,
-        duration: data.duration
+        duration: data.duration,
+        skipped: false
       });
-      return response;
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/today-workout"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/user-progress"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/recent-workouts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/upcoming-workouts"] });
       toast({
         title: "Workout Completed!",
         description: "Great job finishing your workout.",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/recent-activity"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/today-workout"] });
-      
-      if (stravaStatus?.connected) {
-        setShowStravaShare(true);
-      } else {
-        onClose();
-      }
+      onComplete({ rating, notes });
     },
     onError: (error: any) => {
+      console.error("Workout completion error:", error);
       toast({
         title: "Error",
-        description: error.message || "Failed to complete workout",
+        description: error.message || "Failed to complete workout. Please try again.",
         variant: "destructive",
       });
     },
@@ -99,9 +101,21 @@ export function WorkoutCompletionDialog({ isOpen, onClose, workout, onComplete }
   });
 
   const handleComplete = () => {
-    const completionData = { rating, notes, duration };
-    completeWorkoutMutation.mutate(completionData);
-    onComplete(completionData);
+    if (!workout || !workout.id) {
+      toast({
+        title: "Error",
+        description: "Workout data is missing. Please try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    completeWorkoutMutation.mutate({ 
+      rating, 
+      notes,
+      duration: duration || workout.estimatedDuration || 60
+    });
+    onClose();
   };
 
   const handleStravaShare = () => {
@@ -114,7 +128,7 @@ export function WorkoutCompletionDialog({ isOpen, onClose, workout, onComplete }
       });
       return;
     }
-    
+
     console.log("Sharing to Strava with workoutId:", workout.id);
     shareToStravaMutation.mutate({
       workoutId: workout.id,
@@ -127,7 +141,7 @@ export function WorkoutCompletionDialog({ isOpen, onClose, workout, onComplete }
     onClose();
   };
 
-  
+
 
   if (showStravaShare) {
     return (

@@ -16,7 +16,7 @@ import Stripe from "stripe";
 import { insertProgramSchema, insertWorkoutSchema, insertAssessmentSchema, insertWeightEntrySchema } from "../shared/schema";
 import { db } from "./db";
 import { workouts, workoutCompletions, users, programs } from "../shared/schema";
-import { eq, and, gte, desc } from "drizzle-orm";
+import { eq, and, gte, desc, asc } from "drizzle-orm";
 
 // Enhanced async error wrapper with logging
 const asyncHandler = (fn: Function) => (req: Request, res: Response, next: NextFunction) => {
@@ -1687,30 +1687,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/workout-completions", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { workoutId, rating, notes, skipped = false } = req.body;
+      const { workoutId, rating, notes, skipped = false, duration } = req.body;
+
+      console.log("Workout completion request:", { userId, workoutId, rating, notes, skipped, duration });
+
+      // Validate workoutId
+      if (!workoutId || isNaN(parseInt(workoutId))) {
+        console.error("Invalid or missing workoutId:", workoutId);
+        return res.status(400).json({ message: "Valid workout ID is required" });
+      }
+
+      // Verify workout exists
+      const workout = await storage.getWorkout(parseInt(workoutId));
+      if (!workout) {
+        console.error("Workout not found:", workoutId);
+        return res.status(404).json({ message: "Workout not found" });
+      }
 
       // Get current progress to determine next day
       const progress = await storage.getUserProgress(userId);
       if (!progress) {
+        console.error("User progress not found for user:", userId);
         return res.status(404).json({ message: "User progress not found" });
       }
 
       // Create workout completion record
       const completion = await storage.createWorkoutCompletion({
         userId,
-        workoutId,
+        workoutId: parseInt(workoutId),
         rating: rating || null,
         notes: notes || null,
         skipped,
+        duration: duration || null,
         completedAt: new Date()
       });
+
+      console.log("Created workout completion:", completion.id);
 
       // Get all workouts for this program to understand progression
       const allWorkouts = await db
         .select()
         .from(workouts)
         .where(eq(workouts.programId, progress.programId))
-        .orderBy(asc(workouts.week), asc(workouts.day));
+        .orderBy(workouts.week, workouts.day);
 
       console.log(`Program has ${allWorkouts.length} total workouts`);
 
