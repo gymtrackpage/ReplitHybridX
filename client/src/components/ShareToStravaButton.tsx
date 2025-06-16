@@ -40,11 +40,12 @@ export function ShareToStravaButton({
       duration: number; 
       notes: string; 
     }) => {
-      return apiRequest('POST', '/api/share-to-strava', {
+      const response = await apiRequest('POST', '/api/share-to-strava', {
         workoutId,
         duration: duration * 60, // Convert to seconds
         notes
       });
+      return await response.json();
     },
     onSuccess: (data) => {
       toast({
@@ -74,7 +75,8 @@ export function ShareToStravaButton({
   const connectStravaMutation = useMutation({
     mutationFn: async () => {
       console.log("Requesting Strava connection...");
-      return apiRequest('GET', '/api/strava/connect');
+      const response = await apiRequest('GET', '/api/strava/connect');
+      return await response.json();
     },
     onSuccess: (data) => {
       console.log("Strava connect response:", data);

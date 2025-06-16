@@ -83,7 +83,8 @@ export default function Profile() {
   const connectStravaMutation = useMutation({
     mutationFn: async () => {
       console.log("Profile: Requesting Strava connection...");
-      return apiRequest('GET', '/api/strava/connect');
+      const response = await apiRequest('GET', '/api/strava/connect');
+      return await response.json();
     },
     onSuccess: (data) => {
       console.log("Profile: Strava connect response:", data);
