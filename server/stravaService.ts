@@ -165,7 +165,6 @@ export class StravaService {
 
       const activityData = {
         name: workoutData.name.trim(),
-        type: this.mapWorkoutTypeToStravaType(workoutData.type),
         sport_type: this.mapWorkoutTypeToStravaSportType(workoutData.type),
         start_date_local: startDate,
         elapsed_time: Math.max(60, Math.floor(workoutData.duration)), // Minimum 1 minute
@@ -272,12 +271,12 @@ export class StravaService {
       case 'crosstraining':
       case 'hyrox':
       case 'strength':
-        return 'CrossTraining';
+        return 'Crosstraining';
       case 'bike':
       case 'cycling':
         return 'Ride';
       default:
-        return 'CrossTraining';
+        return 'Crosstraining';
     }
   }
 
