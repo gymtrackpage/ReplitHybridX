@@ -92,12 +92,23 @@ export function WorkoutCompletionDialog({ isOpen, onClose, workout, onComplete }
   const shareToStravaMutation = useMutation({
     mutationFn: async (data: { workoutId: number; notes: string; duration: number }) => {
       console.log("Sharing to Strava:", data);
-      const response = await apiRequest("POST", "/api/strava/push-workout", {
-        workoutId: data.workoutId,
-        notes: data.notes,
-        duration: data.duration * 60 // Convert minutes to seconds for Strava API
-      });
-      return response;
+      try {
+        const response = await apiRequest("POST", "/api/strava/push-workout", {
+          workoutId: data.workoutId,
+          notes: data.notes,
+          duration: data.duration * 60 // Convert minutes to seconds for Strava API
+        });
+        return response;
+      } catch (error: any) {
+        console.error("API request failed:", error);
+        // Re-throw with more detailed error information
+        throw {
+          message: error.message || "Failed to share workout to Strava",
+          status: error.status,
+          needsAuth: error.needsAuth,
+          details: error
+        };
+      }
     },
     onSuccess: (data: any) => {
       console.log("Strava share success:", data);
@@ -112,16 +123,36 @@ export function WorkoutCompletionDialog({ isOpen, onClose, workout, onComplete }
     },
     onError: (error: any) => {
       console.error("Strava share error:", error);
+      console.error("Error details:", JSON.stringify(error, null, 2));
+      
+      let errorMessage = "Failed to share workout to Strava";
+      
       if (error.needsAuth) {
+        errorMessage = error.message || "Please connect your Strava account first";
         toast({
           title: "Connect Strava",
-          description: error.message || "Please connect your Strava account first",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      } else if (error.status === 400) {
+        errorMessage = error.message || "Invalid workout data for Strava";
+        toast({
+          title: "Strava Share Error",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      } else if (error.status === 401 || error.status === 403) {
+        errorMessage = "Please reconnect your Strava account";
+        toast({
+          title: "Strava Authorization Error",
+          description: errorMessage,
           variant: "destructive",
         });
       } else {
+        errorMessage = error.message || error.details?.message || "Unknown error occurred";
         toast({
           title: "Error sharing to Strava",
-          description: error.message || "Failed to share workout to Strava",
+          description: errorMessage,
           variant: "destructive",
         });
       }

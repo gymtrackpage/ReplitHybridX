@@ -2039,58 +2039,92 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const { workoutId, duration, notes } = req.body;
 
-      console.log("Strava push-workout request:", { userId, workoutId, duration, notes });
+      console.log("🎯 Strava push-workout request:", { 
+        userId, 
+        workoutId, 
+        duration, 
+        notes: notes?.substring(0, 100) + (notes?.length > 100 ? '...' : '') 
+      });
 
+      // Validate required fields
       if (!workoutId) {
-        console.error("No workout ID provided");
-        return res.status(400).json({ message: "Workout ID is required" });
+        console.error("❌ No workout ID provided");
+        return res.status(400).json({ 
+          message: "Workout ID is required",
+          success: false 
+        });
+      }
+
+      if (isNaN(parseInt(workoutId))) {
+        console.error("❌ Invalid workout ID:", workoutId);
+        return res.status(400).json({ 
+          message: "Invalid workout ID format",
+          success: false 
+        });
       }
 
       // Check if Strava environment variables are configured
       if (!process.env.STRAVA_CLIENT_ID || !process.env.STRAVA_CLIENT_SECRET) {
-        console.error("Strava environment variables not configured");
+        console.error("❌ Strava environment variables not configured");
         return res.status(400).json({ 
           message: "Strava integration not configured. Please set STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET in Secrets.",
-          needsAuth: false
+          needsAuth: false,
+          success: false
         });
       }
 
       // Check if user has Strava connected
       const user = await storage.getUser(userId);
-      console.log("User Strava connection status:", {
+      console.log("👤 User Strava connection status:", {
         userId,
         stravaConnected: user?.stravaConnected,
         hasAccessToken: !!user?.stravaAccessToken,
-        tokenExpiry: user?.stravaTokenExpiry
+        tokenExpiry: user?.stravaTokenExpiry ? new Date(user.stravaTokenExpiry).toISOString() : 'null'
       });
 
       if (!user?.stravaConnected || !user.stravaAccessToken) {
-        console.error("User not connected to Strava");
+        console.error("❌ User not connected to Strava");
         return res.status(400).json({ 
           message: "Please connect your Strava account first",
-          needsAuth: true 
+          needsAuth: true,
+          success: false
         });
       }
 
       // Get workout details
       const workout = await storage.getWorkout(parseInt(workoutId));
       if (!workout) {
-        console.error("Workout not found:", workoutId);
-        return res.status(404).json({ message: "Workout not found" });
+        console.error("❌ Workout not found:", workoutId);
+        return res.status(404).json({ 
+          message: "Workout not found",
+          success: false 
+        });
       }
 
-      console.log("Found workout:", { id: workout.id, name: workout.name });
+      console.log("✅ Found workout:", { 
+        id: workout.id, 
+        name: workout.name,
+        estimatedDuration: workout.estimatedDuration 
+      });
 
       // Validate and prepare duration (ensure it's in seconds)
-      let durationInSeconds = 60; // Default 1 minute
+      let durationInSeconds = 1800; // Default 30 minutes
       if (duration && !isNaN(parseInt(duration))) {
         durationInSeconds = parseInt(duration);
-        // If duration is very small, it might be in minutes, convert to seconds
-        if (durationInSeconds < 300) { // Less than 5 minutes, likely in minutes
-          durationInSeconds = durationInSeconds * 60;
-        }
+        console.log("📊 Duration processing:", { 
+          originalDuration: duration, 
+          parsed: durationInSeconds,
+          isLikelyMinutes: durationInSeconds < 300 
+        });
       } else if (workout.estimatedDuration) {
         durationInSeconds = workout.estimatedDuration * 60; // Convert minutes to seconds
+        console.log("📊 Using workout estimated duration:", workout.estimatedDuration, "minutes =", durationInSeconds, "seconds");
+      }
+
+      // Ensure minimum duration
+      if (durationInSeconds < 60) {
+        console.warn("⚠️ Duration too short, setting to minimum 60 seconds");
+        durationInSeconds = 60;
       }
 
       // Prepare workout data for Strava
@@ -2102,11 +2136,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         start_date_local: new Date().toISOString()
       };
 
-      console.log("Sending workout data to Strava:", workoutData);
+      console.log("📤 Sending workout data to Strava:", {
+        ...workoutData,
+        description: workoutData.description.substring(0, 100) + '...'
+      });
 
       const result = await StravaService.pushWorkoutToStrava(userId, workoutData);
       
-      console.log("Strava push result:", result);
+      console.log("📥 Strava push result:", result);
 
       if (result.success) {
         console.log("✅ Strava activity created successfully with ID:", result.activityId);
@@ -2123,31 +2160,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
     } catch (error: any) {
-      console.error("Error pushing workout to Strava:", error);
-      console.error("Error stack:", error.stack);
-      console.error("Error response:", error.response?.data);
+      console.error("💥 Error pushing workout to Strava:");
+      console.error("  Error message:", error.message);
+      console.error("  Error stack:", error.stack);
+      console.error("  Error response status:", error.response?.status);
+      console.error("  Error response data:", JSON.stringify(error.response?.data, null, 2));
+      console.error("  Full error object:", JSON.stringify(error, null, 2));
       
       // More specific error handling
       if (error.response?.status === 401) {
+        console.error("🔐 Strava authorization error (401)");
         res.status(401).json({ 
           message: "Strava authorization expired. Please reconnect your account.",
-          needsAuth: true
+          needsAuth: true,
+          success: false
         });
       } else if (error.response?.status === 403) {
+        console.error("🚫 Strava permissions error (403)");
         res.status(403).json({ 
           message: "Insufficient Strava permissions. Please reconnect your account.",
-          needsAuth: true
+          needsAuth: true,
+          success: false
         });
       } else if (error.response?.status === 400) {
+        console.error("📋 Strava validation error (400)");
+        const stravaErrorMsg = error.response?.data?.message || 
+                              error.response?.data?.errors?.[0]?.field + ': ' + error.response?.data?.errors?.[0]?.code ||
+                              error.message;
         res.status(400).json({ 
-          message: "Invalid workout data for Strava: " + (error.response?.data?.message || error.message),
+          message: "Invalid workout data for Strava: " + stravaErrorMsg,
+          success: false,
+          stravaError: error.response?.data
+        });
+      } else if (error.response?.status === 429) {
+        console.error("⏱️ Strava rate limit error (429)");
+        res.status(429).json({ 
+          message: "Strava API rate limit exceeded. Please try again later.",
           success: false
         });
       } else {
+        console.error("🔧 Generic error:", error.response?.status || 'No status');
         res.status(500).json({ 
           message: "Failed to share workout to Strava: " + (error.message || "Unknown error"),
           success: false,
-          error: error.response?.data || error.message
+          error: error.response?.data || { message: error.message }
         });
       }
     }
