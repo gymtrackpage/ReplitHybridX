@@ -237,6 +237,7 @@ export class DatabaseStorage implements IStorage {
   async getTodaysWorkout(userId: string): Promise<Workout | undefined> {
     const user = await this.getUser(userId);
     if (!user?.currentProgramId) {
+      console.log(`No current program for user ${userId}`);
       return undefined;
     }
 
@@ -244,6 +245,7 @@ export class DatabaseStorage implements IStorage {
     
     // If no progress exists, create initial progress
     if (!progress) {
+      console.log(`Creating initial progress for user ${userId}`);
       progress = await this.createUserProgress({
         userId,
         programId: user.currentProgramId,
@@ -257,6 +259,7 @@ export class DatabaseStorage implements IStorage {
 
     // If progress exists but for different program, reset to week 1 day 1
     if (progress.programId !== user.currentProgramId) {
+      console.log(`Program mismatch for user ${userId}, resetting progress`);
       progress = await this.updateUserProgress(userId, {
         programId: user.currentProgramId,
         currentWeek: 1,
@@ -269,7 +272,9 @@ export class DatabaseStorage implements IStorage {
     const currentWeek = progress.currentWeek || 1;
     const currentDay = progress.currentDay || 1;
 
-    // Find the workout for current week and day
+    console.log(`Looking for workout: Program ${progress.programId}, Week ${currentWeek}, Day ${currentDay} for user ${userId}`);
+
+    // Find the workout for current week and day (training days 1-6, no day 7)
     const [workout] = await db
       .select()
       .from(workouts)
@@ -280,6 +285,22 @@ export class DatabaseStorage implements IStorage {
           eq(workouts.day, currentDay)
         )
       );
+    
+    if (!workout) {
+      console.log(`No workout found for Program ${progress.programId}, Week ${currentWeek}, Day ${currentDay}`);
+      // Check if we've reached the end of the program and need to move to next week/day
+      const allWorkouts = await db
+        .select()
+        .from(workouts)
+        .where(eq(workouts.programId, progress.programId))
+        .orderBy(asc(workouts.week), asc(workouts.day));
+      
+      console.log(`Total workouts in program: ${allWorkouts.length}`);
+      if (allWorkouts.length > 0) {
+        const maxWeek = Math.max(...allWorkouts.map(w => w.week));
+        console.log(`Max week in program: ${maxWeek}`);
+      }
+    }
     
     return workout;
   }

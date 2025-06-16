@@ -1693,13 +1693,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let nextDay = currentDay + 1;
       let nextWeek = currentWeek;
 
-      // Check if we need to advance to next week (assuming 6 training days per week, day 7 is rest)
+      // Check if we need to advance to next week (6 training days per week: Mon-Sat)
+      // Day 7 (Sunday) is rest, so after day 6 we go to day 1 of next week
       if (nextDay > 6) {
         nextDay = 1;
         nextWeek = currentWeek + 1;
       }
 
       // Update user progress with next day/week
+      console.log(`Progressing user ${userId} from Week ${currentWeek} Day ${currentDay} to Week ${nextWeek} Day ${nextDay}`);
+      
       const updatedProgress = await storage.updateUserProgress(userId, {
         currentDay: nextDay,
         currentWeek: nextWeek,
