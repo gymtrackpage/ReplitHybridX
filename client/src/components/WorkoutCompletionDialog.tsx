@@ -26,13 +26,22 @@ export function WorkoutCompletionDialog({ isOpen, onClose, workout, onComplete }
   const [stravaNote, setStravaNote] = useState("");
   const [stravaDuration, setStravaDuration] = useState(duration);
 
+  // Don't render if workout is null
+  if (!workout) {
+    return null;
+  }
+
   const { data: stravaStatus } = useQuery({
     queryKey: ["/api/strava/status"],
   });
 
   const completeWorkoutMutation = useMutation({
     mutationFn: async (data: { rating: number; notes: string; duration: number }) => {
-      await apiRequest("POST", `/api/complete-workout/${workout.id}`, data);
+      if (!workout?.id) {
+        throw new Error("Workout ID is missing");
+      }
+      const response = await apiRequest("POST", `/api/complete-workout/${workout.id}`, data);
+      return await response.json();
     },
     onSuccess: () => {
       toast({
@@ -59,7 +68,8 @@ export function WorkoutCompletionDialog({ isOpen, onClose, workout, onComplete }
 
   const shareToStravaMutation = useMutation({
     mutationFn: async (data: { workoutId: number; notes: string; duration: number }) => {
-      await apiRequest("POST", "/api/strava/share-workout", data);
+      const response = await apiRequest("POST", "/api/strava/push-workout", data);
+      return await response.json();
     },
     onSuccess: () => {
       toast({

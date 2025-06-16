@@ -40,7 +40,7 @@ export function ShareToStravaButton({
       duration: number; 
       notes: string; 
     }) => {
-      const response = await apiRequest('POST', '/api/share-to-strava', {
+      const response = await apiRequest('POST', '/api/strava/push-workout', {
         workoutId,
         duration: duration * 60, // Convert to seconds
         notes
