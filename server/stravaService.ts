@@ -267,20 +267,20 @@ export class StravaService {
     switch (type.toLowerCase()) {
       case 'run':
       case 'running':
-        return 'run';
+        return 'Run';
       case 'workout':
       case 'crosstraining':
       case 'hyrox':
       case 'strength':
-        return 'crosstraining';
+        return 'WeightTraining';
       case 'bike':
       case 'cycling':
-        return 'ride';
+        return 'Ride';
       case 'weighttraining':
       case 'weight':
-        return 'weighttraining';
+        return 'WeightTraining';
       default:
-        return 'crosstraining';
+        return 'WeightTraining';
     }
   }
 
