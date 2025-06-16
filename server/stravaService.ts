@@ -212,23 +212,43 @@ export class StravaService {
           console.log('Recent activities check:', recentActivitiesResponse.data);
           
           if (recentActivitiesResponse.data && recentActivitiesResponse.data.length > 0) {
-            const latestActivity = recentActivitiesResponse.data[0];
-            if (latestActivity.name === activityData.name) {
-              console.log('Found newly created activity with ID:', latestActivity.id);
-              const foundActivityId = latestActivity.id;
+            // Look for our activity in the recent activities (check first few activities)
+            for (let i = 0; i < Math.min(3, recentActivitiesResponse.data.length); i++) {
+              const activity = recentActivitiesResponse.data[i];
+              console.log(`Checking activity ${i}:`, {
+                id: activity.id,
+                name: activity.name,
+                type: activity.type,
+                sport_type: activity.sport_type,
+                start_date: activity.start_date,
+                elapsed_time: activity.elapsed_time
+              });
               
-              // Upload image if provided and we found the activity
-              if (imageBuffer && foundActivityId) {
-                try {
-                  await this.uploadActivityPhoto(accessToken, foundActivityId, imageBuffer);
-                  console.log('Successfully uploaded workout image to Strava activity');
-                } catch (photoError) {
-                  console.error('Failed to upload photo to Strava activity:', photoError);
+              // Check if this is our activity by comparing name and approximate time
+              const activityTime = new Date(activity.start_date);
+              const now = new Date();
+              const timeDiffMinutes = (now.getTime() - activityTime.getTime()) / (1000 * 60);
+              
+              if (activity.name === activityData.name && timeDiffMinutes < 5) {
+                console.log('Found newly created activity with ID:', activity.id);
+                const foundActivityId = activity.id;
+                
+                // Upload image if provided and we found the activity
+                if (imageBuffer && foundActivityId) {
+                  try {
+                    console.log('Uploading image to activity ID:', foundActivityId);
+                    await this.uploadActivityPhoto(accessToken, foundActivityId, imageBuffer);
+                    console.log('Successfully uploaded workout image to Strava activity');
+                  } catch (photoError) {
+                    console.error('Failed to upload photo to Strava activity:', photoError);
+                  }
                 }
+                
+                return { success: true, activityId: foundActivityId };
               }
-              
-              return { success: true, activityId: foundActivityId };
             }
+            
+            console.log('Could not find matching activity in recent activities');
           }
         } catch (activitiesError) {
           console.error('Failed to fetch recent activities:', activitiesError);
