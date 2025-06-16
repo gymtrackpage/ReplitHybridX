@@ -180,9 +180,11 @@ export class StravaService {
       const response = await axios.post(`${STRAVA_BASE_URL}/activities`, activityData, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
-        timeout: 10000 // 10 second timeout
+        timeout: 10000, // 10 second timeout
+        responseType: 'json'
       });
 
       console.log('Raw Strava response:', {
@@ -197,16 +199,50 @@ export class StravaService {
       if (!activityId) {
         console.error('No activity ID returned from Strava API');
         console.error('Full response data:', JSON.stringify(response.data, null, 2));
-      }
-
-      // Upload image if provided
-      if (imageBuffer && activityId) {
+        
+        // For debugging: check if activity was actually created by querying recent activities
         try {
-          await this.uploadActivityPhoto(accessToken, activityId, imageBuffer);
-          console.log('Successfully uploaded workout image to Strava activity');
-        } catch (photoError) {
-          console.error('Failed to upload photo to Strava activity:', photoError);
-          // Don't fail the entire operation if photo upload fails
+          const recentActivitiesResponse = await axios.get(`${STRAVA_BASE_URL}/athlete/activities?per_page=1`, {
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Accept': 'application/json'
+            }
+          });
+          
+          console.log('Recent activities check:', recentActivitiesResponse.data);
+          
+          if (recentActivitiesResponse.data && recentActivitiesResponse.data.length > 0) {
+            const latestActivity = recentActivitiesResponse.data[0];
+            if (latestActivity.name === activityData.name) {
+              console.log('Found newly created activity with ID:', latestActivity.id);
+              const foundActivityId = latestActivity.id;
+              
+              // Upload image if provided and we found the activity
+              if (imageBuffer && foundActivityId) {
+                try {
+                  await this.uploadActivityPhoto(accessToken, foundActivityId, imageBuffer);
+                  console.log('Successfully uploaded workout image to Strava activity');
+                } catch (photoError) {
+                  console.error('Failed to upload photo to Strava activity:', photoError);
+                }
+              }
+              
+              return { success: true, activityId: foundActivityId };
+            }
+          }
+        } catch (activitiesError) {
+          console.error('Failed to fetch recent activities:', activitiesError);
+        }
+      } else {
+        // Upload image if provided
+        if (imageBuffer && activityId) {
+          try {
+            await this.uploadActivityPhoto(accessToken, activityId, imageBuffer);
+            console.log('Successfully uploaded workout image to Strava activity');
+          } catch (photoError) {
+            console.error('Failed to upload photo to Strava activity:', photoError);
+            // Don't fail the entire operation if photo upload fails
+          }
         }
       }
 

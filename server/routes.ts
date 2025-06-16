@@ -2136,12 +2136,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         start_date_local: new Date().toISOString()
       };
 
+      // Generate workout image
+      let imageBuffer;
+      try {
+        console.log("🖼️ Generating workout image for Strava");
+        imageBuffer = await StravaImageService.generateWorkoutImage(
+          workout.name, 
+          workout.exercises as any[]
+        );
+        console.log("✅ Workout image generated successfully");
+      } catch (imageError) {
+        console.error('🚫 Image generation failed:', imageError);
+        // Continue without image if generation fails
+      }
+
       console.log("📤 Sending workout data to Strava:", {
         ...workoutData,
-        description: workoutData.description.substring(0, 100) + '...'
+        description: workoutData.description.substring(0, 100) + '...',
+        hasImage: !!imageBuffer
       });
 
-      const result = await StravaService.pushWorkoutToStrava(userId, workoutData);
+      const result = await StravaService.pushWorkoutToStrava(userId, workoutData, imageBuffer);
       
       console.log("📥 Strava push result:", result);
 
