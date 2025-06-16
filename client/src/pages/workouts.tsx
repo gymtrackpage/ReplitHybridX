@@ -150,9 +150,9 @@ export default function Workouts() {
                   Week {todayWorkout.week}, Day {todayWorkout.day}
                 </div>
               </div>
-              
+
               <p className="text-sm">{todayWorkout.description}</p>
-              
+
               {todayWorkout.exercises && todayWorkout.exercises.length > 0 && (
                 <div className="space-y-2">
                   <h4 className="font-medium">Exercises:</h4>
@@ -186,8 +186,13 @@ export default function Workouts() {
               <div className="flex gap-2">
                 <Button
                   onClick={() => {
-                    setWorkoutToComplete(todayWorkout);
-                    setShowCompletionDialog(true);
+                    if (todayWorkout && todayWorkout.id) {
+                      console.log("Opening completion dialog for workout:", todayWorkout.id);
+                      setWorkoutToComplete(todayWorkout);
+                      setShowCompletionDialog(true);
+                    } else {
+                      console.error("Cannot complete workout: missing workout data or ID");
+                    }
                   }}
                   className="bg-yellow-400 hover:bg-yellow-500 text-black"
                 >
@@ -230,9 +235,9 @@ export default function Workouts() {
                   {randomWorkout.estimatedDuration} minutes
                 </div>
               </div>
-              
+
               <p className="text-sm">{randomWorkout.description}</p>
-              
+
               {randomWorkout.exercises && randomWorkout.exercises.length > 0 && (
                 <div className="space-y-2">
                   <h4 className="font-medium">Exercises:</h4>
@@ -343,13 +348,13 @@ export default function Workouts() {
                   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
                   const workoutDate = new Date(completedDate.getFullYear(), completedDate.getMonth(), completedDate.getDate());
                   const daysDiff = Math.floor((today.getTime() - workoutDate.getTime()) / (1000 * 60 * 60 * 24));
-                  
+
                   let dayLabel = 'Earlier';
                   if (daysDiff === 0) dayLabel = 'Today';
                   else if (daysDiff === 1) dayLabel = 'Yesterday';
                   else if (daysDiff === 2) dayLabel = '2 days ago';
                   else if (daysDiff === 3) dayLabel = '3 days ago';
-                  
+
                   return (
                     <div 
                       key={workout.id}

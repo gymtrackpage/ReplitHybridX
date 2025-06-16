@@ -26,9 +26,15 @@ export function WorkoutCompletionDialog({ isOpen, onClose, workout, onComplete }
   const [stravaNote, setStravaNote] = useState("");
   const [stravaDuration, setStravaDuration] = useState(duration);
 
+  // Early return if no workout data
+  if (!workout || !workout.id) {
+    console.log("WorkoutCompletionDialog: No workout data available");
+    return null;
+  }
+
   const { data: stravaStatus } = useQuery({
     queryKey: ["/api/strava/status"],
-    enabled: !!workout // Only fetch when workout exists
+    enabled: !!workout && !!workout.id
   });
 
   const completeWorkoutMutation = useMutation({
@@ -95,10 +101,11 @@ export function WorkoutCompletionDialog({ isOpen, onClose, workout, onComplete }
   };
 
   const handleStravaShare = () => {
-    if (!workout?.id) {
+    if (!workout?.id || typeof workout.id !== 'number') {
+      console.error("Invalid workout ID:", workout?.id);
       toast({
         title: "Error",
-        description: "Workout ID is missing. Please try completing the workout again.",
+        description: "Workout ID is missing or invalid. Please try completing the workout again.",
         variant: "destructive",
       });
       return;
@@ -115,12 +122,6 @@ export function WorkoutCompletionDialog({ isOpen, onClose, workout, onComplete }
   const handleSkipStrava = () => {
     onClose();
   };
-
-  // Don't render if workout is null - this must come after all hooks
-  if (!workout) {
-    console.log("WorkoutCompletionDialog: workout is null/undefined");
-    return null;
-  }
 
   // Debug: Log workout data
   console.log("WorkoutCompletionDialog: workout data:", workout);
