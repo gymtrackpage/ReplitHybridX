@@ -21,6 +21,10 @@ export function WorkoutCompletionDialog({ isOpen, onClose, workout, onComplete }
   // Early return if no workout data - BEFORE any hooks
   if (!workout || !workout.id) {
     console.log("WorkoutCompletionDialog: No workout data available");
+    // If dialog is supposed to be open but no workout data, close it
+    if (isOpen) {
+      setTimeout(() => onClose(), 0);
+    }
     return null;
   }
 
