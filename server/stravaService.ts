@@ -185,9 +185,19 @@ export class StravaService {
         timeout: 10000 // 10 second timeout
       });
 
-      const activityId = response.data.id;
+      console.log('Raw Strava response:', {
+        status: response.status,
+        headers: response.headers,
+        data: response.data
+      });
+
+      const activityId = response.data?.id;
       console.log('Successfully created Strava activity with ID:', activityId);
-      console.log('Strava response data:', response.data);
+      
+      if (!activityId) {
+        console.error('No activity ID returned from Strava API');
+        console.error('Full response data:', JSON.stringify(response.data, null, 2));
+      }
 
       // Upload image if provided
       if (imageBuffer && activityId) {

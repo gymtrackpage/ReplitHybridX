@@ -103,7 +103,8 @@ HybridX is a comprehensive HYROX training application designed to provide person
 ## Changelog
 
 Changelog:
-- June 16, 2025. Initial setup
+- June 16, 2025: Initial setup
+- June 16, 2025: Successfully implemented Strava integration with OAuth authentication, workout sharing, and automated image generation. Fixed sport_type validation issues and response stream handling errors. Strava sharing now works with custom workout images uploaded to activities.
 
 ## User Preferences
 
