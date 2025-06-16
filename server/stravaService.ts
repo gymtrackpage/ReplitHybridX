@@ -143,16 +143,36 @@ export class StravaService {
 
       console.log('Valid access token found, preparing activity data');
 
+      // Ensure we have valid data
+      if (!workoutData.name || workoutData.name.trim() === '') {
+        throw new Error('Workout name is required');
+      }
+
+      if (!workoutData.duration || workoutData.duration <= 0) {
+        throw new Error('Valid workout duration is required');
+      }
+
+      // Validate and format start date
+      let startDate = workoutData.start_date_local;
+      try {
+        const dateObj = new Date(startDate);
+        if (isNaN(dateObj.getTime())) {
+          startDate = new Date().toISOString();
+        }
+      } catch {
+        startDate = new Date().toISOString();
+      }
+
       const activityData = {
-        name: workoutData.name,
+        name: workoutData.name.trim(),
         type: this.mapWorkoutTypeToStravaType(workoutData.type),
         sport_type: this.mapWorkoutTypeToStravaSportType(workoutData.type),
-        start_date_local: workoutData.start_date_local,
-        elapsed_time: workoutData.duration,
-        description: workoutData.description,
+        start_date_local: startDate,
+        elapsed_time: Math.max(60, Math.floor(workoutData.duration)), // Minimum 1 minute
+        description: workoutData.description || 'Workout completed using HybridX training app',
         trainer: true, // Mark as indoor/gym workout
         commute: false,
-        ...(workoutData.distance && { distance: workoutData.distance })
+        ...(workoutData.distance && workoutData.distance > 0 && { distance: workoutData.distance })
       };
 
       console.log('Activity data to send to Strava:', activityData);
@@ -161,7 +181,8 @@ export class StravaService {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json'
-        }
+        },
+        timeout: 10000 // 10 second timeout
       });
 
       const activityId = response.data.id;
@@ -182,9 +203,12 @@ export class StravaService {
       return { success: true, activityId };
     } catch (error: any) {
       console.error('Error pushing workout to Strava:', error);
+      console.error('Error response status:', error.response?.status);
       console.error('Error response data:', error.response?.data);
-      console.error('Error status:', error.response?.status);
-      return { success: false };
+      console.error('Error message:', error.message);
+      
+      // Re-throw the error so it can be handled by the calling function
+      throw error;
     }
   }
 

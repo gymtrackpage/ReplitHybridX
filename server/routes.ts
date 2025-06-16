@@ -1942,14 +1942,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/strava/connect', isAuthenticated, async (req: any, res) => {
     try {
       console.log("Strava connect request received");
-      console.log("STRAVA_CLIENT_ID:", process.env.STRAVA_CLIENT_ID ? "Set" : "Not set");
-      console.log("STRAVA_CLIENT_SECRET:", process.env.STRAVA_CLIENT_SECRET ? "Set" : "Not set");
+      console.log("Environment check:");
+      console.log("  STRAVA_CLIENT_ID:", process.env.STRAVA_CLIENT_ID ? `Set (${process.env.STRAVA_CLIENT_ID.slice(0, 4)}...)` : "Not set");
+      console.log("  STRAVA_CLIENT_SECRET:", process.env.STRAVA_CLIENT_SECRET ? "Set" : "Not set");
       
       if (!process.env.STRAVA_CLIENT_ID || !process.env.STRAVA_CLIENT_SECRET) {
         console.error("Strava environment variables not configured");
         return res.status(400).json({ 
           message: "Strava integration not configured. Please set STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET in Secrets.",
-          configured: false
+          configured: false,
+          success: false
         });
       }
       
@@ -1966,8 +1968,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(response);
     } catch (error) {
       console.error("Error getting Strava auth URL:", error);
+      console.error("Error stack:", error instanceof Error ? error.stack : 'No stack trace');
       const errorResponse = { 
-        message: "Failed to get Strava authorization URL: " + (error as Error).message,
+        message: "Failed to get Strava authorization URL: " + (error instanceof Error ? error.message : 'Unknown error'),
         configured: false,
         success: false
       };
@@ -2039,6 +2042,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Strava push-workout request:", { userId, workoutId, duration, notes });
 
       if (!workoutId) {
+        console.error("No workout ID provided");
         return res.status(400).json({ message: "Workout ID is required" });
       }
 
@@ -2046,14 +2050,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!process.env.STRAVA_CLIENT_ID || !process.env.STRAVA_CLIENT_SECRET) {
         console.error("Strava environment variables not configured");
         return res.status(400).json({ 
-          message: "Strava integration not configured. Please set STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET.",
+          message: "Strava integration not configured. Please set STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET in Secrets.",
           needsAuth: false
         });
       }
 
       // Check if user has Strava connected
       const user = await storage.getUser(userId);
+      console.log("User Strava connection status:", {
+        userId,
+        stravaConnected: user?.stravaConnected,
+        hasAccessToken: !!user?.stravaAccessToken,
+        tokenExpiry: user?.stravaTokenExpiry
+      });
+
       if (!user?.stravaConnected || !user.stravaAccessToken) {
+        console.error("User not connected to Strava");
         return res.status(400).json({ 
           message: "Please connect your Strava account first",
           needsAuth: true 
@@ -2061,18 +2073,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get workout details
-      const workout = await storage.getWorkout(workoutId);
+      const workout = await storage.getWorkout(parseInt(workoutId));
       if (!workout) {
+        console.error("Workout not found:", workoutId);
         return res.status(404).json({ message: "Workout not found" });
       }
 
-      console.log("Found workout:", workout.name);
+      console.log("Found workout:", { id: workout.id, name: workout.name });
 
-      // Prepare workout data for Strava (duration should already be in seconds from frontend)
-      const durationInSeconds = duration || (workout.estimatedDuration || 60) * 60;
+      // Validate and prepare duration (ensure it's in seconds)
+      let durationInSeconds = 60; // Default 1 minute
+      if (duration && !isNaN(parseInt(duration))) {
+        durationInSeconds = parseInt(duration);
+        // If duration is very small, it might be in minutes, convert to seconds
+        if (durationInSeconds < 300) { // Less than 5 minutes, likely in minutes
+          durationInSeconds = durationInSeconds * 60;
+        }
+      } else if (workout.estimatedDuration) {
+        durationInSeconds = workout.estimatedDuration * 60; // Convert minutes to seconds
+      }
+
+      // Prepare workout data for Strava
       const workoutData = {
-        name: workout.name,
-        description: notes || `HybridX Training Session\n\n${workout.description || ''}`,
+        name: workout.name || 'HybridX Training Session',
+        description: notes || `HybridX Training Session\n\n${workout.description || 'Completed workout using HybridX training app'}`,
         duration: durationInSeconds,
         type: 'workout' as const,
         start_date_local: new Date().toISOString()
@@ -2100,6 +2124,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } catch (error: any) {
       console.error("Error pushing workout to Strava:", error);
+      console.error("Error stack:", error.stack);
+      console.error("Error response:", error.response?.data);
       
       // More specific error handling
       if (error.response?.status === 401) {
@@ -2112,10 +2138,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message: "Insufficient Strava permissions. Please reconnect your account.",
           needsAuth: true
         });
+      } else if (error.response?.status === 400) {
+        res.status(400).json({ 
+          message: "Invalid workout data for Strava: " + (error.response?.data?.message || error.message),
+          success: false
+        });
       } else {
         res.status(500).json({ 
           message: "Failed to share workout to Strava: " + (error.message || "Unknown error"),
-          success: false
+          success: false,
+          error: error.response?.data || error.message
         });
       }
     }
