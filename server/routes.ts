@@ -2140,14 +2140,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let imageBuffer;
       try {
         console.log("🖼️ Generating workout image for Strava");
+        console.log("🖼️ Workout details for image:", {
+          name: workout.name,
+          exerciseCount: workout.exercises ? (workout.exercises as any[]).length : 0,
+          exercisePreview: workout.exercises ? JSON.stringify(workout.exercises).substring(0, 200) + '...' : 'No exercises'
+        });
+        
         imageBuffer = await StravaImageService.generateWorkoutImage(
           workout.name, 
           workout.exercises as any[]
         );
-        console.log("✅ Workout image generated successfully");
-      } catch (imageError) {
-        console.error('🚫 Image generation failed:', imageError);
+        
+        if (imageBuffer) {
+          console.log("✅ Workout image generated successfully, size:", imageBuffer.length, "bytes");
+        } else {
+          console.warn("⚠️ Image generation returned null/undefined buffer");
+        }
+      } catch (imageError: any) {
+        console.error('🚫 Image generation failed:');
+        console.error('  Error message:', imageError.message);
+        console.error('  Error stack:', imageError.stack);
         // Continue without image if generation fails
+        imageBuffer = undefined;
       }
 
       console.log("📤 Sending workout data to Strava:", {

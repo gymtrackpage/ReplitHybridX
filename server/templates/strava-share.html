@@ -121,3 +121,111 @@
     </div>
 </body>
 </html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HybridX Workout Share</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            width: 1200px;
+            height: 630px;
+            background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        
+        .container {
+            width: 1100px;
+            height: 530px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 60px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            position: relative;
+        }
+        
+        .logo {
+            position: absolute;
+            top: 40px;
+            left: 60px;
+            font-size: 28px;
+            font-weight: bold;
+            color: #ff6b35;
+        }
+        
+        .workout-title {
+            font-size: 56px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 30px;
+            line-height: 1.2;
+            max-width: 900px;
+        }
+        
+        .workout-description {
+            font-size: 24px;
+            color: #7f8c8d;
+            line-height: 1.4;
+            max-width: 800px;
+            margin-bottom: 40px;
+        }
+        
+        .badge {
+            background: linear-gradient(135deg, #ff6b35, #f7931e);
+            color: white;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 18px;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+        
+        .decorative-element {
+            position: absolute;
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, rgba(255, 107, 53, 0.2), rgba(247, 147, 30, 0.2));
+        }
+        
+        .element-1 {
+            top: -50px;
+            right: -50px;
+        }
+        
+        .element-2 {
+            bottom: -50px;
+            left: -50px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">HybridX</div>
+        
+        <div class="decorative-element element-1"></div>
+        <div class="decorative-element element-2"></div>
+        
+        <h1 class="workout-title">{{WORKOUT_NAME}}</h1>
+        <p class="workout-description">{{WORKOUT_DESCRIPTION}}</p>
+        
+        <div class="badge">HYROX TRAINING</div>
+    </div>
+</body>
+</html>

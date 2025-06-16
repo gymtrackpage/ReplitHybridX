@@ -36,10 +36,10 @@ export class StravaService {
     if (!process.env.STRAVA_CLIENT_ID || !process.env.STRAVA_CLIENT_SECRET) {
       throw new Error('STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET environment variables must be set');
     }
-    
+
     console.log("Strava Client ID:", process.env.STRAVA_CLIENT_ID ? "Set" : "Not set");
     console.log("Redirect URI:", REDIRECT_URI);
-    
+
     // According to Strava API docs, use approval_prompt=auto for better UX
     // and include activity:read for better compatibility
     const params = new URLSearchParams({
@@ -49,7 +49,7 @@ export class StravaService {
       approval_prompt: 'auto',
       scope: 'activity:write,activity:read'
     });
-    
+
     const authUrl = `https://www.strava.com/oauth/authorize?${params.toString()}`;
     console.log("Generated Auth URL:", authUrl);
     return authUrl;
@@ -96,19 +96,19 @@ export class StravaService {
     // Check if token is expired (with 5 minute buffer)
     const now = Math.floor(Date.now() / 1000);
     const expiryTime = user.stravaTokenExpiry ? Math.floor(user.stravaTokenExpiry.getTime() / 1000) : 0;
-    
+
     if (expiryTime - 300 < now) {
       try {
         // Refresh the token
         const tokens = await this.refreshAccessToken(user.stravaRefreshToken);
-        
+
         // Update user with new tokens
         await storage.updateUser(userId, {
           stravaAccessToken: tokens.access_token,
           stravaRefreshToken: tokens.refresh_token,
           stravaTokenExpiry: new Date(tokens.expires_at * 1000),
         });
-        
+
         return tokens.access_token;
       } catch (error) {
         console.error('Failed to refresh Strava token:', error);
@@ -134,7 +134,7 @@ export class StravaService {
     try {
       console.log('Attempting to push workout to Strava for user:', userId);
       console.log('Workout data:', workoutData);
-      
+
       const accessToken = await this.getValidAccessToken(userId);
       if (!accessToken) {
         console.error('No valid Strava access token found');
@@ -195,11 +195,11 @@ export class StravaService {
 
       const activityId = response.data?.id;
       console.log('Successfully created Strava activity with ID:', activityId);
-      
+
       if (!activityId) {
         console.error('No activity ID returned from Strava API');
         console.error('Full response data:', JSON.stringify(response.data, null, 2));
-        
+
         // For debugging: check if activity was actually created by querying recent activities
         try {
           const recentActivitiesResponse = await axios.get(`${STRAVA_BASE_URL}/athlete/activities?per_page=1`, {
@@ -208,9 +208,9 @@ export class StravaService {
               'Accept': 'application/json'
             }
           });
-          
+
           console.log('Recent activities check:', recentActivitiesResponse.data);
-          
+
           if (recentActivitiesResponse.data && recentActivitiesResponse.data.length > 0) {
             // Look for our activity in the recent activities (check first few activities)
             for (let i = 0; i < Math.min(3, recentActivitiesResponse.data.length); i++) {
@@ -223,16 +223,16 @@ export class StravaService {
                 start_date: activity.start_date,
                 elapsed_time: activity.elapsed_time
               });
-              
+
               // Check if this is our activity by comparing name and approximate time
               const activityTime = new Date(activity.start_date);
               const now = new Date();
               const timeDiffMinutes = (now.getTime() - activityTime.getTime()) / (1000 * 60);
-              
+
               if (activity.name === activityData.name && timeDiffMinutes < 5) {
                 console.log('Found newly created activity with ID:', activity.id);
                 const foundActivityId = activity.id;
-                
+
                 // Upload image if provided and we found the activity
                 if (imageBuffer && foundActivityId) {
                   try {
@@ -243,25 +243,41 @@ export class StravaService {
                     console.error('Failed to upload photo to Strava activity:', photoError);
                   }
                 }
-                
+
                 return { success: true, activityId: foundActivityId };
               }
             }
-            
+
             console.log('Could not find matching activity in recent activities');
           }
         } catch (activitiesError) {
           console.error('Failed to fetch recent activities:', activitiesError);
         }
       } else {
-        // Upload image if provided
+        // Upload image if provided and we have an activity ID
         if (imageBuffer && activityId) {
           try {
+            console.log('Attempting to upload image to Strava activity:', activityId);
+            console.log('Image buffer size:', imageBuffer.length, 'bytes');
+
+            // Wait a moment for the activity to be fully created
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
             await this.uploadActivityPhoto(accessToken, activityId, imageBuffer);
-            console.log('Successfully uploaded workout image to Strava activity');
-          } catch (photoError) {
-            console.error('Failed to upload photo to Strava activity:', photoError);
+            console.log('✅ Successfully uploaded workout image to Strava activity');
+          } catch (photoError: any) {
+            console.error('❌ Failed to upload photo to Strava activity:');
+            console.error('  Photo error message:', photoError.message);
+            console.error('  Photo error response:', photoError.response?.data);
+            console.error('  Photo error status:', photoError.response?.status);
             // Don't fail the entire operation if photo upload fails
+          }
+        } else {
+          if (!imageBuffer) {
+            console.log('⚠️ No image buffer provided for Strava upload');
+          }
+          if (!activityId) {
+            console.log('⚠️ No activity ID available for image upload');
           }
         }
       }
@@ -272,7 +288,7 @@ export class StravaService {
       console.error('Error response status:', error.response?.status);
       console.error('Error response data:', error.response?.data);
       console.error('Error message:', error.message);
-      
+
       // Re-throw the error so it can be handled by the calling function
       throw error;
     }
@@ -285,7 +301,7 @@ export class StravaService {
   ): Promise<void> {
     try {
       const form = new FormData();
-      
+
       form.append('file', imageBuffer, {
         filename: 'workout-share.png',
         contentType: 'image/png'
