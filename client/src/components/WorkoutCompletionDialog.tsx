@@ -18,6 +18,12 @@ interface WorkoutCompletionDialogProps {
 }
 
 export function WorkoutCompletionDialog({ isOpen, onClose, workout, onComplete }: WorkoutCompletionDialogProps) {
+  // Early return if no workout data - BEFORE any hooks
+  if (!workout || !workout.id) {
+    console.log("WorkoutCompletionDialog: No workout data available");
+    return null;
+  }
+
   const { toast } = useToast();
   const [rating, setRating] = useState(5);
   const [notes, setNotes] = useState("");
@@ -25,12 +31,6 @@ export function WorkoutCompletionDialog({ isOpen, onClose, workout, onComplete }
   const [showStravaShare, setShowStravaShare] = useState(false);
   const [stravaNote, setStravaNote] = useState("");
   const [stravaDuration, setStravaDuration] = useState(duration);
-
-  // Early return if no workout data
-  if (!workout || !workout.id) {
-    console.log("WorkoutCompletionDialog: No workout data available");
-    return null;
-  }
 
   const { data: stravaStatus } = useQuery({
     queryKey: ["/api/strava/status"],
@@ -123,9 +123,7 @@ export function WorkoutCompletionDialog({ isOpen, onClose, workout, onComplete }
     onClose();
   };
 
-  // Debug: Log workout data
-  console.log("WorkoutCompletionDialog: workout data:", workout);
-  console.log("WorkoutCompletionDialog: workout.id:", workout.id);
+  
 
   if (showStravaShare) {
     return (
