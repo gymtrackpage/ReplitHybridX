@@ -451,13 +451,15 @@ export default function Workouts() {
           isOpen={showCompletionDialog}
           onClose={() => {
             setShowCompletionDialog(false);
-            setWorkoutToComplete(null);
+            // Don't clear workoutToComplete immediately to allow Strava sharing
+            setTimeout(() => setWorkoutToComplete(null), 100);
           }}
           workout={workoutToComplete}
           onComplete={(data) => {
             // The dialog handles the completion internally
             setShowCompletionDialog(false);
-            setWorkoutToComplete(null);
+            // Don't clear workoutToComplete immediately to allow Strava sharing
+            setTimeout(() => setWorkoutToComplete(null), 100);
           }}
         />
       </div>

@@ -90,6 +90,16 @@ export function WorkoutCompletionDialog({ isOpen, onClose, workout, onComplete }
   };
 
   const handleStravaShare = () => {
+    if (!workout?.id) {
+      toast({
+        title: "Error",
+        description: "Workout ID is missing. Please try completing the workout again.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    console.log("Sharing to Strava with workoutId:", workout.id);
     shareToStravaMutation.mutate({
       workoutId: workout.id,
       notes: stravaNote,
