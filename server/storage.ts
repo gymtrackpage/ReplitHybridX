@@ -269,37 +269,68 @@ export class DatabaseStorage implements IStorage {
       });
     }
 
-    const currentWeek = progress.currentWeek || 1;
-    const currentDay = progress.currentDay || 1;
+    let currentWeek = progress.currentWeek || 1;
+    let currentDay = progress.currentDay || 1;
 
     console.log(`Looking for workout: Program ${progress.programId}, Week ${currentWeek}, Day ${currentDay} for user ${userId}`);
 
-    // Find the workout for current week and day (training days 1-6, no day 7)
-    const [workout] = await db
+    // Get all workouts for this program to understand the structure
+    const allWorkouts = await db
       .select()
       .from(workouts)
-      .where(
-        and(
-          eq(workouts.programId, progress.programId),
-          eq(workouts.week, currentWeek),
-          eq(workouts.day, currentDay)
-        )
-      );
-    
+      .where(eq(workouts.programId, progress.programId))
+      .orderBy(asc(workouts.week), asc(workouts.day));
+
+    console.log(`Total workouts in program: ${allWorkouts.length}`);
+
+    if (allWorkouts.length === 0) {
+      console.log(`No workouts found for program ${progress.programId}`);
+      return undefined;
+    }
+
+    // Try to find the exact workout first
+    let workout = allWorkouts.find(w => w.week === currentWeek && w.day === currentDay);
+
+    // If no exact match found, try to find the next available workout
     if (!workout) {
-      console.log(`No workout found for Program ${progress.programId}, Week ${currentWeek}, Day ${currentDay}`);
-      // Check if we've reached the end of the program and need to move to next week/day
-      const allWorkouts = await db
-        .select()
-        .from(workouts)
-        .where(eq(workouts.programId, progress.programId))
-        .orderBy(asc(workouts.week), asc(workouts.day));
+      console.log(`No exact workout found for Week ${currentWeek}, Day ${currentDay}. Looking for next available workout...`);
       
-      console.log(`Total workouts in program: ${allWorkouts.length}`);
-      if (allWorkouts.length > 0) {
-        const maxWeek = Math.max(...allWorkouts.map(w => w.week));
-        console.log(`Max week in program: ${maxWeek}`);
+      // Find the next workout in sequence
+      const nextWorkout = allWorkouts.find(w => 
+        w.week > currentWeek || (w.week === currentWeek && w.day > currentDay)
+      );
+
+      if (nextWorkout) {
+        console.log(`Found next workout: Week ${nextWorkout.week}, Day ${nextWorkout.day}`);
+        
+        // Update progress to match the found workout
+        await this.updateUserProgress(userId, {
+          currentWeek: nextWorkout.week,
+          currentDay: nextWorkout.day
+        });
+        
+        workout = nextWorkout;
+      } else {
+        // If no next workout found, check if we need to cycle back to beginning
+        const firstWorkout = allWorkouts[0];
+        if (firstWorkout) {
+          console.log(`End of program reached. Cycling back to Week ${firstWorkout.week}, Day ${firstWorkout.day}`);
+          
+          // Update progress to start over
+          await this.updateUserProgress(userId, {
+            currentWeek: firstWorkout.week,
+            currentDay: firstWorkout.day
+          });
+          
+          workout = firstWorkout;
+        }
       }
+    }
+
+    if (workout) {
+      console.log(`Returning workout: ${workout.name} (Week ${workout.week}, Day ${workout.day})`);
+    } else {
+      console.log(`No workout could be found or determined for user ${userId}`);
     }
     
     return workout;

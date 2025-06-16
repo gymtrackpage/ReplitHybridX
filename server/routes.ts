@@ -1687,6 +1687,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         completedAt: new Date()
       });
 
+      // Get all workouts for this program to understand progression
+      const allWorkouts = await db
+        .select()
+        .from(workouts)
+        .where(eq(workouts.programId, progress.programId))
+        .orderBy(asc(workouts.week), asc(workouts.day));
+
+      console.log(`Program has ${allWorkouts.length} total workouts`);
+
       // Calculate next day/week progression
       const currentDay = progress.currentDay || 1;
       const currentWeek = progress.currentWeek || 1;
@@ -1698,6 +1707,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (nextDay > 6) {
         nextDay = 1;
         nextWeek = currentWeek + 1;
+      }
+
+      // Verify the next workout exists, if not find the next available one
+      const nextWorkoutExists = allWorkouts.find(w => w.week === nextWeek && w.day === nextDay);
+      
+      if (!nextWorkoutExists && allWorkouts.length > 0) {
+        console.log(`Next workout Week ${nextWeek} Day ${nextDay} doesn't exist. Finding next available workout...`);
+        
+        // Find the next workout in chronological order
+        const nextAvailableWorkout = allWorkouts.find(w => 
+          w.week > currentWeek || (w.week === currentWeek && w.day > currentDay)
+        );
+
+        if (nextAvailableWorkout) {
+          nextWeek = nextAvailableWorkout.week;
+          nextDay = nextAvailableWorkout.day;
+          console.log(`Found next available workout: Week ${nextWeek} Day ${nextDay}`);
+        } else {
+          // If no next workout found, cycle back to the beginning
+          const firstWorkout = allWorkouts[0];
+          if (firstWorkout) {
+            nextWeek = firstWorkout.week;
+            nextDay = firstWorkout.day;
+            console.log(`End of program reached, cycling back to Week ${nextWeek} Day ${nextDay}`);
+          }
+        }
       }
 
       // Update user progress with next day/week
