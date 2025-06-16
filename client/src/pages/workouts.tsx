@@ -382,9 +382,9 @@ export default function Workouts() {
                               Completed in {workout.duration} minutes
                             </div>
                           )}
-                          {workout.rating && (
+                          {workout.rating && workout.rating > 0 && workout.rating <= 5 && (
                             <div className="text-xs text-muted-foreground mt-1">
-                              Rating: {'★'.repeat(workout.rating)}{'☆'.repeat(5 - workout.rating)}
+                              Rating: {'★'.repeat(Math.max(0, Math.min(5, workout.rating)))}{'☆'.repeat(Math.max(0, 5 - Math.max(0, Math.min(5, workout.rating))))}
                             </div>
                           )}
                         </div>
