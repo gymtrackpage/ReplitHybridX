@@ -36,8 +36,13 @@ export function WorkoutCompletionDialog({ isOpen, onClose, workout, onComplete }
       if (!workout?.id) {
         throw new Error("Workout ID is missing");
       }
-      const response = await apiRequest("POST", `/api/complete-workout/${workout.id}`, data);
-      return await response.json();
+      const response = await apiRequest("POST", "/api/workout-completions", {
+        workoutId: workout.id,
+        rating: data.rating,
+        notes: data.notes,
+        duration: data.duration
+      });
+      return response;
     },
     onSuccess: () => {
       toast({
