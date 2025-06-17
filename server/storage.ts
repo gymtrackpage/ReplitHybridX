@@ -194,9 +194,34 @@ export class DatabaseStorage implements IStorage {
     return updatedProgram;
   }
 
-  async deleteProgram(id: number): Promise<void> {
-    await db.delete(workouts).where(eq(workouts.programId, id));
-    await db.delete(programs).where(eq(programs.id, id));
+  async deleteProgram(programId: number): Promise<void> {
+    // Delete all workouts first
+    await db.delete(workouts).where(eq(workouts.programId, programId));
+
+    // Then delete the program
+    await db.delete(programs).where(eq(programs.id, programId));
+  }
+
+  async updateWorkout(workoutId: number, updateData: any): Promise<any> {
+    const [updatedWorkout] = await db
+      .update(workouts)
+      .set({
+        ...updateData,
+        exercises: updateData.exercises ? JSON.stringify(updateData.exercises) : undefined,
+        updatedAt: new Date()
+      })
+      .where(eq(workouts.id, workoutId))
+      .returning();
+
+    return updatedWorkout;
+  }
+
+  async deleteWorkout(workoutId: number): Promise<void> {
+    // Delete workout completions first
+    await db.delete(workoutCompletions).where(eq(workoutCompletions.workoutId, workoutId));
+
+    // Then delete the workout
+    await db.delete(workouts).where(eq(workouts.id, workoutId));
   }
 
   // Workout operations
@@ -242,7 +267,7 @@ export class DatabaseStorage implements IStorage {
     }
 
     let progress = await this.getUserProgress(userId);
-    
+
     // If no progress exists, create initial progress
     if (!progress) {
       console.log(`Creating initial progress for user ${userId}`);
@@ -294,7 +319,7 @@ export class DatabaseStorage implements IStorage {
     // If no exact match found, try to find the next available workout
     if (!workout) {
       console.log(`No exact workout found for Week ${currentWeek}, Day ${currentDay}. Looking for next available workout...`);
-      
+
       // Find the next workout in sequence
       const nextWorkout = allWorkouts.find(w => 
         w.week > currentWeek || (w.week === currentWeek && w.day > currentDay)
@@ -302,26 +327,26 @@ export class DatabaseStorage implements IStorage {
 
       if (nextWorkout) {
         console.log(`Found next workout: Week ${nextWorkout.week}, Day ${nextWorkout.day}`);
-        
+
         // Update progress to match the found workout
         await this.updateUserProgress(userId, {
           currentWeek: nextWorkout.week,
           currentDay: nextWorkout.day
         });
-        
+
         workout = nextWorkout;
       } else {
         // If no next workout found, check if we need to cycle back to beginning
         const firstWorkout = allWorkouts[0];
         if (firstWorkout) {
           console.log(`End of program reached. Cycling back to Week ${firstWorkout.week}, Day ${firstWorkout.day}`);
-          
+
           // Update progress to start over
           await this.updateUserProgress(userId, {
             currentWeek: firstWorkout.week,
             currentDay: firstWorkout.day
           });
-          
+
           workout = firstWorkout;
         }
       }
@@ -332,26 +357,13 @@ export class DatabaseStorage implements IStorage {
     } else {
       console.log(`No workout could be found or determined for user ${userId}`);
     }
-    
+
     return workout;
   }
 
   async createWorkout(workout: InsertWorkout): Promise<Workout> {
     const [newWorkout] = await db.insert(workouts).values(workout).returning();
     return newWorkout;
-  }
-
-  async updateWorkout(id: number, workout: Partial<InsertWorkout>): Promise<Workout> {
-    const [updatedWorkout] = await db
-      .update(workouts)
-      .set(workout)
-      .where(eq(workouts.id, id))
-      .returning();
-    return updatedWorkout;
-  }
-
-  async deleteWorkout(id: number): Promise<void> {
-    await db.delete(workouts).where(eq(workouts.id, id));
   }
 
   // Progress operations

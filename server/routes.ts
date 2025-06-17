@@ -2422,6 +2422,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.put('/api/admin/workouts/:id', isAuthenticated, requireAdmin, async (req, res) => {
+    try {
+      const workoutId = parseInt(req.params.id);
+      if (isNaN(workoutId)) {
+        return res.status(400).json({ message: "Invalid workout ID" });
+      }
+      
+      const updateData = req.body;
+      console.log("Updating workout", workoutId, "with data:", updateData);
+      
+      // Ensure exercises is properly formatted
+      if (updateData.exercises && typeof updateData.exercises === 'string') {
+        try {
+          updateData.exercises = JSON.parse(updateData.exercises);
+        } catch (error) {
+          return res.status(400).json({ message: "Invalid exercises JSON format" });
+        }
+      }
+      
+      const workout = await storage.updateWorkout(workoutId, updateData);
+      res.json(workout);
+    } catch (error) {
+      console.error("Error updating workout:", error);
+      res.status(500).json({ message: "Failed to update workout" });
+    }
+  });
+
+  app.delete('/api/admin/workouts/:id', isAuthenticated, requireAdmin, async (req, res) => {
+    try {
+      const workoutId = parseInt(req.params.id);
+      if (isNaN(workoutId)) {
+        return res.status(400).json({ message: "Invalid workout ID" });
+      }
+      
+      await storage.deleteWorkout(workoutId);
+      res.json({ message: "Workout deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting workout:", error);
+      res.status(500).json({ message: "Failed to delete workout" });
+    }
+  });
+
   // Admin: Upload program from CSV
   app.post('/api/admin/upload-program', isAuthenticated, requireAdmin, upload.single('file'), async (req: any, res) => {
     try {

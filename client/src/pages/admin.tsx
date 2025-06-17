@@ -37,6 +37,8 @@ export default function Admin() {
   const [expandedPrograms, setExpandedPrograms] = useState<Set<number>>(new Set());
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [editingProgram, setEditingProgram] = useState<Program | null>(null);
+  const [editingWorkout, setEditingWorkout] = useState<Workout | null>(null);
+  const [editWorkoutOpen, setEditWorkoutOpen] = useState(false);
   const [programWorkouts, setProgramWorkouts] = useState<{[key: number]: Workout[]}>({});
   const [uploadForm, setUploadForm] = useState({
     name: "",
@@ -154,6 +156,57 @@ export default function Admin() {
     }
   });
 
+  const updateWorkoutMutation = useMutation({
+    mutationFn: async (workoutData: { id: number; [key: string]: any }) => {
+      return apiRequest("PUT", `/api/admin/workouts/${workoutData.id}`, workoutData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/programs"] });
+      // Refresh the specific program's workouts
+      const programId = editingWorkout?.programId;
+      if (programId) {
+        fetchProgramWorkouts(programId);
+      }
+      setEditingWorkout(null);
+      setEditWorkoutOpen(false);
+      toast({
+        title: "Success",
+        description: "Workout updated successfully",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to update workout",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const deleteWorkoutMutation = useMutation({
+    mutationFn: async (workoutId: number) => {
+      return apiRequest("DELETE", `/api/admin/workouts/${workoutId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/programs"] });
+      // Refresh all expanded program workouts
+      expandedPrograms.forEach(programId => {
+        fetchProgramWorkouts(programId);
+      });
+      toast({
+        title: "Success",
+        description: "Workout deleted successfully",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to delete workout",
+        variant: "destructive",
+      });
+    }
+  });
+
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -176,6 +229,27 @@ export default function Admin() {
     uploadProgramMutation.mutate(formData);
   };
 
+  const fetchProgramWorkouts = async (programId: number) => {
+    try {
+      console.log("Fetching workouts for program:", programId);
+      const workouts = await apiRequest("GET", `/api/admin/programs/${programId}/workouts`);
+      
+      // Ensure workouts is an array
+      const workoutArray = Array.isArray(workouts) ? workouts : [];
+      
+      console.log("Final workout array for program", programId, ":", workoutArray);
+      setProgramWorkouts(prev => ({ ...prev, [programId]: workoutArray }));
+    } catch (error) {
+      console.error("Failed to fetch workouts for program", programId, ":", error);
+      setProgramWorkouts(prev => ({ ...prev, [programId]: [] }));
+      toast({
+        title: "Error",
+        description: "Failed to load workouts for this program",
+        variant: "destructive"
+      });
+    }
+  };
+
   const toggleProgramExpansion = async (programId: number) => {
     const newExpanded = new Set(expandedPrograms);
     if (newExpanded.has(programId)) {
@@ -184,25 +258,7 @@ export default function Admin() {
       newExpanded.add(programId);
       // Fetch workouts for this program if not already loaded
       if (!programWorkouts[programId]) {
-        try {
-          console.log("Fetching workouts for program:", programId);
-          const response = await apiRequest("GET", `/api/admin/programs/${programId}/workouts`);
-          const workouts = await response.json();
-          
-          // Ensure workouts is an array
-          const workoutArray = Array.isArray(workouts) ? workouts : [];
-          
-          console.log("Final workout array for program", programId, ":", workoutArray);
-          setProgramWorkouts(prev => ({ ...prev, [programId]: workoutArray }));
-        } catch (error) {
-          console.error("Failed to fetch workouts for program", programId, ":", error);
-          setProgramWorkouts(prev => ({ ...prev, [programId]: [] }));
-          toast({
-            title: "Error",
-            description: "Failed to load workouts for this program",
-            variant: "destructive"
-          });
-        }
+        await fetchProgramWorkouts(programId);
       }
     }
     setExpandedPrograms(newExpanded);
@@ -355,33 +411,68 @@ export default function Admin() {
                       {/* Expanded Workouts View */}
                       {expandedPrograms.has(program.id) && (
                         <div className="mt-4 border-t pt-4">
-                          <h4 className="font-medium text-gray-900 mb-3">Program Workouts</h4>
+                          <div className="flex justify-between items-center mb-3">
+                            <h4 className="font-medium text-gray-900">Program Workouts</h4>
+                            <Button 
+                              size="sm" 
+                              onClick={() => fetchProgramWorkouts(program.id)}
+                              className="flex items-center gap-1 text-xs"
+                            >
+                              Refresh
+                            </Button>
+                          </div>
                           {programWorkouts[program.id] !== undefined ? (
                             Array.isArray(programWorkouts[program.id]) && programWorkouts[program.id].length > 0 ? (
-                              <div className="space-y-2">
-                                {programWorkouts[program.id].map((workout: any) => (
-                                  <div key={workout.id} className="bg-gray-50 rounded-lg p-3">
+                              <div className="space-y-2 max-h-96 overflow-y-auto">
+                                {programWorkouts[program.id]
+                                  .sort((a: any, b: any) => a.week - b.week || a.day - b.day)
+                                  .map((workout: any) => (
+                                  <div key={workout.id} className="bg-gray-50 rounded-lg p-3 border">
                                     <div className="flex justify-between items-start">
                                       <div className="flex-1">
-                                        <div className="flex items-center gap-2">
-                                          <span className="font-medium text-sm">Week {workout.week}, Day {workout.day}</span>
-                                          <span className="text-gray-600 text-sm">•</span>
-                                          <span className="text-gray-900 font-medium">{workout.name}</span>
+                                        <div className="flex items-center gap-2 mb-1">
+                                          <Badge variant="secondary" className="text-xs">
+                                            W{workout.week}D{workout.day}
+                                          </Badge>
+                                          <span className="text-gray-900 font-medium text-sm">{workout.name}</span>
                                         </div>
                                         {workout.description && (
-                                          <p className="text-gray-600 text-sm mt-1 line-clamp-2">{workout.description}</p>
+                                          <p className="text-gray-600 text-xs mt-1 line-clamp-2">{workout.description}</p>
                                         )}
                                         <div className="flex gap-3 mt-2 text-xs text-gray-500">
-                                          <span>{workout.estimatedDuration || 60}min</span>
+                                          <span className="flex items-center gap-1">
+                                            ⏱️ {workout.duration || workout.estimatedDuration || 60}min
+                                          </span>
                                           <span>•</span>
-                                          <span>{Array.isArray(workout.exercises) ? workout.exercises.length : 0} exercises</span>
+                                          <span className="flex items-center gap-1">
+                                            💪 {Array.isArray(workout.exercises) ? workout.exercises.length : 0} exercises
+                                          </span>
                                         </div>
                                       </div>
                                       <div className="flex gap-1 ml-2">
-                                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                        <Button 
+                                          variant="ghost" 
+                                          size="sm" 
+                                          className="h-6 w-6 p-0"
+                                          onClick={() => {
+                                            setEditingWorkout(workout);
+                                            setEditWorkoutOpen(true);
+                                          }}
+                                          title="Edit Workout"
+                                        >
                                           <Edit3 className="w-3 h-3" />
                                         </Button>
-                                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-500 hover:text-red-700">
+                                        <Button 
+                                          variant="ghost" 
+                                          size="sm" 
+                                          className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                                          onClick={() => {
+                                            if (confirm("Are you sure you want to delete this workout?")) {
+                                              deleteWorkoutMutation.mutate(workout.id);
+                                            }
+                                          }}
+                                          title="Delete Workout"
+                                        >
                                           <Trash2 className="w-3 h-3" />
                                         </Button>
                                       </div>
@@ -715,6 +806,151 @@ export default function Admin() {
                 disabled={updateProgramMutation.isPending}
               >
                 {updateProgramMutation.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Workout Dialog */}
+      {editingWorkout && editWorkoutOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold mb-4">Edit Workout</h3>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-workout-week">Week</Label>
+                  <Input
+                    id="edit-workout-week"
+                    type="number"
+                    min="1"
+                    defaultValue={editingWorkout.week || 1}
+                    onChange={(e) => setEditingWorkout({...editingWorkout, week: parseInt(e.target.value) || 1})}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-workout-day">Day</Label>
+                  <Input
+                    id="edit-workout-day"
+                    type="number"
+                    min="1"
+                    max="7"
+                    defaultValue={editingWorkout.day || 1}
+                    onChange={(e) => setEditingWorkout({...editingWorkout, day: parseInt(e.target.value) || 1})}
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <Label htmlFor="edit-workout-name">Workout Name</Label>
+                <Input
+                  id="edit-workout-name"
+                  defaultValue={editingWorkout.name || ""}
+                  onChange={(e) => setEditingWorkout({...editingWorkout, name: e.target.value})}
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="edit-workout-description">Description</Label>
+                <Textarea
+                  id="edit-workout-description"
+                  rows={4}
+                  defaultValue={editingWorkout.description || ""}
+                  onChange={(e) => setEditingWorkout({...editingWorkout, description: e.target.value})}
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-workout-duration">Duration (minutes)</Label>
+                  <Input
+                    id="edit-workout-duration"
+                    type="number"
+                    min="1"
+                    defaultValue={editingWorkout.duration || editingWorkout.estimatedDuration || 60}
+                    onChange={(e) => setEditingWorkout({...editingWorkout, duration: parseInt(e.target.value) || 60})}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-workout-type">Workout Type</Label>
+                  <Select 
+                    value={editingWorkout.workoutType || "Training"} 
+                    onValueChange={(value) => setEditingWorkout({...editingWorkout, workoutType: value})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Training">Training</SelectItem>
+                      <SelectItem value="Recovery">Recovery</SelectItem>
+                      <SelectItem value="Testing">Testing</SelectItem>
+                      <SelectItem value="Competition">Competition</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <div>
+                <Label htmlFor="edit-workout-exercises">Exercises (JSON format)</Label>
+                <Textarea
+                  id="edit-workout-exercises"
+                  rows={6}
+                  placeholder='[{"name": "Exercise Name", "sets": "3", "reps": "10", "weight": "20kg"}]'
+                  defaultValue={typeof editingWorkout.exercises === 'string' ? editingWorkout.exercises : JSON.stringify(editingWorkout.exercises || [], null, 2)}
+                  onChange={(e) => {
+                    try {
+                      const exercises = JSON.parse(e.target.value);
+                      setEditingWorkout({...editingWorkout, exercises: exercises});
+                    } catch {
+                      // Keep the string value for now, validation will happen on save
+                      setEditingWorkout({...editingWorkout, exercises: e.target.value});
+                    }
+                  }}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Enter exercises as a JSON array. Each exercise should have name, sets, reps, and optional weight fields.
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex gap-2 mt-6">
+              <Button 
+                variant="outline" 
+                className="flex-1"
+                onClick={() => {
+                  setEditingWorkout(null);
+                  setEditWorkoutOpen(false);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button 
+                className="flex-1 bg-blue-600 hover:bg-blue-700"
+                onClick={() => {
+                  // Validate exercises JSON if it's a string
+                  let exercisesToSave = editingWorkout.exercises;
+                  if (typeof editingWorkout.exercises === 'string') {
+                    try {
+                      exercisesToSave = JSON.parse(editingWorkout.exercises);
+                    } catch {
+                      toast({
+                        title: "Invalid JSON",
+                        description: "Please enter valid JSON for exercises",
+                        variant: "destructive"
+                      });
+                      return;
+                    }
+                  }
+                  
+                  updateWorkoutMutation.mutate({
+                    ...editingWorkout,
+                    exercises: exercisesToSave
+                  });
+                }}
+                disabled={updateWorkoutMutation.isPending}
+              >
+                {updateWorkoutMutation.isPending ? "Saving..." : "Save Changes"}
               </Button>
             </div>
           </div>
