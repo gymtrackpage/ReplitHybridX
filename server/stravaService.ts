@@ -260,17 +260,30 @@ export class StravaService {
             console.log('Attempting to upload image to Strava activity:', activityId);
             console.log('Image buffer size:', imageBuffer.length, 'bytes');
 
-            // Wait a moment for the activity to be fully created
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            // Wait longer for the activity to be fully created and processed
+            console.log('Waiting for Strava activity to be fully processed...');
+            await new Promise(resolve => setTimeout(resolve, 5000));
 
             await this.uploadActivityPhoto(accessToken, activityId, imageBuffer);
             console.log('✅ Successfully uploaded workout image to Strava activity');
           } catch (photoError: any) {
             console.error('❌ Failed to upload photo to Strava activity:');
             console.error('  Photo error message:', photoError.message);
-            console.error('  Photo error response:', photoError.response?.data);
-            console.error('  Photo error status:', photoError.response?.status);
-            // Don't fail the entire operation if photo upload fails
+            console.error('  Photo error response status:', photoError.response?.status);
+            console.error('  Photo error response data:', JSON.stringify(photoError.response?.data, null, 2));
+            
+            // Try one more time after additional wait if it's a 404 (activity not ready)
+            if (photoError.response?.status === 404) {
+              try {
+                console.log('Retrying photo upload after additional wait...');
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                await this.uploadActivityPhoto(accessToken, activityId, imageBuffer);
+                console.log('✅ Successfully uploaded workout image on retry');
+              } catch (retryError) {
+                console.error('❌ Photo upload retry also failed:', retryError);
+                // Don't fail the entire operation if photo upload fails
+              }
+            }
           }
         } else {
           if (!imageBuffer) {
@@ -300,12 +313,27 @@ export class StravaService {
     imageBuffer: Buffer
   ): Promise<void> {
     try {
+      console.log(`📤 Uploading photo to Strava activity ${activityId}, image size: ${imageBuffer.length} bytes`);
+      
+      // Validate image buffer
+      if (!imageBuffer || imageBuffer.length === 0) {
+        throw new Error('Invalid image buffer provided');
+      }
+
+      // Check if buffer size is reasonable (not too large)
+      if (imageBuffer.length > 10 * 1024 * 1024) { // 10MB limit
+        throw new Error('Image buffer too large for Strava upload');
+      }
+
       const form = new FormData();
 
       form.append('file', imageBuffer, {
-        filename: 'workout-share.png',
-        contentType: 'image/png'
+        filename: `hybridx-workout-${Date.now()}.png`,
+        contentType: 'image/png',
+        knownLength: imageBuffer.length
       });
+
+      console.log('📡 Sending photo upload request to Strava...');
 
       const response = await axios.post(
         `${STRAVA_BASE_URL}/activities/${activityId}/photos`,
@@ -313,16 +341,39 @@ export class StravaService {
         {
           headers: {
             ...form.getHeaders(),
-            'Authorization': `Bearer ${accessToken}`
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json'
           },
           maxContentLength: Infinity,
-          maxBodyLength: Infinity
+          maxBodyLength: Infinity,
+          timeout: 30000, // 30 second timeout
+          validateStatus: (status) => {
+            // Accept 200-299 status codes
+            return status >= 200 && status < 300;
+          }
         }
       );
 
-      console.log('Photo upload response:', response.status);
-    } catch (error) {
-      console.error('Error uploading photo to Strava:', error);
+      console.log('📥 Photo upload response status:', response.status);
+      console.log('📥 Photo upload response data:', response.data);
+
+      if (response.status === 201 || response.status === 200) {
+        console.log('✅ Photo upload successful');
+      } else {
+        console.warn('⚠️ Photo upload returned unexpected status:', response.status);
+      }
+    } catch (error: any) {
+      console.error('💥 Error uploading photo to Strava:');
+      console.error('  Error message:', error.message);
+      console.error('  Error code:', error.code);
+      console.error('  Response status:', error.response?.status);
+      console.error('  Response data:', error.response?.data);
+      console.error('  Request config:', {
+        url: error.config?.url,
+        method: error.config?.method,
+        headers: Object.keys(error.config?.headers || {}),
+        timeout: error.config?.timeout
+      });
       throw error;
     }
   }
