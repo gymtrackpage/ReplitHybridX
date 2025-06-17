@@ -26,16 +26,28 @@ export default function Workouts() {
   const [showCompletionDialog, setShowCompletionDialog] = useState(false);
   const [workoutToComplete, setWorkoutToComplete] = useState<any>(null);
 
-  const { data: todayWorkout } = useQuery({
+  // Show error messages for failed queries
+  if (todayWorkoutError || upcomingWorkoutsError || recentWorkoutsError) {
+    console.error("Workout query errors:", {
+      todayWorkoutError,
+      upcomingWorkoutsError,
+      recentWorkoutsError
+    });
+  }
+
+  const { data: todayWorkout, error: todayWorkoutError } = useQuery({
     queryKey: ["/api/today-workout"],
+    retry: 2,
   });
 
-  const { data: upcomingWorkouts } = useQuery({
+  const { data: upcomingWorkouts, error: upcomingWorkoutsError } = useQuery({
     queryKey: ["/api/upcoming-workouts"],
+    retry: 2,
   });
 
-  const { data: recentWorkouts } = useQuery({
+  const { data: recentWorkouts, error: recentWorkoutsError } = useQuery({
     queryKey: ["/api/recent-workouts"],
+    retry: 2,
   });
 
   const { data: randomWorkout, refetch: generateRandomWorkout } = useQuery({
@@ -153,7 +165,7 @@ export default function Workouts() {
 
               <p className="text-sm">{todayWorkout.description}</p>
 
-              {todayWorkout.exercises && todayWorkout.exercises.length > 0 && (
+              {todayWorkout.exercises && Array.isArray(todayWorkout.exercises) && todayWorkout.exercises.length > 0 && (
                 <div className="space-y-2">
                   <h4 className="font-medium">Exercises:</h4>
                   <div className="grid gap-2">
@@ -192,17 +204,33 @@ export default function Workouts() {
                       setShowCompletionDialog(true);
                     } else {
                       console.error("Cannot complete workout: missing workout data or ID");
+                      toast({
+                        title: "Error",
+                        description: "No workout available to complete",
+                        variant: "destructive",
+                      });
                     }
                   }}
                   className="bg-yellow-400 hover:bg-yellow-500 text-black"
+                  disabled={!todayWorkout || !todayWorkout.id}
                 >
                   <CheckCircle className="h-4 w-4 mr-2" />
                   Complete Workout
                 </Button>
                 <Button
                   variant="outline"
-                  onClick={() => skipWorkoutMutation.mutate(todayWorkout.id)}
-                  disabled={skipWorkoutMutation.isPending}
+                  onClick={() => {
+                    if (todayWorkout && todayWorkout.id) {
+                      skipWorkoutMutation.mutate(todayWorkout.id);
+                    } else {
+                      toast({
+                        title: "Error",
+                        description: "No workout available to skip",
+                        variant: "destructive",
+                      });
+                    }
+                  }}
+                  disabled={skipWorkoutMutation.isPending || !todayWorkout || !todayWorkout.id}
                 >
                   Skip Today
                 </Button>
@@ -238,7 +266,7 @@ export default function Workouts() {
 
               <p className="text-sm">{randomWorkout.description}</p>
 
-              {randomWorkout.exercises && randomWorkout.exercises.length > 0 && (
+              {randomWorkout.exercises && Array.isArray(randomWorkout.exercises) && randomWorkout.exercises.length > 0 && (
                 <div className="space-y-2">
                   <h4 className="font-medium">Exercises:</h4>
                   <div className="grid gap-2">

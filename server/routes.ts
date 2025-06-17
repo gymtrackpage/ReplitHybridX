@@ -1238,6 +1238,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get random workout (for workouts page)
+  app.get('/api/random-workout', isAuthenticated, async (req: any, res) => {
+    try {
+      const randomWorkout = generateRandomHyroxWorkout();
+      res.json(randomWorkout);
+    } catch (error) {
+      console.error("Error getting random workout:", error);
+      res.status(500).json({ message: "Failed to get random workout" });
+    }
+  });
+
   // Complete random HYROX workout and log it
   app.post('/api/complete-random-workout', isAuthenticated, async (req: any, res) => {
     try {
@@ -1695,6 +1706,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!workoutId || isNaN(parseInt(workoutId))) {
         console.error("Invalid or missing workoutId:", workoutId);
         return res.status(400).json({ message: "Valid workout ID is required" });
+      }
+
+      // Validate user exists
+      const user = await storage.getUser(userId);
+      if (!user) {
+        console.error("User not found:", userId);
+        return res.status(404).json({ message: "User not found" });
       }
 
       // Verify workout exists
