@@ -203,16 +203,43 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateWorkout(workoutId: number, updateData: any): Promise<any> {
+    console.log("Storage: Updating workout", workoutId, "with data:", updateData);
+    
+    // Prepare the update object with proper JSON serialization
+    const updateObject: any = {
+      ...updateData,
+      updatedAt: new Date()
+    };
+
+    // Handle exercises field - ensure it's stored as JSON string
+    if (updateData.exercises !== undefined) {
+      if (typeof updateData.exercises === 'string') {
+        // If it's already a string, try to parse and re-stringify to validate
+        try {
+          const parsed = JSON.parse(updateData.exercises);
+          updateObject.exercises = JSON.stringify(parsed);
+        } catch (error) {
+          console.error("Invalid exercises JSON string:", error);
+          throw new Error("Invalid exercises JSON format");
+        }
+      } else if (Array.isArray(updateData.exercises) || typeof updateData.exercises === 'object') {
+        // If it's an array or object, stringify it
+        updateObject.exercises = JSON.stringify(updateData.exercises);
+      } else {
+        // For any other type, remove it
+        delete updateObject.exercises;
+      }
+    }
+
+    console.log("Storage: Final update object:", updateObject);
+
     const [updatedWorkout] = await db
       .update(workouts)
-      .set({
-        ...updateData,
-        exercises: updateData.exercises ? JSON.stringify(updateData.exercises) : undefined,
-        updatedAt: new Date()
-      })
+      .set(updateObject)
       .where(eq(workouts.id, workoutId))
       .returning();
 
+    console.log("Storage: Updated workout result:", updatedWorkout);
     return updatedWorkout;
   }
 
