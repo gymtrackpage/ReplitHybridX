@@ -2268,6 +2268,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("  Error stack:", error.stack);
       console.error("  Error response status:", error.response?.status);
       console.error("  Error response data:", JSON.stringify(error.response?.data, null, 2));
+
+      // Handle specific Strava API errors
+      if (error.response?.status === 409) {
+        // Conflict - activity might already exist
+        res.status(409).json({ 
+          message: "This workout may have already been shared to Strava recently. Please wait a few minutes before trying again.",
+          success: false,
+          error: { message: "Duplicate activity detected" }
+        });
+        return;
+      }
       console.error("  Full error object:", JSON.stringify(error, null, 2));
 
       // More specific error handling
