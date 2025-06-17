@@ -26,15 +26,6 @@ export default function Workouts() {
   const [showCompletionDialog, setShowCompletionDialog] = useState(false);
   const [workoutToComplete, setWorkoutToComplete] = useState<any>(null);
 
-  // Show error messages for failed queries
-  if (todayWorkoutError || upcomingWorkoutsError || recentWorkoutsError) {
-    console.error("Workout query errors:", {
-      todayWorkoutError,
-      upcomingWorkoutsError,
-      recentWorkoutsError
-    });
-  }
-
   const { data: todayWorkout, error: todayWorkoutError } = useQuery({
     queryKey: ["/api/today-workout"],
     retry: 2,
@@ -54,6 +45,15 @@ export default function Workouts() {
     queryKey: ["/api/random-workout"],
     enabled: false,
   });
+
+  // Show error messages for failed queries
+  if (todayWorkoutError || upcomingWorkoutsError || recentWorkoutsError) {
+    console.error("Workout query errors:", {
+      todayWorkoutError,
+      upcomingWorkoutsError,
+      recentWorkoutsError
+    });
+  }
 
   const completeWorkoutMutation = useMutation({
     mutationFn: async (workoutId: number) => {
