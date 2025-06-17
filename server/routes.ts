@@ -66,17 +66,17 @@ const requireAdmin = async (req: AuthenticatedRequest, res: Response, next: Next
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Unauthorized" });
     }
-    
+
     const userId = req.user?.claims?.sub;
     if (!userId) {
       return res.status(401).json({ message: "User ID not found" });
     }
-    
+
     const user = await storage.getUser(userId);
     if (!user || !user.isAdmin) {
       return res.status(403).json({ message: "Admin access required" });
     }
-    
+
     next();
   } catch (error) {
     console.error("Admin middleware error:", error);
@@ -168,7 +168,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
-      
+
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -193,7 +193,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const assessment = await storage.getUserAssessment(userId);
       const progress = await storage.getUserProgress(userId);
       const completions = await storage.getWorkoutCompletions(userId);
-      
+
       res.json({
         user,
         assessment,
@@ -212,16 +212,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       console.log("Dashboard request for user:", userId);
-      
+
       const user = await storage.getUser(userId);
       console.log("User found:", !!user);
-      
+
       const progress = await storage.getUserProgress(userId);
       console.log("Progress found:", !!progress, progress ? `Program ID: ${progress.programId}` : 'No progress');
-      
+
       const todaysWorkout = await storage.getTodaysWorkout(userId);
       console.log("Today's workout found:", !!todaysWorkout);
-      
+
       const weeklyCompletions = await storage.getWeeklyCompletions(userId);
       const weightEntries = await storage.getUserWeightEntries(userId);
 
@@ -256,7 +256,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const progress = await storage.getUserProgress(userId);
       const user = await storage.getUser(userId);
       const completions = await storage.getWorkoutCompletions(userId);
-      
+
       res.json({
         ...progress,
         streak: user?.streak || 0,
@@ -273,7 +273,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const weeklyCompletions = await storage.getWeeklyCompletions(userId);
-      
+
       res.json({
         completed: weeklyCompletions.length,
         target: 6, // Assuming 6 workouts per week target
@@ -291,7 +291,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const { month } = req.query;
       const targetMonth = month ? new Date(month as string) : new Date();
-      
+
       // Get user's current program
       const user = await storage.getUser(userId);
       if (!user?.currentProgramId) {
@@ -300,7 +300,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get program workouts
       const programWorkouts = await storage.getProgramWorkouts(user.currentProgramId);
-      
+
       // Get user's workout history for the month
       const workoutHistory = await storage.getUserWorkoutHistory(userId);
 
@@ -308,12 +308,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const startOfMonth = new Date(targetMonth.getFullYear(), targetMonth.getMonth(), 1);
       const endOfMonth = new Date(targetMonth.getFullYear(), targetMonth.getMonth() + 1, 0);
       const calendarWorkouts = [];
-      
+
       for (let date = new Date(startOfMonth); date <= endOfMonth; date.setDate(date.getDate() + 1)) {
         const daysSinceStart = Math.floor((date.getTime() - new Date(user.programStartDate || Date.now()).getTime()) / (1000 * 60 * 60 * 24));
         const programIndex = Math.max(0, daysSinceStart) % programWorkouts.length;
         const programWorkout = programWorkouts[programIndex];
-        
+
         if (programWorkout) {
           // Check if this workout was completed
           const completedWorkout = workoutHistory.find((h: any) => 
@@ -322,7 +322,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           let status = 'upcoming';
           let comments = '';
-          
+
           if (completedWorkout) {
             status = completedWorkout.status || 'completed';
             comments = completedWorkout.comments || '';
@@ -353,7 +353,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const completions = await storage.getWorkoutCompletions(userId);
-      
+
       // Get workout details for recent completions
       const recentActivity = await Promise.all(
         completions.slice(0, 10).map(async (completion) => {
@@ -367,7 +367,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
         })
       );
-      
+
       res.json(recentActivity);
     } catch (error) {
       console.error("Error fetching recent activity:", error);
@@ -381,7 +381,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
       const progress = await storage.getUserProgress(userId);
-      
+
       if (!user?.currentProgramId || !progress) {
         return res.json([]);
       }
@@ -395,7 +395,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // For the first iteration, use current position, then advance
         let searchWeek = currentWeek;
         let searchDay = currentDay;
-        
+
         if (i > 0) {
           // Calculate the next workout position
           searchDay = currentDay + i;
@@ -486,7 +486,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUser(userId);
       const completions = await storage.getWorkoutCompletions(userId);
       const weeklyCompletions = await storage.getWeeklyCompletions(userId);
-      
+
       res.json({
         totalWorkouts: completions.length,
         currentStreak: user?.streak || 0,
@@ -504,7 +504,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const completions = await storage.getWorkoutCompletions(userId);
       const user = await storage.getUser(userId);
-      
+
       // Generate chart data for last 8 weeks
       const chartData = [];
       for (let i = 7; i >= 0; i--) {
@@ -512,18 +512,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         weekStart.setDate(weekStart.getDate() - (i * 7));
         const weekEnd = new Date(weekStart);
         weekEnd.setDate(weekEnd.getDate() + 6);
-        
+
         const weekCompletions = completions.filter(c => {
           const completedDate = new Date(c.completedAt);
           return completedDate >= weekStart && completedDate <= weekEnd;
         });
-        
+
         chartData.push({
           week: 8 - i,
           completed: weekCompletions.length
         });
       }
-      
+
       res.json({
         totalWorkouts: completions.length,
         weeklyCompleted: await storage.getWeeklyCompletions(userId).then(comps => comps.length),
@@ -541,7 +541,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const completions = await storage.getWorkoutCompletions(userId);
-      
+
       const workoutHistory = await Promise.all(
         completions.map(async (completion) => {
           const workout = await storage.getWorkout(completion.workoutId);
@@ -556,7 +556,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
         })
       );
-      
+
       res.json(workoutHistory);
     } catch (error) {
       console.error("Error fetching workout history:", error);
@@ -568,7 +568,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
-      
+
       res.json({
         status: user?.subscriptionStatus || 'inactive',
         nextBillingDate: null // Would be populated from Stripe in production
@@ -597,12 +597,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!progress) {
         return res.json(null);
       }
-      
+
       const program = await storage.getProgram(progress.programId);
       if (!program) {
         return res.json(null);
       }
-      
+
       const workouts = await storage.getWorkoutsByProgram(progress.programId);
       res.json({ ...program, workouts });
     } catch (error) {
@@ -662,7 +662,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check if user already has progress
       const existingProgress = await storage.getUserProgress(userId);
-      
+
       if (existingProgress) {
         // Update existing progress for new program
         await storage.updateUserProgress(userId, {
@@ -710,7 +710,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get existing progress
       const existingProgress = await storage.getUserProgress(userId);
-      
+
       let startDate = new Date();
       let currentWeek = 1;
       let currentDay = 1;
@@ -725,11 +725,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             currentDay = existingProgress.currentDay || 1;
           }
           break;
-          
+
         case "beginning":
           // Start from week 1, day 1 (default values already set)
           break;
-          
+
         case "eventDate":
           if (eventDate) {
             const event = new Date(eventDate);
@@ -737,25 +737,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const daysUntilEvent = Math.ceil((event.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
             const programDuration = program.duration || 12;
             const totalDaysInProgram = ((programDuration - 1) * 7) + 6; // Week 12, Day 6 = 83 days total
-            
+
             if (daysUntilEvent < totalDaysInProgram) {
               // Event is closer than full program duration - start at appropriate week/day
               const daysToSkip = totalDaysInProgram - daysUntilEvent;
               currentWeek = Math.floor(daysToSkip / 7) + 1;
               currentDay = (daysToSkip % 7) + 1;
-              
+
               // Ensure we don't exceed program duration
               if (currentWeek > programDuration) {
                 currentWeek = programDuration;
                 currentDay = 6;
               }
-              
+
               startDate = new Date(today);
             } else {
               // Event is far enough away - calculate normal start date
               const startDateMs = event.getTime() - (totalDaysInProgram * 24 * 60 * 60 * 1000);
               startDate = new Date(startDateMs);
-              
+
               // If calculated start date is in the future, use today
               if (startDate > today) {
                 startDate = new Date(today);
@@ -763,7 +763,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
           break;
-          
+
         default:
           // Default to beginning
           break;
@@ -803,7 +803,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get updated user data to return
       const updatedUser = await storage.getUser(userId);
-      
+
       res.json(updatedUser);
     } catch (error) {
       console.error("Error changing program:", error);
@@ -884,7 +884,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ success: true });
     } catch (error) {
-      console.error("Error completing workout:", error);
+      console<replit_final_file>
+.error("Error completing workout:", error);
       res.status(500).json({ message: "Failed to complete workout" });
     }
   });
@@ -912,11 +913,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/get-program-recommendation', isAuthenticated, async (req: any, res) => {
     try {
       console.log("Getting program recommendation for assessment data:", req.body);
-      
+
       // Use your program selection algorithm
       const programRecommendation = selectHyroxProgram(req.body);
       console.log("Generated program recommendation:", programRecommendation);
-      
+
       res.json({
         programRecommendation,
         success: true
@@ -931,28 +932,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/assessment', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      
+
       // Get available programs from database
       const programs = await storage.getPrograms();
       console.log("Available programs:", programs.map(p => ({ id: p.id, name: p.name, difficulty: p.difficulty, category: p.category })));
-      
+
       // Convert database programs to metadata format for the new algorithm
       const { convertProgramToMetadata } = require('./programSelection');
       const programsWithMetadata = programs.map(program => ({
         program,
         metadata: convertProgramToMetadata(program)
       }));
-      
+
       // Use new metadata-based program selection algorithm
       const programRecommendation = selectHyroxProgram(req.body, programsWithMetadata);
-      
+
       console.log("Program recommendation:", {
         topProgram: programRecommendation.recommendedPrograms[0]?.program?.name,
         score: programRecommendation.recommendedPrograms[0]?.totalScore,
         userProfile: programRecommendation.userProfile,
         reasoning: programRecommendation.reasoningExplanation
       });
-      
+
       const assessmentData = insertAssessmentSchema.parse({
         ...req.body,
         userId,
@@ -960,18 +961,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const assessment = await storage.createAssessment(assessmentData);
-      
+
       // Get the top recommended program
       const topRecommendation = programRecommendation.recommendedPrograms[0];
       if (topRecommendation && topRecommendation.program) {
         const recommendedProgram = topRecommendation.program;
-        
+
         await storage.updateUserProgram(userId, recommendedProgram.id);
-        
+
         // Create user progress entry for the program
         const eventDate = req.body.eventDate ? new Date(req.body.eventDate) : null;
         await calculateProgramSchedule(userId, recommendedProgram.id, eventDate);
-        
+
         // Create initial user progress tracking
         const existingProgress = await storage.getUserProgress(userId);
         if (!existingProgress) {
@@ -986,7 +987,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             totalWorkouts: recommendedProgram.duration ? recommendedProgram.duration * (recommendedProgram.frequency || 4) : 56
           });
         }
-        
+
         console.log(`Successfully assigned ${recommendedProgram.name} (score: ${topRecommendation.totalScore.toFixed(2)}) to user ${userId}`);
       } else {
         console.error("No valid program recommendation found, using fallback");
@@ -995,7 +996,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.updateUserProgram(userId, programs[0].id);
         }
       }
-      
+
       // Update user's fitness level based on program recommendation
       const fitnessLevel = programRecommendation.userProfile?.preferredDifficulty || 'Intermediate';
       await storage.updateUserAssessment(userId, fitnessLevel);
@@ -1021,7 +1022,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  
+
 
   // Weight tracking
   app.post('/api/weight', isAuthenticated, async (req: any, res) => {
@@ -1142,12 +1143,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const profileData = req.body;
-      
+
       // Convert date string to Date object if provided
       if (profileData.hyroxEventDate) {
         profileData.hyroxEventDate = new Date(profileData.hyroxEventDate);
       }
-      
+
       const user = await storage.updateUserProfile(userId, profileData);
       res.json(user);
     } catch (error) {
@@ -1160,7 +1161,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const { programId } = req.body;
-      
+
       const user = await storage.updateUserProgram(userId, programId);
       res.json(user);
     } catch (error) {
@@ -1174,11 +1175,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
-      
+
       if (!user?.currentProgramId) {
         return res.json([]);
       }
-      
+
       const workouts = await storage.getWorkoutsByProgram(user.currentProgramId);
       res.json(workouts);
     } catch (error) {
@@ -1203,7 +1204,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const completions = await storage.getWorkoutCompletions(userId);
-      
+
       // Get workout details for each completion to preserve historical data
       const historicalCompletions = await Promise.all(
         completions.map(async (completion) => {
@@ -1219,7 +1220,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
         })
       );
-      
+
       res.json(historicalCompletions);
     } catch (error) {
       console.error("Error fetching calendar workout history:", error);
@@ -1307,7 +1308,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: p.name,
           description: p.description
         }));
-      
+
       res.json(availablePrograms);
     } catch (error) {
       console.error("Error fetching available programs:", error);
@@ -1331,7 +1332,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const { programId, eventDate } = req.body;
-      
+
       const schedule = await calculateProgramSchedule(userId, programId, eventDate ? new Date(eventDate) : null);
       res.json(schedule);
     } catch (error) {
@@ -1390,7 +1391,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const workouts = [];
       for (const row of jsonData) {
         const workout = row as any;
-        
+
         // Validate required fields
         if (!workout.week || !workout.day || !workout.name) {
           console.warn("Skipping row with missing required fields:", workout);
@@ -1473,7 +1474,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { amount, currency = "usd" } = req.body;
       const userId = req.user.claims.sub;
-      
+
       const Stripe = require('stripe');
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -1494,7 +1495,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
-      
+
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -1503,7 +1504,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
       let customerId = user.stripeCustomerId;
-      
+
       // Create customer if doesn't exist
       if (!customerId) {
         const customer = await stripe.customers.create({
@@ -1565,9 +1566,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const programPhaseManager = await import('./programPhaseManager');
       const { checkForPhaseTransition, transitionUserToPhase } = programPhaseManager;
-      
+
       const transitionCheck = await checkForPhaseTransition(userId);
-      
+
       if (transitionCheck.shouldTransition && transitionCheck.newPhase) {
         await transitionUserToPhase(userId, transitionCheck.newPhase);
         res.json({ 
@@ -1588,7 +1589,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
-      
+
       if (!user?.isAdmin) {
         return res.status(403).json({ message: "Admin access required" });
       }
@@ -1605,7 +1606,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const adminUserId = req.user.claims.sub;
       const adminUser = await storage.getUser(adminUserId);
-      
+
       if (!adminUser?.isAdmin) {
         return res.status(403).json({ message: "Admin access required" });
       }
@@ -1626,7 +1627,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const progress = await storage.getUserProgress(userId);
-      
+
       if (!progress || !progress.startDate) {
         return res.json({ missedWorkouts: [] });
       }
@@ -1634,22 +1635,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const today = new Date();
       const startDate = new Date(progress.startDate);
       const daysSinceStart = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-      
+
       // Calculate what week/day we should be on based on calendar days
       const expectedWeek = Math.floor(daysSinceStart / 7) + 1;
       const expectedDay = (daysSinceStart % 7) + 1;
-      
+
       const currentWeek = progress.currentWeek || 1;
       const currentDay = progress.currentDay || 1;
-      
+
       // If we're behind schedule, mark missed workouts
       const missedWorkouts = [];
-      
+
       if (expectedWeek > currentWeek || (expectedWeek === currentWeek && expectedDay > currentDay)) {
         // We're behind - calculate missed workouts
         let checkWeek = currentWeek;
         let checkDay = currentDay;
-        
+
         while (checkWeek < expectedWeek || (checkWeek === expectedWeek && checkDay < expectedDay)) {
           // Find workout for this missed day
           const [missedWorkout] = await db
@@ -1662,7 +1663,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 eq(workouts.day, checkDay)
               )
             );
-            
+
           if (missedWorkout) {
             missedWorkouts.push({
               workout: missedWorkout,
@@ -1671,7 +1672,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               day: checkDay
             });
           }
-          
+
           checkDay++;
           if (checkDay > 7) {
             checkDay = 1;
@@ -1679,7 +1680,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
       }
-      
+
       res.json({ 
         missedWorkouts,
         expectedWeek,
@@ -1766,10 +1767,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Verify the next workout exists, if not find the next available one
       const nextWorkoutExists = allWorkouts.find(w => w.week === nextWeek && w.day === nextDay);
-      
+
       if (!nextWorkoutExists && allWorkouts.length > 0) {
         console.log(`Next workout Week ${nextWeek} Day ${nextDay} doesn't exist. Finding next available workout...`);
-        
+
         // Find the next workout in chronological order
         const nextAvailableWorkout = allWorkouts.find(w => 
           w.week > currentWeek || (w.week === currentWeek && w.day > currentDay)
@@ -1792,7 +1793,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Update user progress with next day/week
       console.log(`Progressing user ${userId} from Week ${currentWeek} Day ${currentDay} to Week ${nextWeek} Day ${nextDay}`);
-      
+
       const updatedProgress = await storage.updateUserProgress(userId, {
         currentDay: nextDay,
         currentWeek: nextWeek,
@@ -1921,21 +1922,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put('/api/admin/workouts/:id', requireAdmin, async (req: any, res) => {
+  app.put('/api/admin/workouts/:id', requireAdmin, async (req, res) => {
     try {
       const workoutId = parseInt(req.params.id);
-      const updateData = req.body;
+      if (isNaN(workoutId)) {
+        return res.status(400).json({ message: "Invalid workout ID" });
+      }
+
+      const rawUpdateData = req.body;
+      console.log("Route: Received workout update data:", rawUpdateData);
+
+      // Clean and validate the update data
+      const updateData: any = {};
+
+      // Only include valid workout fields
+      const validFields = ['name', 'description', 'week', 'day', 'duration', 'workoutType', 'exercises', 'estimatedDuration'];
+
+      for (const field of validFields) {
+        if (rawUpdateData[field] !== undefined) {
+          updateData[field] = rawUpdateData[field];
+        }
+      }
+
+      // Handle numeric fields
+      if (updateData.week !== undefined) {
+        updateData.week = parseInt(updateData.week) || 1;
+      }
+      if (updateData.day !== undefined) {
+        updateData.day = parseInt(updateData.day) || 1;
+      }
+      if (updateData.duration !== undefined) {
+        updateData.duration = parseInt(updateData.duration) || 60;
+      }
+      if (updateData.estimatedDuration !== undefined) {
+        updateData.estimatedDuration = parseInt(updateData.estimatedDuration) || updateData.duration || 60;
+      }
+
+      // Handle exercises field - ensure it's properly formatted
+      if (updateData.exercises !== undefined) {
+        if (typeof updateData.exercises === 'string') {
+          try {
+            // Try to parse the JSON string to validate it
+            const parsed = JSON.parse(updateData.exercises);
+            updateData.exercises = parsed; // Keep as parsed object for storage layer
+          } catch (error) {
+            console.error("Invalid exercises JSON string:", error);
+            return res.status(400).json({ message: "Invalid exercises JSON format" });
+          }
+        }
+        // If it's already an array/object, keep it as is
+      }
+
+      console.log("Route: Cleaned update data:", updateData);
+
       const workout = await storage.updateWorkout(workoutId, updateData);
+
+      console.log("Route: Successfully updated workout:", workout?.id);
       res.json(workout);
     } catch (error) {
       console.error("Error updating workout:", error);
-      res.status(500).json({ message: "Failed to update workout" });
+      res.status(500).json({ message: "Failed to update workout: " + (error instanceof Error ? error.message : "Unknown error") });
     }
   });
 
-  app.delete('/api/admin/workouts/:id', requireAdmin, async (req: any, res) => {
+  app.delete('/api/admin/workouts/:id', requireAdmin, async (req, res) => {
     try {
       const workoutId = parseInt(req.params.id);
+      if (isNaN(workoutId)) {
+        return res.status(400).json({ message: "Invalid workout ID" });
+      }
+
       await storage.deleteWorkout(workoutId);
       res.json({ message: "Workout deleted successfully" });
     } catch (error) {
@@ -1963,7 +2019,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Environment check:");
       console.log("  STRAVA_CLIENT_ID:", process.env.STRAVA_CLIENT_ID ? `Set (${process.env.STRAVA_CLIENT_ID.slice(0, 4)}...)` : "Not set");
       console.log("  STRAVA_CLIENT_SECRET:", process.env.STRAVA_CLIENT_SECRET ? "Set" : "Not set");
-      
+
       if (!process.env.STRAVA_CLIENT_ID || !process.env.STRAVA_CLIENT_SECRET) {
         console.error("Strava environment variables not configured");
         return res.status(400).json({ 
@@ -1972,17 +2028,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           success: false
         });
       }
-      
+
       const authUrl = StravaService.getAuthorizationUrl();
       console.log("Generated Strava auth URL:", authUrl);
-      
+
       const response = { 
         authUrl, 
         configured: true,
         success: true
       };
       console.log("Sending response:", response);
-      
+
       res.json(response);
     } catch (error) {
       console.error("Error getting Strava auth URL:", error);
@@ -2001,12 +2057,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log("Strava callback received with query:", req.query);
       const { code, state, error } = req.query;
-      
+
       if (error) {
         console.error("Strava authorization error:", error);
         return res.redirect('/profile?strava_error=authorization_denied');
       }
-      
+
       if (!code) {
         console.error("No authorization code provided");
         return res.redirect('/profile?strava_error=no_code');
@@ -2020,7 +2076,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const userId = (req.user as any).claims.sub;
       console.log("Processing Strava callback for user:", userId);
-      
+
       const tokens = await StravaService.exchangeCodeForTokens(code as string);
       console.log("Successfully exchanged code for tokens");
 
@@ -2032,7 +2088,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         stravaTokenExpiry: new Date(tokens.expires_at * 1000),
         stravaConnected: true,
       });
-      
+
       console.log("Successfully stored Strava tokens for user:", userId);
       res.redirect('/profile?strava_connected=true');
     } catch (error) {
@@ -2163,12 +2219,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           exerciseCount: workout.exercises ? (workout.exercises as any[]).length : 0,
           exercisePreview: workout.exercises ? JSON.stringify(workout.exercises).substring(0, 200) + '...' : 'No exercises'
         });
-        
+
         imageBuffer = await StravaImageService.generateWorkoutImage(
           workout.name, 
           workout.exercises as any[]
         );
-        
+
         if (imageBuffer) {
           console.log("✅ Workout image generated successfully, size:", imageBuffer.length, "bytes");
         } else {
@@ -2189,7 +2245,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const result = await StravaService.pushWorkoutToStrava(userId, workoutData, imageBuffer);
-      
+
       console.log("📥 Strava push result:", result);
 
       if (result.success) {
@@ -2213,7 +2269,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("  Error response status:", error.response?.status);
       console.error("  Error response data:", JSON.stringify(error.response?.data, null, 2));
       console.error("  Full error object:", JSON.stringify(error, null, 2));
-      
+
       // More specific error handling
       if (error.response?.status === 401) {
         console.error("🔐 Strava authorization error (401)");
@@ -2260,7 +2316,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
-      
+
       let recentActivities = null;
       if (user?.stravaConnected && user.stravaAccessToken) {
         try {
@@ -2285,7 +2341,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.error("Error fetching recent activities:", activitiesError);
         }
       }
-      
+
       res.json({
         connected: user?.stravaConnected || false,
         athleteId: user?.stravaUserId || null,
@@ -2336,7 +2392,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId } = req.params;
       const updateData = req.body;
-      
+
       await storage.updateUserAdmin(userId, updateData);
       res.json({ message: "User updated successfully" });
     } catch (error) {
@@ -2373,7 +2429,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { programId } = req.params;
       const updateData = req.body;
-      
+
       await storage.updateProgram(parseInt(programId), updateData);
       res.json({ message: "Program updated successfully" });
     } catch (error) {
@@ -2399,22 +2455,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const programId = parseInt(req.params.id);
       console.log("Fetching workouts for program ID:", programId);
-      
+
       if (isNaN(programId)) {
         return res.status(400).json({ message: "Invalid program ID" });
       }
-      
+
       const workouts = await storage.getWorkoutsByProgram(programId);
       console.log("Raw workouts result:", workouts);
       console.log("Found workouts:", Array.isArray(workouts) ? workouts.length : 'Not an array', "workouts for program", programId);
-      
+
       // Ensure we always return an array, and sort by week/day
       const workoutArray = Array.isArray(workouts) ? workouts : [];
       const sortedWorkouts = workoutArray.sort((a, b) => {
         if (a.week !== b.week) return a.week - b.week;
         return a.day - b.day;
       });
-      
+
       res.json(sortedWorkouts);
     } catch (error) {
       console.error("Error fetching program workouts:", error);
@@ -2422,45 +2478,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put('/api/admin/workouts/:id', isAuthenticated, requireAdmin, async (req, res) => {
+  app.delete('/api/admin/workouts/:id', requireAdmin, async (req, res) => {
     try {
       const workoutId = parseInt(req.params.id);
       if (isNaN(workoutId)) {
         return res.status(400).json({ message: "Invalid workout ID" });
       }
-      
-      const updateData = req.body;
-      console.log("Updating workout", workoutId, "with data:", updateData);
-      
-      // Ensure exercises is properly formatted
-      if (updateData.exercises && typeof updateData.exercises === 'string') {
-        try {
-          updateData.exercises = JSON.parse(updateData.exercises);
-        } catch (error) {
-          return res.status(400).json({ message: "Invalid exercises JSON format" });
-        }
-      }
-      
-      const workout = await storage.updateWorkout(workoutId, updateData);
-      res.json(workout);
-    } catch (error) {
-      console.error("Error updating workout:", error);
-      res.status(500).json({ message: "Failed to update workout" });
-    }
-  });
 
-  app.delete('/api/admin/workouts/:id', isAuthenticated, requireAdmin, async (req, res) => {
-    try {
-      const workoutId = parseInt(req.params.id);
-      if (isNaN(workoutId)) {
-        return res.status(400).json({ message: "Invalid workout ID" });
-      }
-      
       await storage.deleteWorkout(workoutId);
       res.json({ message: "Workout deleted successfully" });
     } catch (error) {
       console.error("Error deleting workout:", error);
       res.status(500).json({ message: "Failed to delete workout" });
+    }
+  });
+
+  app.post('/api/admin/users/:id/admin', requireAdmin, async (req: any, res) => {
+    try {
+      const userId = req.params.id;
+      const { isAdmin } = req.body;
+      const user = await storage.updateUserAdmin(userId, isAdmin);
+      res.json(user);
+    } catch (error) {
+      console.error("Error updating user admin status:", error);
+      res.status(500).json({ message: "Failed to update user admin status" });
     }
   });
 

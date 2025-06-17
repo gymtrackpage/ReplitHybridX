@@ -205,42 +205,71 @@ export class DatabaseStorage implements IStorage {
   async updateWorkout(workoutId: number, updateData: any): Promise<any> {
     console.log("Storage: Updating workout", workoutId, "with data:", updateData);
     
-    // Prepare the update object with proper JSON serialization
-    const updateObject: any = {
-      ...updateData,
-      updatedAt: new Date()
-    };
-
-    // Handle exercises field - ensure it's stored as JSON string
-    if (updateData.exercises !== undefined) {
-      if (typeof updateData.exercises === 'string') {
-        // If it's already a string, try to parse and re-stringify to validate
-        try {
-          const parsed = JSON.parse(updateData.exercises);
-          updateObject.exercises = JSON.stringify(parsed);
-        } catch (error) {
-          console.error("Invalid exercises JSON string:", error);
-          throw new Error("Invalid exercises JSON format");
-        }
-      } else if (Array.isArray(updateData.exercises) || typeof updateData.exercises === 'object') {
-        // If it's an array or object, stringify it
-        updateObject.exercises = JSON.stringify(updateData.exercises);
-      } else {
-        // For any other type, remove it
-        delete updateObject.exercises;
+    try {
+      // Verify workout exists first
+      const existingWorkout = await this.getWorkout(workoutId);
+      if (!existingWorkout) {
+        throw new Error("Workout not found");
       }
+      
+      // Prepare the update object
+      const updateObject: any = {
+        updatedAt: new Date()
+      };
+
+      // Only include fields that are actually provided and valid
+      const validFields = ['name', 'description', 'week', 'day', 'duration', 'workoutType', 'exercises', 'estimatedDuration'];
+      
+      for (const field of validFields) {
+        if (updateData[field] !== undefined && updateData[field] !== null) {
+          updateObject[field] = updateData[field];
+        }
+      }
+
+      // Handle exercises field - ensure it's stored as JSON string in database
+      if (updateData.exercises !== undefined) {
+        if (typeof updateData.exercises === 'string') {
+          // If it's already a string, validate it's valid JSON
+          try {
+            JSON.parse(updateData.exercises);
+            updateObject.exercises = updateData.exercises;
+          } catch (error) {
+            console.error("Invalid exercises JSON string:", error);
+            throw new Error("Invalid exercises JSON format");
+          }
+        } else if (Array.isArray(updateData.exercises) || (typeof updateData.exercises === 'object' && updateData.exercises !== null)) {
+          // If it's an array or object, stringify it
+          try {
+            updateObject.exercises = JSON.stringify(updateData.exercises);
+          } catch (error) {
+            console.error("Error stringifying exercises:", error);
+            throw new Error("Failed to serialize exercises data");
+          }
+        } else {
+          // For any other type, don't include it in the update
+          console.warn("Ignoring invalid exercises data type:", typeof updateData.exercises);
+        }
+      }
+
+      console.log("Storage: Final update object:", updateObject);
+
+      // Perform the update
+      const [updatedWorkout] = await db
+        .update(workouts)
+        .set(updateObject)
+        .where(eq(workouts.id, workoutId))
+        .returning();
+
+      if (!updatedWorkout) {
+        throw new Error("Workout update failed - no result returned");
+      }
+
+      console.log("Storage: Successfully updated workout:", updatedWorkout.id);
+      return updatedWorkout;
+    } catch (error) {
+      console.error("Storage: Error updating workout:", error);
+      throw error;
     }
-
-    console.log("Storage: Final update object:", updateObject);
-
-    const [updatedWorkout] = await db
-      .update(workouts)
-      .set(updateObject)
-      .where(eq(workouts.id, workoutId))
-      .returning();
-
-    console.log("Storage: Updated workout result:", updatedWorkout);
-    return updatedWorkout;
   }
 
   async deleteWorkout(workoutId: number): Promise<void> {
