@@ -18,6 +18,10 @@ export default function Landing() {
                 src="/logo-x.png" 
                 alt="HybridX Logo" 
                 className="h-8 w-8"
+                onError={(e) => {
+                  console.error('Logo failed to load:', e);
+                  e.currentTarget.style.display = 'none';
+                }}
               />
               <span className="font-bold text-2xl text-white">
                 HybridX<span className="text-yellow-400">.CLUB</span>

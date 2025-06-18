@@ -42,16 +42,20 @@ export function Navigation({ onLogout }: NavigationProps) {
             src="/logo-x.png" 
             alt="HybridX Logo" 
             className="h-12 w-12"
+            onError={(e) => {
+              console.error('Logo failed to load:', e);
+              e.currentTarget.style.display = 'none';
+            }}
           />
         </div>
       </div>
-      
+
       <div className="flex-1 p-4">
         <div className="space-y-2">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location === item.path || (item.path !== "/" && location.startsWith(item.path));
-            
+
             return (
               <Link key={item.path} href={item.path}>
                 <a className={cn(
@@ -68,7 +72,7 @@ export function Navigation({ onLogout }: NavigationProps) {
           })}
         </div>
       </div>
-      
+
       <div className="p-4 border-t border-border">
         <Button
           onClick={onLogout}

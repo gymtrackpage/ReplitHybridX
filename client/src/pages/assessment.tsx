@@ -552,6 +552,10 @@ export default function Assessment() {
                   src="/logo-x.png" 
                   alt="HybridX Logo" 
                   className="h-8 w-8"
+                  onError={(e) => {
+                    console.error('Logo failed to load:', e);
+                    e.currentTarget.style.display = 'none';
+                  }}
                 />
                 <h1 className="text-lg font-bold">Initial Assessment</h1>
               </div>
