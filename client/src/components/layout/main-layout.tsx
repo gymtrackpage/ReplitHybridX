@@ -18,7 +18,7 @@ export function MainLayout({ children }: MainLayoutProps) {
       <div className="flex-1 flex flex-col overflow-hidden">
         <div className="p-4 bg-white border-b border-gray-200 lg:hidden">
             <img 
-              src="/logo-x.png" 
+              src="/client/public/logo-x.png" 
               alt="HybridX Logo" 
               className="h-6 w-6"
             />
