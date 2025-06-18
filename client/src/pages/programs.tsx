@@ -141,7 +141,7 @@ export default function Programs() {
 
         {/* Temporarily disabled subscription gate to fix React hook errors */}
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {programs?.map((program: any) => (
+            {safePrograms.map((program: any) => (
               <Card 
                 key={program.id} 
                 className={`transition-all hover:shadow-lg cursor-pointer ${
@@ -183,7 +183,7 @@ export default function Programs() {
 
                   <Button 
                     className="w-full"
-                    variant={userStatus?.currentProgramId === program.id ? "secondary" : "default"}
+                    variant={safeUserStatus.currentProgramId === program.id ? "secondary" : "default"}
                     onClick={(e) => {
                       e.stopPropagation();
                       handleProgramSelect(program.id);
@@ -193,13 +193,13 @@ export default function Programs() {
                     {selectProgramMutation.isPending && selectedProgram === program.id ? (
                       <div className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full mr-2" />
                     ) : null}
-                    {userStatus?.currentProgramId === program.id ? "Current Program" : "Select Program"}
+                    {safeUserStatus.currentProgramId === program.id ? "Current Program" : "Select Program"}
                   </Button>
                 </CardContent>
               </Card>
             ))}
 
-            {programs?.length === 0 && (
+            {safePrograms.length === 0 && (
               <Card className="text-center py-12">
                 <CardContent>
                   <Trophy className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
