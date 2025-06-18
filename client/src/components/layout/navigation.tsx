@@ -37,9 +37,16 @@ export function Navigation({ onLogout }: NavigationProps) {
   return (
     <nav className="bg-background border-r border-border h-full flex flex-col">
       <div className="p-6 border-b border-border">
-        <h1 className="text-xl font-bold text-yellow-400">HybridX</h1>
-        <p className="text-sm text-muted-foreground">Fitness Training</p>
-      </div>
+        <div className="flex flex-col items-center">
+          <img 
+            src="/logo-x.png" 
+            alt="HybridX Logo" 
+            className="h-10 w-10 mb-2"
+          />
+          <h1 className="text-xl font-bold text-yellow-400">HybridX</h1>
+          <p className="text-sm text-muted-foreground">Fitness Training</p>
+        </div>
+      </div></div>
       
       <div className="flex-1 p-4">
         <div className="space-y-2">

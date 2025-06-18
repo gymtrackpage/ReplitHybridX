@@ -13,7 +13,12 @@ export default function Landing() {
       <header className="border-b border-gray-800 bg-black/95 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
+            <div className="flex items-center gap-3">
+              <img 
+                src="/logo-x.png" 
+                alt="HybridX Logo" 
+                className="h-8 w-8"
+              />
               <span className="font-bold text-2xl text-white">
                 HybridX<span className="text-yellow-400">.CLUB</span>
               </span>
@@ -78,7 +83,7 @@ export default function Landing() {
       <section className="py-20 px-4 sm:px-6 lg:px-8 bg-black">
         <div className="max-w-6xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-            
+
             {/* Smart Workout Tracking */}
             <div className="text-center">
               <div className="w-20 h-20 bg-yellow-400 rounded-full flex items-center justify-center mx-auto mb-6">
