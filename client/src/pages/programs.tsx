@@ -21,6 +21,7 @@ export default function Programs() {
   const [open, setOpen] = useState(false);
   const [programSelectionMode, setProgramSelectionMode] = useState("continue"); // continue, restart, enddate
   const [endDate, setEndDate] = useState("");
+  const { hasAccess } = usePremiumAccess();
 
   const { data: programs, isLoading } = useQuery({
     queryKey: ["/api/programs"],
@@ -131,80 +132,85 @@ export default function Programs() {
           </Card>
         )}
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {programs?.map((program: any) => (
-            <Card 
-              key={program.id} 
-              className={`transition-all hover:shadow-lg cursor-pointer ${
-                selectedProgram === program.id ? "ring-2 ring-yellow-400" : ""
-              }`}
-              onClick={() => handleProgramSelect(program.id)}
-            >
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div className="flex items-center gap-2">
-                    {getCategoryIcon(program.category)}
-                    <CardTitle className="text-lg">{program.name}</CardTitle>
+        <SubscriptionGate 
+          feature="Professional Training Programs"
+          description="Access to all HYROX training programs requires a premium subscription. Free users can still use the random workout generator."
+        >
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {programs?.map((program: any) => (
+              <Card 
+                key={program.id} 
+                className={`transition-all hover:shadow-lg cursor-pointer ${
+                  selectedProgram === program.id ? "ring-2 ring-yellow-400" : ""
+                }`}
+                onClick={() => handleProgramSelect(program.id)}
+              >
+                <CardHeader>
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-2">
+                      {getCategoryIcon(program.category)}
+                      <CardTitle className="text-lg">{program.name}</CardTitle>
+                    </div>
+                    <Badge className={getDifficultyColor(program.difficulty)}>
+                      {program.difficulty}
+                    </Badge>
                   </div>
-                  <Badge className={getDifficultyColor(program.difficulty)}>
-                    {program.difficulty}
-                  </Badge>
-                </div>
-                <CardDescription className="line-clamp-2">
-                  {program.description}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <span>{program.duration} weeks</span>
+                  <CardDescription className="line-clamp-2">
+                    {program.description}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <span>{program.duration} weeks</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                      <span>{program.frequency}x/week</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    <span>{program.frequency}x/week</span>
-                  </div>
-                </div>
 
-                {program.targetEventWeeks && (
-                  <div className="text-sm text-muted-foreground">
-                    Recommended {program.targetEventWeeks} weeks before event
-                  </div>
-                )}
+                  {program.targetEventWeeks && (
+                    <div className="text-sm text-muted-foreground">
+                      Recommended {program.targetEventWeeks} weeks before event
+                    </div>
+                  )}
 
-                <Button 
-                  className="w-full"
-                  variant={userStatus?.currentProgramId === program.id ? "secondary" : "default"}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleProgramSelect(program.id);
-                  }}
-                  disabled={selectProgramMutation.isPending}
-                >
-                  {selectProgramMutation.isPending && selectedProgram === program.id ? (
-                    <div className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full mr-2" />
-                  ) : null}
-                  {userStatus?.currentProgramId === program.id ? "Current Program" : "Select Program"}
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                  <Button 
+                    className="w-full"
+                    variant={userStatus?.currentProgramId === program.id ? "secondary" : "default"}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleProgramSelect(program.id);
+                    }}
+                    disabled={selectProgramMutation.isPending}
+                  >
+                    {selectProgramMutation.isPending && selectedProgram === program.id ? (
+                      <div className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full mr-2" />
+                    ) : null}
+                    {userStatus?.currentProgramId === program.id ? "Current Program" : "Select Program"}
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
 
-        {programs?.length === 0 && (
-          <Card className="text-center py-12">
-            <CardContent>
-              <Trophy className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No Programs Available</h3>
-              <p className="text-muted-foreground mb-4">
-                Training programs are being loaded. Please check back shortly.
-              </p>
-              <Button onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/programs"] })}>
-                Refresh
-              </Button>
-            </CardContent>
-          </Card>
-        )}
+            {programs?.length === 0 && (
+              <Card className="text-center py-12">
+                <CardContent>
+                  <Trophy className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No Programs Available</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Training programs are being loaded. Please check back shortly.
+                  </p>
+                  <Button onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/programs"] })}>
+                    Refresh
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </SubscriptionGate>
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
