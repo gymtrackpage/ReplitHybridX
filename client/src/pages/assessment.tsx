@@ -542,7 +542,7 @@ export default function Assessment() {
 
   return (
     <MobileLayout>
-      <div className="space-y-4">
+      <div className="space-y-3">
         {/* Progress Header */}
         <Card className="mobile-card">
           <CardContent className="p-4">

@@ -100,7 +100,7 @@ body {
   }
   
   .mobile-content {
-    @apply container mx-auto p-4 max-w-md;
+    @apply container mx-auto px-4 pt-2 pb-4 max-w-md;
   }
   
   .mobile-nav {
