@@ -4,21 +4,28 @@ import React, { useState } from 'react';
 interface LogoProps {
   className?: string;
   size?: 'sm' | 'md' | 'lg';
+  variant?: 'icon' | 'full' | 'white';
 }
 
-export function Logo({ className = '', size = 'md' }: LogoProps) {
+export function Logo({ className = '', size = 'md', variant = 'icon' }: LogoProps) {
   const [imageError, setImageError] = useState(false);
   
   const sizeClasses = {
-    sm: 'h-6 w-6',
-    md: 'h-8 w-8', 
-    lg: 'h-12 w-12'
+    sm: variant === 'full' ? 'h-6' : 'h-6 w-6',
+    md: variant === 'full' ? 'h-8' : 'h-8 w-8',
+    lg: variant === 'full' ? 'h-12' : 'h-12 w-12'
   };
 
   const textSizeClasses = {
     sm: 'text-xs',
     md: 'text-sm',
     lg: 'text-lg'
+  };
+
+  const logoSources = {
+    icon: '/logo-icon.png',
+    full: '/logo-full.png',
+    white: '/logo-white.png'
   };
 
   if (imageError) {
@@ -31,9 +38,9 @@ export function Logo({ className = '', size = 'md' }: LogoProps) {
 
   return (
     <img 
-      src="/logo-x.png" 
+      src={logoSources[variant]} 
       alt="HybridX Logo" 
-      className={`${sizeClasses[size]} ${className}`}
+      className={`${sizeClasses[size]} object-contain ${className}`}
       onError={(e) => {
         console.error('Logo failed to load, switching to fallback');
         setImageError(true);
