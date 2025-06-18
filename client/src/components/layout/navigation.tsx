@@ -1,6 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { Logo } from "@/components/Logo";
 import { 
   Home, 
   Calendar, 
@@ -38,15 +39,7 @@ export function Navigation({ onLogout }: NavigationProps) {
     <nav className="bg-background border-r border-border h-full flex flex-col">
       <div className="p-6 border-b border-border">
         <div className="flex flex-col items-center">
-          <img 
-            src="/logo-x.png" 
-            alt="HybridX Logo" 
-            className="h-12 w-12"
-            onError={(e) => {
-              console.error('Logo failed to load:', e);
-              e.currentTarget.style.display = 'none';
-            }}
-          />
+          <Logo size="lg" />
         </div>
       </div>
 
