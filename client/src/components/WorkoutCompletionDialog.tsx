@@ -67,7 +67,7 @@ export function WorkoutCompletionDialog({ isOpen, onClose, workout, onComplete }
         title: "Workout Completed!",
         description: "Great job finishing your workout.",
       });
-      
+
       // Check if user wants to share to Strava BEFORE calling onComplete
       if (stravaStatus?.connected) {
         setStravaNote(notes || `Completed ${workout.name} - HybridX Training`);
@@ -124,9 +124,9 @@ export function WorkoutCompletionDialog({ isOpen, onClose, workout, onComplete }
     onError: (error: any) => {
       console.error("Strava share error:", error);
       console.error("Error details:", JSON.stringify(error, null, 2));
-      
+
       let errorMessage = "Failed to share workout to Strava";
-      
+
       if (error.needsAuth) {
         errorMessage = error.message || "Please connect your Strava account first";
         toast({
@@ -213,7 +213,9 @@ export function WorkoutCompletionDialog({ isOpen, onClose, workout, onComplete }
               Share to Strava
             </DialogTitle>
             <DialogDescription>
-              Share your completed workout to Strava with a custom note and image
+              <p className="text-sm text-muted-foreground mb-4">
+            Share your workout achievement to Strava and let your network see your training progress!
+          </p>
             </DialogDescription>
           </DialogHeader>
 
@@ -292,7 +294,7 @@ export function WorkoutCompletionDialog({ isOpen, onClose, workout, onComplete }
               <span className="text-sm text-orange-700">Strava connected - option to share after completion</span>
             </div>
           )}
-          
+
           <div>
             <Label>Rating (1-10)</Label>
             <div className="flex gap-1 mt-2">

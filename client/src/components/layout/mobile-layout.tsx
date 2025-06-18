@@ -8,11 +8,13 @@ export function MobileLayout({ children }: MobileLayoutProps) {
   return (
     <div className="fixed inset-0 flex flex-col bg-background">
       {/* Mobile Header - Fixed */}
-      <header className="fixed top-0 left-0 right-0 z-50 h-14 bg-white/95 backdrop-blur-sm border-b border-gray-200 shadow-sm">
-        <div className="flex h-full items-center justify-between px-4">
-          <div className="flex items-center gap-2">
-            <h1 className="text-lg font-bold text-yellow-500">HybridX</h1>
-          </div>
+      <header className="bg-white/95 backdrop-blur-sm border-b border-gray-200 shadow-sm sticky top-0 z-50">
+        <div className="flex items-center justify-between px-4 h-14">
+          <img 
+            src="/logo-x.png" 
+            alt="HybridX Logo" 
+            className="h-8 w-8"
+          />
         </div>
       </header>
 
