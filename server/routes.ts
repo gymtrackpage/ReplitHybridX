@@ -884,8 +884,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ success: true });
     } catch (error) {
-      console<replit_final_file>
-.error("Error completing workout:", error);
+      console.error("Error completing workout:", error);
       res.status(500).json({ message: "Failed to complete workout" });
     }
   });
@@ -932,7 +931,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const completions = await storage.getUserWorkoutCompletions(userId);
       
       // Calculate workout schedule based on start date and program structure
-      const startDate = new Date(userProgress.startDate);
+      const startDate = userProgress.startDate ? new Date(userProgress.startDate) : new Date();
       const workoutCalendar = [];
 
       for (const workout of programWorkouts) {
@@ -944,7 +943,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const workoutMonthYear = workoutDate.toISOString().substring(0, 7); // YYYY-MM
         if (workoutMonthYear === monthYear) {
           // Check completion status
-          const completion = completions.find(c => c.workoutId === workout.id);
+          const completion = completions.find((c: any) => c.workoutId === workout.id);
           let status = 'upcoming';
           
           if (completion) {
@@ -960,8 +959,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               id: workout.id,
               name: workout.name,
               description: workout.description,
-              estimatedDuration: workout.duration,
-              workoutType: workout.workoutType || 'training',
+              estimatedDuration: workout.estimatedDuration || 60,
+              workoutType: 'training',
               week: workout.week,
               day: workout.day,
               exercises: workout.exercises || [],
