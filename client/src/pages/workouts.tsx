@@ -570,48 +570,151 @@ export default function Workouts() {
                     <div className="space-y-3">
                       {workoutDetailsData.exercises.map((exercise: any, index: number) => (
                         <div key={index} className="bg-white border rounded-lg p-4">
-                          <div className="font-medium text-base mb-2">{exercise.name}</div>
-                          <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                            {exercise.sets && exercise.reps && (
-                              <div className="flex items-center gap-1">
-                                <span className="font-medium">Sets:</span>
-                                <span>{exercise.sets} × {exercise.reps}</span>
+                          <div className="font-medium text-base mb-2 flex items-center justify-between">
+                            <span>{exercise.name || `Exercise ${index + 1}`}</span>
+                            {exercise.type && (
+                              <Badge variant="outline" className="text-xs">
+                                {exercise.type}
+                              </Badge>
+                            )}
+                          </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                            {exercise.sets && (
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-gray-700 min-w-[60px]">Sets:</span>
+                                <span className="bg-blue-50 text-blue-800 px-2 py-1 rounded text-xs">
+                                  {exercise.sets}
+                                </span>
                               </div>
                             )}
-                            {exercise.sets && exercise.duration && !exercise.reps && (
-                              <div className="flex items-center gap-1">
-                                <span className="font-medium">Sets:</span>
-                                <span>{exercise.sets} × {exercise.duration}</span>
+                            
+                            {exercise.reps && (
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-gray-700 min-w-[60px]">Reps:</span>
+                                <span className="bg-green-50 text-green-800 px-2 py-1 rounded text-xs">
+                                  {exercise.reps}
+                                </span>
                               </div>
                             )}
-                            {exercise.duration && !exercise.sets && (
-                              <div className="flex items-center gap-1">
-                                <span className="font-medium">Duration:</span>
-                                <span>{exercise.duration}</span>
+                            
+                            {exercise.duration && (
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-gray-700 min-w-[60px]">Duration:</span>
+                                <span className="bg-purple-50 text-purple-800 px-2 py-1 rounded text-xs">
+                                  {exercise.duration}
+                                </span>
                               </div>
                             )}
+                            
                             {exercise.weight && (
-                              <div className="flex items-center gap-1">
-                                <span className="font-medium">Weight:</span>
-                                <span>{exercise.weight}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-gray-700 min-w-[60px]">Weight:</span>
+                                <span className="bg-red-50 text-red-800 px-2 py-1 rounded text-xs">
+                                  {exercise.weight}
+                                </span>
                               </div>
                             )}
+                            
                             {exercise.distance && (
-                              <div className="flex items-center gap-1">
-                                <span className="font-medium">Distance:</span>
-                                <span>{exercise.distance}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-gray-700 min-w-[60px]">Distance:</span>
+                                <span className="bg-yellow-50 text-yellow-800 px-2 py-1 rounded text-xs">
+                                  {exercise.distance}
+                                </span>
                               </div>
                             )}
+                            
                             {exercise.rest && (
-                              <div className="flex items-center gap-1">
-                                <span className="font-medium">Rest:</span>
-                                <span>{exercise.rest}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-gray-700 min-w-[60px]">Rest:</span>
+                                <span className="bg-gray-50 text-gray-800 px-2 py-1 rounded text-xs">
+                                  {exercise.rest}
+                                </span>
+                              </div>
+                            )}
+                            
+                            {exercise.tempo && (
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-gray-700 min-w-[60px]">Tempo:</span>
+                                <span className="bg-indigo-50 text-indigo-800 px-2 py-1 rounded text-xs">
+                                  {exercise.tempo}
+                                </span>
+                              </div>
+                            )}
+                            
+                            {exercise.intensity && (
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-gray-700 min-w-[60px]">Intensity:</span>
+                                <span className="bg-orange-50 text-orange-800 px-2 py-1 rounded text-xs">
+                                  {exercise.intensity}
+                                </span>
+                              </div>
+                            )}
+                            
+                            {exercise.equipment && (
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-gray-700 min-w-[60px]">Equipment:</span>
+                                <span className="bg-teal-50 text-teal-800 px-2 py-1 rounded text-xs">
+                                  {exercise.equipment}
+                                </span>
+                              </div>
+                            )}
+                            
+                            {exercise.target && (
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-gray-700 min-w-[60px]">Target:</span>
+                                <span className="bg-pink-50 text-pink-800 px-2 py-1 rounded text-xs">
+                                  {exercise.target}
+                                </span>
                               </div>
                             )}
                           </div>
+                          
+                          {/* Exercise Notes/Instructions */}
+                          {exercise.instructions && (
+                            <div className="mt-3">
+                              <span className="font-medium text-gray-700 text-sm">Instructions:</span>
+                              <div className="mt-1 text-sm text-gray-600 bg-blue-50 p-3 rounded border-l-4 border-blue-200">
+                                {exercise.instructions}
+                              </div>
+                            </div>
+                          )}
+                          
                           {exercise.description && (
-                            <div className="mt-2 text-sm text-gray-600 bg-gray-50 p-2 rounded">
-                              {exercise.description}
+                            <div className="mt-3">
+                              <span className="font-medium text-gray-700 text-sm">Description:</span>
+                              <div className="mt-1 text-sm text-gray-600 bg-gray-50 p-3 rounded border-l-4 border-gray-200">
+                                {exercise.description}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {exercise.notes && (
+                            <div className="mt-3">
+                              <span className="font-medium text-gray-700 text-sm">Notes:</span>
+                              <div className="mt-1 text-sm text-gray-600 bg-yellow-50 p-3 rounded border-l-4 border-yellow-200">
+                                {exercise.notes}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Show any additional fields that might exist */}
+                          {Object.keys(exercise).filter(key => 
+                            !['name', 'type', 'sets', 'reps', 'duration', 'weight', 'distance', 'rest', 'tempo', 'intensity', 'equipment', 'target', 'instructions', 'description', 'notes'].includes(key)
+                          ).length > 0 && (
+                            <div className="mt-3">
+                              <span className="font-medium text-gray-700 text-sm">Additional Info:</span>
+                              <div className="mt-1 text-xs text-gray-500 bg-slate-50 p-2 rounded font-mono">
+                                {Object.entries(exercise).filter(([key]) => 
+                                  !['name', 'type', 'sets', 'reps', 'duration', 'weight', 'distance', 'rest', 'tempo', 'intensity', 'equipment', 'target', 'instructions', 'description', 'notes'].includes(key)
+                                ).map(([key, value]) => (
+                                  <div key={key} className="flex gap-2">
+                                    <span className="font-semibold">{key}:</span>
+                                    <span>{typeof value === 'object' ? JSON.stringify(value) : String(value)}</span>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
                           )}
                         </div>
