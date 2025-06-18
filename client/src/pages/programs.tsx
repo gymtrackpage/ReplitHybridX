@@ -11,6 +11,8 @@ import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { SubscriptionGate } from "@/components/subscription/SubscriptionGate";
+import { usePremiumAccess } from "@/hooks/useSubscription";
 import { Trophy, Clock, Target, Users, Calendar } from "lucide-react";
 
 export default function Programs() {
