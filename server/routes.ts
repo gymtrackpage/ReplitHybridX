@@ -909,6 +909,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Workout calendar - get workouts for a specific month
+  app.get('/api/workout-calendar', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const monthYear = req.query.queryKey ? req.query.queryKey.split(',')[1] : req.query.month;
+      
+      if (!monthYear) {
+        return res.status(400).json({ message: "Month parameter required (YYYY-MM format)" });
+      }
+
+      // Get user's current program and progress
+      const userProgress = await storage.getUserProgress(userId);
+      if (!userProgress || !userProgress.programId) {
+        return res.json({ workouts: [] });
+      }
+
+      // Get all workouts for the user's current program
+      const programWorkouts = await storage.getProgramWorkouts(userProgress.programId);
+      
+      // Get user's workout completions
+      const completions = await storage.getUserWorkoutCompletions(userId);
+      
+      // Calculate workout schedule based on start date and program structure
+      const startDate = new Date(userProgress.startDate);
+      const workoutCalendar = [];
+
+      for (const workout of programWorkouts) {
+        // Calculate the date for this workout based on week/day
+        const workoutDate = new Date(startDate);
+        workoutDate.setDate(startDate.getDate() + ((workout.week - 1) * 7) + (workout.day - 1));
+        
+        // Check if this workout date falls in the requested month
+        const workoutMonthYear = workoutDate.toISOString().substring(0, 7); // YYYY-MM
+        if (workoutMonthYear === monthYear) {
+          // Check completion status
+          const completion = completions.find(c => c.workoutId === workout.id);
+          let status = 'upcoming';
+          
+          if (completion) {
+            status = 'completed';
+          } else if (workoutDate < new Date()) {
+            status = 'missed';
+          }
+
+          workoutCalendar.push({
+            date: workoutDate.toISOString().split('T')[0],
+            status,
+            workout: {
+              id: workout.id,
+              name: workout.name,
+              description: workout.description,
+              estimatedDuration: workout.duration,
+              workoutType: workout.workoutType || 'training',
+              week: workout.week,
+              day: workout.day,
+              exercises: workout.exercises || [],
+              completedAt: completion?.completedAt,
+              comments: completion?.notes
+            }
+          });
+        }
+      }
+
+      res.json({ workouts: workoutCalendar });
+    } catch (error) {
+      console.error("Error fetching workout calendar:", error);
+      res.status(500).json({ message: "Failed to fetch workout calendar" });
+    }
+  });
+
   // Get program recommendation (without saving assessment)
   app.post('/api/get-program-recommendation', isAuthenticated, async (req: any, res) => {
     try {

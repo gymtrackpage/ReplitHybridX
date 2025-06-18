@@ -59,6 +59,7 @@ export interface IStorage {
 
   // Workout completion operations
   getWorkoutCompletions(userId: string): Promise<WorkoutCompletion[]>;
+  getUserWorkoutCompletions(userId: string): Promise<WorkoutCompletion[]>;
   getWeeklyCompletions(userId: string): Promise<WorkoutCompletion[]>;
   createWorkoutCompletion(completion: InsertWorkoutCompletion): Promise<WorkoutCompletion>;
 
@@ -467,6 +468,14 @@ export class DatabaseStorage implements IStorage {
           gte(workoutCompletions.completedAt, oneWeekAgo)
         )
       )
+      .orderBy(desc(workoutCompletions.completedAt));
+  }
+
+  async getUserWorkoutCompletions(userId: string): Promise<WorkoutCompletion[]> {
+    return await db
+      .select()
+      .from(workoutCompletions)
+      .where(eq(workoutCompletions.userId, userId))
       .orderBy(desc(workoutCompletions.completedAt));
   }
 
