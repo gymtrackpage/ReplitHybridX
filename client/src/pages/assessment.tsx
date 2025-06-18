@@ -547,7 +547,14 @@ export default function Assessment() {
         <Card className="mobile-card">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
-              <h1 className="text-lg font-bold">Initial Assessment</h1>
+              <div className="flex items-center gap-3">
+                <img 
+                  src="/logo-x.png" 
+                  alt="HybridX Logo" 
+                  className="h-8 w-8"
+                />
+                <h1 className="text-lg font-bold">Initial Assessment</h1>
+              </div>
               <Badge variant="secondary">
                 Step {currentStep + 1} of {assessmentSteps.length}
               </Badge>
