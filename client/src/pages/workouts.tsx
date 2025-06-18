@@ -15,16 +15,22 @@ import {
   Shuffle,
   Target,
   TrendingUp,
-  Calendar
+  Calendar,
+  X,
+  User,
+  MapPin
 } from "lucide-react";
 import { ShareToStravaButton } from "@/components/ShareToStravaButton";
 import { WorkoutCompletionDialog } from "@/components/WorkoutCompletionDialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export default function Workouts() {
   const { toast } = useToast();
   const [selectedWorkout, setSelectedWorkout] = useState<any>(null);
   const [showCompletionDialog, setShowCompletionDialog] = useState(false);
   const [workoutToComplete, setWorkoutToComplete] = useState<any>(null);
+  const [showWorkoutDetails, setShowWorkoutDetails] = useState(false);
+  const [workoutDetailsData, setWorkoutDetailsData] = useState<any>(null);
 
   const { data: todayWorkout, error: todayWorkoutError } = useQuery({
     queryKey: ["/api/today-workout"],
@@ -112,6 +118,11 @@ export default function Workouts() {
       case "skipped": return <SkipForward className="h-4 w-4 text-yellow-600" />;
       default: return <Play className="h-4 w-4 text-blue-600" />;
     }
+  };
+
+  const handleWorkoutClick = (workout: any) => {
+    setWorkoutDetailsData(workout);
+    setShowWorkoutDetails(true);
   };
 
   return (
@@ -320,7 +331,7 @@ export default function Workouts() {
                     <div 
                       key={workout.id}
                       className="flex justify-between items-start p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors"
-                      onClick={() => setSelectedWorkout(workout)}
+                      onClick={() => handleWorkoutClick(workout)}
                     >
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
@@ -386,7 +397,8 @@ export default function Workouts() {
                   return (
                     <div 
                       key={workout.id}
-                      className="flex justify-between items-start p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                      className="flex justify-between items-start p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors"
+                      onClick={() => handleWorkoutClick(workout)}
                     >
                       <div className="flex items-start gap-3 flex-1">
                         {getStatusIcon(workout.status)}
@@ -495,6 +507,185 @@ export default function Workouts() {
             setTimeout(() => setWorkoutToComplete(null), 100);
           }}
         />
+
+        {/* Workout Details Modal */}
+        <Dialog open={showWorkoutDetails} onOpenChange={setShowWorkoutDetails}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                {workoutDetailsData?.status && getStatusIcon(workoutDetailsData.status)}
+                <span>{workoutDetailsData?.name}</span>
+              </DialogTitle>
+            </DialogHeader>
+            
+            {workoutDetailsData && (
+              <div className="space-y-6">
+                {/* Workout Overview */}
+                <div className="flex flex-wrap gap-3">
+                  {workoutDetailsData.workoutType && (
+                    <Badge className={getWorkoutTypeColor(workoutDetailsData.workoutType)}>
+                      {workoutDetailsData.workoutType}
+                    </Badge>
+                  )}
+                  <Badge variant="outline" className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    {workoutDetailsData.estimatedDuration || workoutDetailsData.duration || 60} min
+                  </Badge>
+                  {workoutDetailsData.week && workoutDetailsData.day && (
+                    <Badge variant="outline" className="flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      Week {workoutDetailsData.week}, Day {workoutDetailsData.day}
+                    </Badge>
+                  )}
+                  {workoutDetailsData.status && (
+                    <Badge 
+                      className={`
+                        ${workoutDetailsData.status === "completed" ? "bg-green-100 text-green-800" : ""}
+                        ${workoutDetailsData.status === "skipped" ? "bg-yellow-100 text-yellow-800" : ""}
+                        ${workoutDetailsData.status === "upcoming" ? "bg-blue-100 text-blue-800" : ""}
+                      `}
+                    >
+                      {workoutDetailsData.status}
+                    </Badge>
+                  )}
+                </div>
+
+                {/* Description */}
+                {workoutDetailsData.description && (
+                  <div>
+                    <h3 className="font-semibold mb-2">Description</h3>
+                    <p className="text-sm text-muted-foreground bg-gray-50 p-3 rounded-lg">
+                      {workoutDetailsData.description}
+                    </p>
+                  </div>
+                )}
+
+                {/* Exercises */}
+                {workoutDetailsData.exercises && Array.isArray(workoutDetailsData.exercises) && workoutDetailsData.exercises.length > 0 && (
+                  <div>
+                    <h3 className="font-semibold mb-3 flex items-center gap-2">
+                      <Dumbbell className="h-4 w-4" />
+                      Exercises ({workoutDetailsData.exercises.length})
+                    </h3>
+                    <div className="space-y-3">
+                      {workoutDetailsData.exercises.map((exercise: any, index: number) => (
+                        <div key={index} className="bg-white border rounded-lg p-4">
+                          <div className="font-medium text-base mb-2">{exercise.name}</div>
+                          <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                            {exercise.sets && exercise.reps && (
+                              <div className="flex items-center gap-1">
+                                <span className="font-medium">Sets:</span>
+                                <span>{exercise.sets} × {exercise.reps}</span>
+                              </div>
+                            )}
+                            {exercise.sets && exercise.duration && !exercise.reps && (
+                              <div className="flex items-center gap-1">
+                                <span className="font-medium">Sets:</span>
+                                <span>{exercise.sets} × {exercise.duration}</span>
+                              </div>
+                            )}
+                            {exercise.duration && !exercise.sets && (
+                              <div className="flex items-center gap-1">
+                                <span className="font-medium">Duration:</span>
+                                <span>{exercise.duration}</span>
+                              </div>
+                            )}
+                            {exercise.weight && (
+                              <div className="flex items-center gap-1">
+                                <span className="font-medium">Weight:</span>
+                                <span>{exercise.weight}</span>
+                              </div>
+                            )}
+                            {exercise.distance && (
+                              <div className="flex items-center gap-1">
+                                <span className="font-medium">Distance:</span>
+                                <span>{exercise.distance}</span>
+                              </div>
+                            )}
+                            {exercise.rest && (
+                              <div className="flex items-center gap-1">
+                                <span className="font-medium">Rest:</span>
+                                <span>{exercise.rest}</span>
+                              </div>
+                            )}
+                          </div>
+                          {exercise.description && (
+                            <div className="mt-2 text-sm text-gray-600 bg-gray-50 p-2 rounded">
+                              {exercise.description}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Completion Details (for completed workouts) */}
+                {workoutDetailsData.status === "completed" && (
+                  <div className="space-y-4">
+                    {workoutDetailsData.completedAt && (
+                      <div>
+                        <h3 className="font-semibold mb-2">Completion Details</h3>
+                        <div className="text-sm text-muted-foreground space-y-1">
+                          <div>Completed: {new Date(workoutDetailsData.completedAt).toLocaleString()}</div>
+                          {workoutDetailsData.duration && (
+                            <div>Duration: {workoutDetailsData.duration} minutes</div>
+                          )}
+                          {workoutDetailsData.rating && workoutDetailsData.rating > 0 && (
+                            <div>Rating: {'★'.repeat(Math.max(0, Math.min(5, workoutDetailsData.rating)))}{'☆'.repeat(Math.max(0, 5 - Math.max(0, Math.min(5, workoutDetailsData.rating))))}</div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {workoutDetailsData.comments && (
+                      <div>
+                        <h3 className="font-semibold mb-2">Comments</h3>
+                        <p className="text-sm text-muted-foreground bg-gray-50 p-3 rounded-lg">
+                          {workoutDetailsData.comments}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Strava Share Button for completed workouts */}
+                    <div className="flex justify-center pt-2">
+                      <ShareToStravaButton 
+                        workoutId={workoutDetailsData.workoutId || workoutDetailsData.id}
+                        workoutName={workoutDetailsData.name}
+                        defaultDuration={workoutDetailsData.duration}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Action Buttons for upcoming workouts */}
+                {workoutDetailsData.status === "upcoming" && (
+                  <div className="flex gap-3 pt-4 border-t">
+                    <Button 
+                      className="flex-1"
+                      onClick={() => {
+                        setShowWorkoutDetails(false);
+                        // You can add logic here to start the workout
+                      }}
+                    >
+                      <Play className="h-4 w-4 mr-2" />
+                      Start Workout
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      onClick={() => {
+                        setShowWorkoutDetails(false);
+                        // You can add logic here to skip the workout
+                      }}
+                    >
+                      Skip
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </MobileLayout>
   );
