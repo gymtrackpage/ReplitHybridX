@@ -91,8 +91,9 @@ export function SubscriptionGate({
       </Card>
 
       <SubscriptionModal 
-        isOpen={showSubscriptionModal}
-        onClose={() => setShowSubscriptionModal(false)}
+        open={showSubscriptionModal}
+        onOpenChange={setShowSubscriptionModal}
+        feature={feature}
       />
     </div>
   );
@@ -117,8 +118,9 @@ export function PremiumBadge({ feature, className = "" }: { feature: string; cla
         Premium
       </Button>
       <SubscriptionModal 
-        isOpen={showModal}
-        onClose={() => setShowModal(false)}
+        open={showModal}
+        onOpenChange={setShowModal}
+        feature={feature}
       />
     </>
   );
