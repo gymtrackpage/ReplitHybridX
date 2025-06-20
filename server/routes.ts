@@ -2514,7 +2514,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log("✅ Strava activity created successfully with ID:", result.activityId);
         res.json({ 
           success: true, 
-          message: "Workout shared to Strava successfully!",
+          message: result.activityId ? 
+            "Workout shared to Strava successfully!" : 
+            "Workout shared to Strava successfully! (Image upload may still be processing)",
           activityId: result.activityId 
         });
       } else {
@@ -2534,10 +2536,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Handle specific Strava API errors
       if (error.response?.status === 409) {
         // Conflict - activity might already exist
-        res.status(409).json({ 
-          message: "This workout may have already been shared to Strava recently. Please wait a few minutes before trying again.",
-          success: false,
-          error: { message: "Duplicate activity detected" }
+        res.status(200).json({ 
+          success: true,
+          message: "Workout may have already been shared to Strava. Please check your Strava activities.",
+          warning: "Duplicate activity detected"
         });
         return;
       }

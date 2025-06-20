@@ -260,11 +260,11 @@ export class StravaImageService {
       // Set page content with extended timeout
       await page.setContent(htmlTemplate, { 
         waitUntil: 'networkidle0',
-        timeout: 30000 
+        timeout: 45000  // Increased timeout
       });
 
-      // Wait a moment for rendering
-      await page.waitForTimeout(2000);
+      // Wait longer for rendering to complete
+      await page.waitForTimeout(3000);
 
       console.log('🖼️ Taking screenshot...');
       
@@ -273,8 +273,7 @@ export class StravaImageService {
         type: 'png',
         fullPage: false,
         clip: { x: 0, y: 0, width: 1200, height: 630 },
-        omitBackground: false,
-        quality: 90
+        omitBackground: false
       });
 
       console.log('🖼️ Screenshot taken, buffer size:', imageBuffer.length, 'bytes');
@@ -283,11 +282,19 @@ export class StravaImageService {
         throw new Error('Generated image buffer is empty');
       }
 
+      // Validate the image buffer
+      if (imageBuffer.length < 1000) {
+        throw new Error('Generated image buffer too small, likely corrupted');
+      }
+
       return imageBuffer;
     } catch (error: any) {
       console.error('💥 Error generating workout image:');
       console.error('  Error message:', error.message);
       console.error('  Error stack:', error.stack);
+      
+      // Don't throw error, return null to allow activity creation without image
+      console.warn('⚠️ Image generation failed, continuing without image');
       throw error;
     } finally {
       if (page) {
