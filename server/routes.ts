@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import path from "path";
+import fs from "fs";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { StravaService } from "./stravaService";
@@ -2385,7 +2386,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       timestamp: new Date().toISOString(),
       dirname: import.meta.dirname,
       cwd: process.cwd(),
-      buildExists: require('fs').existsSync(path.resolve(import.meta.dirname, "..", "dist", "public")),
+      buildExists: fs.existsSync(path.resolve(import.meta.dirname, "..", "dist", "public")),
       staticPath: path.resolve(import.meta.dirname, "..", "dist", "public")
     });
   });
