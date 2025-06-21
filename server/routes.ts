@@ -2374,9 +2374,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/", (req, res) => {
-    res.send("Hello World");
-  });
+  
 
   app.get("/api/health", (req, res) => {
     res.json({
