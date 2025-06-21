@@ -474,7 +474,7 @@ export default function Assessment() {
                   </ul>
 
                   <Button 
-                    className="w-full bg-yellow-500 hover:bg-yellow-600 text-white"
+                    className="w-full"
                     onClick={handleSubscribe}
                     disabled={createSubscriptionMutation.isPending}
                   >
@@ -527,12 +527,22 @@ export default function Assessment() {
   const canProceed = () => {
     switch (currentStep) {
       case 0:
-        return assessmentData.hyroxEventsCompleted !== undefined && assessmentData.competitionFormat;
+        return assessmentData.hyroxEventsCompleted !== undefined && 
+               assessmentData.competitionFormat;
       case 1:
-        return assessmentData.generalFitnessYears && assessmentData.age && 
-               assessmentData.primaryTrainingBackground && assessmentData.weeklyTrainingDays;
+        return assessmentData.generalFitnessYears && 
+               assessmentData.generalFitnessYears > 0 &&
+               assessmentData.age && 
+               assessmentData.age >= 16 && 
+               assessmentData.age <= 100 &&
+               assessmentData.primaryTrainingBackground && 
+               assessmentData.weeklyTrainingDays && 
+               assessmentData.weeklyTrainingDays > 0 && 
+               assessmentData.weeklyTrainingDays <= 7;
       case 2:
-        return assessmentData.equipmentAccess && assessmentData.goals && assessmentData.goals.length > 0;
+        return assessmentData.equipmentAccess && 
+               assessmentData.goals && 
+               assessmentData.goals.length > 0;
       case 3:
         return recommendation !== null;
       default:
@@ -553,8 +563,8 @@ export default function Assessment() {
                   alt="HybridX Logo" 
                   className="h-8 w-8"
                   onError={(e) => {
-                    console.error('Logo failed to load:', e);
-                    e.currentTarget.style.display = 'none';
+                    console.error('Logo failed to load, trying fallback');
+                    e.currentTarget.src = '/icon-192.png';
                   }}
                 />
                 <h1 className="text-lg font-bold">Initial Assessment</h1>
@@ -591,7 +601,7 @@ export default function Assessment() {
             <Button 
               onClick={nextStep}
               disabled={!canProceed() || getRecommendationMutation.isPending}
-              className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white"
+              className="flex-1"
             >
               {currentStep === 2 ? (
                 getRecommendationMutation.isPending ? "Analyzing..." : "Get Recommendation"

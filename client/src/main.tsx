@@ -22,12 +22,19 @@ if ('serviceWorker' in navigator) {
             newWorker.addEventListener('statechange', () => {
               if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
                 // New content available, prompt user to refresh
-                if (confirm('New version available! Reload to update?')) {
+                const updateMessage = 'A new version of HybridX is available! Would you like to update now?';
+                if (confirm(updateMessage)) {
+                  newWorker.postMessage({ type: 'SKIP_WAITING' });
                   window.location.reload();
                 }
               }
             });
           }
+        });
+        
+        // Listen for service worker updates
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          window.location.reload();
         });
       })
       .catch((registrationError) => {

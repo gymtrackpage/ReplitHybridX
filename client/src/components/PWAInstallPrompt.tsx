@@ -23,11 +23,21 @@ export function PWAInstallPrompt() {
       setDeferredPrompt(promptEvent);
       
       // Check if user has previously dismissed the prompt
-      const hasPromptBeenDismissed = localStorage.getItem('pwa-install-dismissed');
-      const lastDismissed = localStorage.getItem('pwa-install-dismissed-date');
-      
-      // Show prompt if never dismissed or if it's been more than 7 days since last dismissal
-      if (!hasPromptBeenDismissed || (lastDismissed && Date.now() - parseInt(lastDismissed) > 7 * 24 * 60 * 60 * 1000)) {
+      try {
+        const hasPromptBeenDismissed = localStorage.getItem('pwa-install-dismissed');
+        const lastDismissed = localStorage.getItem('pwa-install-dismissed-date');
+        
+        // Show prompt if never dismissed or if it's been more than 7 days since last dismissal
+        const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
+        const shouldShow = !hasPromptBeenDismissed || 
+          (lastDismissed && parseInt(lastDismissed) < sevenDaysAgo);
+        
+        if (shouldShow) {
+          setShowInstallPrompt(true);
+        }
+      } catch (error) {
+        console.error('Error checking PWA install prompt status:', error);
+        // Default to showing prompt if localStorage fails
         setShowInstallPrompt(true);
       }
     };
@@ -62,6 +72,8 @@ export function PWAInstallPrompt() {
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
+      // Clear any pending timeouts or intervals if they exist
+      setDeferredPrompt(null);
     };
   }, []);
 
