@@ -69,8 +69,17 @@ app.use((req, res, next) => {
       console.log("✅ Vite development server ready");
     } else {
       console.log("📦 Setting up static file serving...");
-      serveStatic(app);
-      console.log("✅ Static files ready");
+      console.log("🔍 Environment:", process.env.NODE_ENV);
+      console.log("🔍 App env:", app.get("env"));
+      console.log("🔍 Current directory:", process.cwd());
+      console.log("🔍 Server dirname:", import.meta.dirname);
+      try {
+        serveStatic(app);
+        console.log("✅ Static files ready");
+      } catch (error) {
+        console.error("❌ Static file setup failed:", error);
+        throw error;
+      }
     }
 
     // Use PORT environment variable or default to 5000
