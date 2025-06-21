@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -82,36 +82,87 @@ export default function Profile() {
 
   const connectStravaMutation = useMutation({
     mutationFn: async () => {
-      console.log("Profile: Requesting Strava connection...");
-      const response = await apiRequest('GET', '/api/strava/connect');
-      return await response.json();
+      const response = await apiRequest("POST", "/api/strava/connect");
+      return response;
     },
-    onSuccess: (data) => {
-      console.log("Profile: Strava connect response:", data);
+    onSuccess: (data: any) => {
       if (data.authUrl) {
-        console.log("Profile: Opening Strava auth URL:", data.authUrl);
-        window.open(data.authUrl, '_blank', 'width=600,height=700');
-        toast({
-          title: "Redirecting to Strava",
-          description: "Please complete the authorization in the new window.",
-        });
-      } else if (!data.configured) {
-        toast({
-          title: "Configuration Required",
-          description: "Strava integration is not configured. Please contact admin.",
-          variant: "destructive",
-        });
+        window.location.href = data.authUrl;
       }
     },
-    onError: (error: any) => {
-      console.error("Profile: Strava connect error:", error);
+    onError: () => {
       toast({
         title: "Error",
-        description: error.message || "Failed to connect to Strava",
+        description: "Failed to connect to Strava. Please try again.",
         variant: "destructive",
       });
     },
   });
+
+  const saveStravaTokensMutation = useMutation({
+    mutationFn: async (tokens: any) => {
+      return await apiRequest("POST", "/api/strava/save-tokens", { tokens });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/strava/status"] });
+      toast({
+        title: "Success",
+        description: "Strava account connected successfully!",
+      });
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to save Strava connection. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Handle Strava OAuth callback
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const stravaTokens = urlParams.get('strava_tokens');
+    const stravaError = urlParams.get('strava_error');
+
+    if (stravaError) {
+      let errorMessage = "Failed to connect to Strava";
+      switch (stravaError) {
+        case 'access_denied':
+          errorMessage = "Strava access was denied";
+          break;
+        case 'no_code':
+          errorMessage = "No authorization code received from Strava";
+          break;
+        case 'callback_failed':
+          errorMessage = "Strava callback failed";
+          break;
+      }
+      toast({
+        title: "Strava Connection Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (stravaTokens) {
+      try {
+        const tokens = JSON.parse(decodeURIComponent(stravaTokens));
+        saveStravaTokensMutation.mutate(tokens);
+      } catch (error) {
+        console.error('Error parsing Strava tokens:', error);
+        toast({
+          title: "Error",
+          description: "Invalid Strava token data received",
+          variant: "destructive",
+        });
+        // Clean up URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    }
+  }, [saveStravaTokensMutation, toast]);
 
   if (isLoading) {
     return (

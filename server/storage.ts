@@ -205,14 +205,14 @@ export class DatabaseStorage implements IStorage {
 
   async updateWorkout(workoutId: number, updateData: any): Promise<any> {
     console.log("Storage: Updating workout", workoutId, "with data:", updateData);
-    
+
     try {
       // Verify workout exists first
       const existingWorkout = await this.getWorkout(workoutId);
       if (!existingWorkout) {
         throw new Error("Workout not found");
       }
-      
+
       // Prepare the update object
       const updateObject: any = {
         updatedAt: new Date()
@@ -220,7 +220,7 @@ export class DatabaseStorage implements IStorage {
 
       // Only include fields that are actually provided and valid
       const validFields = ['name', 'description', 'week', 'day', 'duration', 'workoutType', 'exercises', 'estimatedDuration'];
-      
+
       for (const field of validFields) {
         if (updateData[field] !== undefined && updateData[field] !== null) {
           updateObject[field] = updateData[field];
@@ -577,6 +577,18 @@ export class DatabaseStorage implements IStorage {
     );
 
     return result;
+  }
+
+  async updateUser(userId: string, updates: any): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({
+        ...updates,
+        updatedAt: new Date()
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    return user;
   }
 
   // Additional methods needed by routes

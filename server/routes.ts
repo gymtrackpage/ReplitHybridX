@@ -1093,8 +1093,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-
-
   // Weight tracking
   app.post('/api/weight', isAuthenticated, async (req: any, res) => {
     try {
@@ -2307,267 +2305,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Share workout to Strava with image
-  app.post('/api/share-to-strava', isAuthenticated, async (req: any, res) => {
+  // Strava connection status
+  app.get('/api/strava/status', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { workoutId, duration, notes } = req.body;
-
-      // Get user's Strava connection status
       const user = await storage.getUser(userId);
-      if (!user?.stravaConnected || !user.stravaAccessToken) {
-        return res.status(400).json({ 
-          message: "Please connect your Strava account first",
-          needsAuth: true 
-        });
-      }
-
-      // Get workout details
-      const workout = await storage.getWorkout(workoutId);
-      if (!workout) {
-        return res.status(404).json({ message: "Workout not found" });
-      }
-
-      // Generate workout image
-      let imageBuffer;
-      try {
-        imageBuffer = await StravaImageService.generateWorkoutImage(
-          workout.name, 
-          workout.exercises as any[]
-        );
-      } catch (imageError) {
-        console.error('Image generation failed:', imageError);
-        // Continue without image if generation fails
-      }
-
-      // Prepare workout data for Strava
-      const workoutData = {
-        name: workout.name,
-        description: notes || `HybridX Training Session\n\n${workout.description || ''}`,
-        duration: duration || (workout.estimatedDuration || 60) * 60,
-        type: 'workout' as const,
-        start_date_local: new Date().toISOString()
-      };
-
-      // Push to Strava
-      const result = await StravaService.pushWorkoutToStrava(
-        userId, 
-        workoutData, 
-        imageBuffer
-      );
-
-      if (result.success) {
-        res.json({ 
-          success: true, 
-          message: "Workout shared to Strava successfully!",
-          activityId: result.activityId 
-        });
-      } else {
-        res.status(500).json({ 
-          message: "Failed to share workout to Strava" 
-        });
-      }
-    } catch (error) {
-      console.error("Error sharing to Strava:", error);
-      res.status(500).json({ 
-        message: "Failed to share workout to Strava" 
-      });
-    }
-  });
-
-  
-
-  app.get("/api/health", (req, res) => {
-    res.json({
-      status: "ok",
-      environment: process.env.NODE_ENV || "unknown",
-      appEnv: app.get("env"),
-      timestamp: new Date().toISOString(),
-      dirname: import.meta.dirname,
-      cwd: process.cwd(),
-      buildExists: fs.existsSync(path.resolve(import.meta.dirname, "..", "dist", "public")),
-      staticPath: path.resolve(import.meta.dirname, "..", "dist", "public")
-    });
-  });
-
-  // ===== ADMIN ENDPOINTS =====
-  // Admin: Get system statistics
-  app.get('/api/admin/stats', isAuthenticated, requireAdmin, async (req: any, res) => {
-    try {
-      const [totalUsers, activeSubscriptions, totalPrograms, totalWorkouts] = await Promise.all([
-        storage.getTotalUsers(),
-        storage.getActiveSubscriptions(),
-        storage.getTotalPrograms(),
-        storage.getTotalWorkouts()
-      ]);
 
       res.json({
-        totalUsers,
-        activeSubscriptions,
-        totalPrograms,
-        totalWorkouts
+        connected: user?.stravaConnected || false,
+        athleteId: user?.stravaUserId || null
       });
     } catch (error) {
-      console.error("Error fetching admin stats:", error);
-      res.status(500).json({ message: "Failed to fetch statistics" });
+      console.error("Error getting Strava status:", error);
+      res.status(500).json({ message: "Failed to get Strava status" });
     }
   });
 
-  // Admin: Get all users
-  app.get('/api/admin/users', isAuthenticated, requireAdmin, async (req: any, res) => {
+  // Connect to Strava - initiate OAuth flow
+  app.post('/api/strava/connect', isAuthenticated, async (req: any, res) => {
     try {
-      const users = await storage.getAllUsers();
-      res.json(users);
+      const authUrl = StravaService.getAuthorizationUrl();
+      res.json({ authUrl });
     } catch (error) {
-      console.error("Error fetching users:", error);
-      res.status(500).json({ message: "Failed to fetch users" });
+      console.error("Error initiating Strava connection:", error);
+      res.status(500).json({ message: "Failed to initiate Strava connection" });
     }
   });
 
-  // Admin: Update user
-  app.put('/api/admin/users/:userId', isAuthenticated, requireAdmin, async (req: any, res) => {
+  // Strava OAuth callback
+  app.get('/api/strava/callback', async (req, res) => {
     try {
-      const { userId } = req.params;
-      const updateData = req.body;
+      const { code, error, state } = req.query;
 
-      await storage.updateUserAdmin(userId, updateData);
-      res.json({ message: "User updated successfully" });
-    } catch (error) {
-      console.error("Error updating user:", error);
-      res.status(500).json({ message: "Failed to update user" });
-    }
-  });
-
-  // Admin: Delete user
-  app.delete('/api/admin/users/:userId', isAuthenticated, requireAdmin, async (req: any, res) => {
-    try {
-      const { userId } = req.params;
-      await storage.deleteUser(userId);
-      res.json({ message: "User deleted successfully" });
-    } catch (error) {
-      console.error("Error deleting user:", error);
-      res.status(500).json({ message: "Failed to delete user" });
-    }
-  });
-
-  // Admin: Get all programs with workout count
-  app.get('/api/admin/programs', isAuthenticated, requireAdmin, async (req: any, res) => {
-    try {
-      const programs = await storage.getAllProgramsWithWorkoutCount();
-      res.json(programs);
-    } catch (error) {
-      console.error("Error fetching programs:", error);
-      res.status(500).json({ message: "Failed to fetch programs" });
-    }
-  });
-
-  // Admin: Update program
-  app.put('/api/admin/programs/:programId', isAuthenticated, requireAdmin, async (req: any, res) => {
-    try {
-      const { programId } = req.params;
-      const updateData = req.body;
-
-      await storage.updateProgram(parseInt(programId), updateData);
-      res.json({ message: "Program updated successfully" });
-    } catch (error) {
-      console.error("Error updating program:", error);
-      res.status(500).json({ message: "Failed to update program" });
-    }
-  });
-
-  // Admin: Delete program
-  app.delete('/api/admin/programs/:programId', isAuthenticated, requireAdmin, async (req: any, res) => {
-    try {
-      const { programId } = req.params;
-      await storage.deleteProgram(parseInt(programId));
-      res.json({ message: "Program deleted successfully" });
-    } catch (error) {
-      console.error("Error deleting program:", error);
-      res.status(500).json({ message: "Failed to delete program" });
-    }
-  });
-
-  // Admin: Get program workouts
-  app.get('/api/admin/programs/:id/workouts', isAuthenticated, requireAdmin, async (req, res) => {
-    try {
-      const programId = parseInt(req.params.id);
-      console.log("Fetching workouts for program ID:", programId);
-
-      if (isNaN(programId)) {
-        return res.status(400).json({ message: "Invalid program ID" });
+      if (error) {
+        console.error('Strava OAuth error:', error);
+        return res.redirect('/profile?strava_error=access_denied');
       }
 
-      const workouts = await storage.getWorkoutsByProgram(programId);
-      console.log("Raw workouts result:", workouts);
-      console.log("Found workouts:", Array.isArray(workouts) ? workouts.length : 'Not an array', "workouts for program", programId);
+      if (!code) {
+        console.error('No authorization code received from Strava');
+        return res.redirect('/profile?strava_error=no_code');
+      }
 
-      // Ensure we always return an array, and sort by week/day
-      const workoutArray = Array.isArray(workouts) ? workouts : [];
-      const sortedWorkouts = workoutArray.sort((a, b) => {
-        if (a.week !== b.week) return a.week - b.week;
-        return a.day - b.day;
+      // Exchange code for tokens
+      const tokens = await StravaService.exchangeCodeForTokens(code as string);
+      console.log('Received Strava tokens for athlete:', tokens.athlete.id);
+
+      // For now, we'll store the userId in a simple way
+      // In production, you'd want to use the state parameter to maintain user session
+      // This is a simplified approach - you might need to adjust based on your auth flow
+
+      // Since we don't have the user session in this callback, we'll need to handle this differently
+      // Let's redirect to a page that can handle the token exchange
+      const tokenData = encodeURIComponent(JSON.stringify(tokens));
+      res.redirect(`/profile?strava_tokens=${tokenData}`);
+
+    } catch (error) {
+      console.error('Strava callback error:', error);
+      res.redirect('/profile?strava_error=callback_failed');
+    }
+  });
+
+  // Save Strava tokens (called from frontend after callback)
+  app.post('/api/strava/save-tokens', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { tokens } = req.body;
+
+      if (!tokens || !tokens.access_token) {
+        return res.status(400).json({ message: "Invalid tokens provided" });
+      }
+
+      // Update user with Strava tokens
+      await storage.updateUser(userId, {
+        stravaUserId: tokens.athlete.id.toString(),
+        stravaAccessToken: tokens.access_token,
+        stravaRefreshToken: tokens.refresh_token,
+        stravaTokenExpiry: new Date(tokens.expires_at * 1000),
+        stravaConnected: true,
       });
-
-      res.json(sortedWorkouts);
-    } catch (error) {
-      console.error("Error fetching program workouts:", error);
-      res.status(500).json({ message: "Failed to fetch workouts" });
-    }
-  });
-
-  app.delete('/api/admin/workouts/:id', requireAdmin, async (req, res) => {
-    try {
-      const workoutId = parseInt(req.params.id);
-      if (isNaN(workoutId)) {
-        return res.status(400).json({ message: "Invalid workout ID" });
-      }
-
-      await storage.deleteWorkout(workoutId);
-      res.json({ message: "Workout deleted successfully" });
-    } catch (error) {
-      console.error("Error deleting workout:", error);
-      res.status(500).json({ message: "Failed to delete workout" });
-    }
-  });
-
-  app.post('/api/admin/users/:id/admin', requireAdmin, async (req: any, res) => {
-    try {
-      const userId = req.params.id;
-      const { isAdmin } = req.body;
-      const user = await storage.updateUserAdmin(userId, isAdmin);
-      res.json(user);
-    } catch (error) {
-      console.error("Error updating user admin status:", error);
-      res.status(500).json({ message: "Failed to update user admin status" });
-    }
-  });
-
-  // Admin: Upload program from CSV
-  app.post('/api/admin/upload-program', isAuthenticated, requireAdmin, upload.single('file'), async (req: any, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ message: "No file uploaded" });
-      }
-
-      const programData = {
-        name: req.body.name,
-        description: req.body.description,
-        difficulty: req.body.difficulty,
-        category: req.body.category,
-        duration: parseInt(req.body.duration) || 12,
-        frequency: parseInt(req.body.frequency) || 4
-      };
-
-      const { handleCSVUpload } = await import('./csvUploadHandler');
-      const result = await handleCSVUpload(req.file.buffer, req.file.originalname, programData);
 
       res.json({ 
-        message: `Program created successfully with ${result.workoutCount} workouts`,
-        programId: result.programId,
-        workoutCount: result.workoutCount
+        success: true,
+        message: "Strava account connected successfully!"
       });
     } catch (error) {
-      console.error("Error uploading program:", error);
-      res.status(500).json({ message: error instanceof Error ? error.message : "Failed to upload program" });
+      console.error("Error saving Strava tokens:", error);
+      res.status(500).json({ message: "Failed to save Strava tokens" });
+    }
+  });
+
+  // Disconnect Strava
+  app.post('/api/strava/disconnect', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      await StravaService.disconnectStrava(userId);
+      res.json({ success: true, message: "Strava account disconnected" });
+    } catch (error) {
+      console.error("Error disconnecting Strava:", error);
+      res.status(500).json({ message: "Failed to disconnect Strava" });
     }
   });
 
