@@ -68,11 +68,26 @@ export async function setupVite(app: Express, server: Server) {
 }
 
 export function serveStatic(app: Express) {
-  const distPath = path.resolve(import.meta.dirname, "public");
+  // Try multiple possible build output directories
+  const possiblePaths = [
+    path.resolve(import.meta.dirname, "..", "dist", "public"),
+    path.resolve(import.meta.dirname, "public"),
+    path.resolve(import.meta.dirname, "..", "client", "dist")
+  ];
 
-  if (!fs.existsSync(distPath)) {
+  let distPath = null;
+  for (const testPath of possiblePaths) {
+    if (fs.existsSync(testPath)) {
+      distPath = testPath;
+      console.log(`✅ Found static files at: ${distPath}`);
+      break;
+    }
+  }
+
+  if (!distPath) {
+    const checkedPaths = possiblePaths.map(p => `  - ${p}`).join('\n');
     throw new Error(
-      `Could not find the build directory: ${distPath}, make sure to build the client first`,
+      `Could not find the build directory. Checked:\n${checkedPaths}\n\nMake sure to build the client first with: npm run build`,
     );
   }
 
