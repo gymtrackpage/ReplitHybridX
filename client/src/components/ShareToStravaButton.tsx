@@ -45,7 +45,7 @@ export function ShareToStravaButton({
         duration: duration * 60, // Convert to seconds
         notes
       });
-      return await response.json();
+      return response;
     },
     onSuccess: (data) => {
       toast({
@@ -76,7 +76,7 @@ export function ShareToStravaButton({
     mutationFn: async () => {
       console.log("Requesting Strava connection...");
       const response = await apiRequest('GET', '/api/strava/connect');
-      return await response.json();
+      return response;
     },
     onSuccess: (data) => {
       console.log("Strava connect response:", data);
