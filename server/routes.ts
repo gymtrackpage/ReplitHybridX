@@ -913,7 +913,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const monthYear = req.query.queryKey ? req.query.queryKey.split(',')[1] : req.query.month;
-      
+
       if (!monthYear) {
         return res.status(400).json({ message: "Month parameter required (YYYY-MM format)" });
       }
@@ -926,10 +926,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get all workouts for the user's current program
       const programWorkouts = await storage.getProgramWorkouts(userProgress.programId);
-      
+
       // Get user's workout completions
       const completions = await storage.getUserWorkoutCompletions(userId);
-      
+
       // Calculate workout schedule based on start date and program structure
       const startDate = userProgress.startDate ? new Date(userProgress.startDate) : new Date();
       const workoutCalendar = [];
@@ -938,14 +938,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Calculate the date for this workout based on week/day
         const workoutDate = new Date(startDate);
         workoutDate.setDate(startDate.getDate() + ((workout.week - 1) * 7) + (workout.day - 1));
-        
+
         // Check if this workout date falls in the requested month
         const workoutMonthYear = workoutDate.toISOString().substring(0, 7); // YYYY-MM
         if (workoutMonthYear === monthYear) {
           // Check completion status
           const completion = completions.find((c: any) => c.workoutId === workout.id);
           let status = 'upcoming';
-          
+
           if (completion) {
             status = 'completed';
           } else if (workoutDate < new Date()) {
@@ -1562,7 +1562,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (user.stripeSubscriptionId && stripe) {
         try {
           const subscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
-          
+
           subscriptionStatus = {
             isSubscribed: subscription.status === 'active',
             subscriptionStatus: subscription.status,
@@ -2512,12 +2512,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (result.success) {
         console.log("✅ Strava activity created successfully with ID:", result.activityId);
-        
+
         let message = "Workout shared to Strava successfully!";
         if (result.warning) {
           message = `Workout shared to Strava! ${result.warning}`;
         }
-        
+
         res.json({ 
           success: true, 
           message: message,
@@ -2583,7 +2583,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } else {
         console.error("🔧 Generic error:", error.response?.status || 'No status');
-        res.status(500).json({ 
+        return res.status(500).json({ 
           message: "Failed to share workout to Strava: " + (error.message || "Unknown error"),
           success: false,
           error: error.response?.data || { message: error.message }
