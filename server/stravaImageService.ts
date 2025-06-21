@@ -204,37 +204,35 @@ export class StravaImageService {
   }
 
   static async generateWorkoutImage(workoutName: string, exercises: any[]): Promise<Buffer | null> {
-    try {
-      console.log("🖼️ Generating workout image for:", workoutName);
-      console.log("🖼️ Exercises data type:", typeof exercises, "length:", Array.isArray(exercises) ? exercises.length : 'N/A');
+    console.log("🖼️ Generating workout image for:", workoutName);
+    console.log("🖼️ Exercises data type:", typeof exercises, "length:", Array.isArray(exercises) ? exercises.length : 'N/A');
 
-      // Validate input
-      if (!workoutName || typeof workoutName !== 'string') {
-        console.warn("⚠️ Invalid workout name provided for image generation");
-        workoutName = "HybridX Workout";
-      }
+    // Validate input
+    if (!workoutName || typeof workoutName !== 'string') {
+      console.warn("⚠️ Invalid workout name provided for image generation");
+      workoutName = "HybridX Workout";
+    }
 
-      // Ensure exercises is an array and has valid data
-      if (!Array.isArray(exercises)) {
-        console.warn("⚠️ Exercises is not an array, converting:", typeof exercises);
-        if (typeof exercises === 'string') {
-          try {
-            exercises = JSON.parse(exercises);
-          } catch {
-            exercises = [{ name: exercises, type: "exercise" }];
-          }
-        } else if (exercises && typeof exercises === 'object') {
-          exercises = [exercises];
-        } else {
-          exercises = [];
+    // Ensure exercises is an array and has valid data
+    if (!Array.isArray(exercises)) {
+      console.warn("⚠️ Exercises is not an array, converting:", typeof exercises);
+      if (typeof exercises === 'string') {
+        try {
+          exercises = JSON.parse(exercises);
+        } catch {
+          exercises = [{ name: exercises, type: "exercise" }];
         }
+      } else if (exercises && typeof exercises === 'object') {
+        exercises = [exercises];
+      } else {
+        exercises = [];
       }
+    }
 
-      // Filter out invalid exercises
-      exercises = exercises.filter(ex => ex && (ex.name || ex.exercise || ex.type));
+    // Filter out invalid exercises
+    exercises = exercises.filter(ex => ex && (ex.name || ex.exercise || ex.type));
 
-      console.log("🖼️ Processed exercises for image generation:", exercises.length, "valid exercises");
-
+    console.log("🖼️ Processed exercises for image generation:", exercises.length, "valid exercises");
     console.log('🖼️ Starting image generation for workout:', workoutName);
     console.log('🖼️ Exercises data:', exercises ? exercises.length : 'none');
 
