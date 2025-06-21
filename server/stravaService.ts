@@ -6,10 +6,8 @@ import FormData from 'form-data';
 
 const STRAVA_BASE_URL = 'https://www.strava.com/api/v3';
 const STRAVA_AUTH_URL = 'https://www.strava.com/oauth/token';
-// Use the current Replit domain for redirect URI
-const REDIRECT_URI = process.env.REPLIT_DEV_DOMAIN ? 
-  `https://${process.env.REPLIT_DEV_DOMAIN}/api/strava/callback` :
-  `https://${process.env.REPL_ID || '0fcc3a45-589d-49fb-a059-7d9954da233f'}-00-${process.env.REPL_OWNER || '8sst6tp6qylm'}.spock.replit.dev/api/strava/callback`;
+// Use the configured Replit domain for redirect URI
+const REDIRECT_URI = `https://0fcc3a45-589d-49fb-a059-7d9954da233f-00-8sst6tp6qylm.spock.replit.dev/api/strava/callback`;
 
 export interface StravaTokens {
   access_token: string;
