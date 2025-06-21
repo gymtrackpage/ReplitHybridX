@@ -1,26 +1,30 @@
-import { Switch, Route } from "wouter";
-import { QueryClientProvider } from "@tanstack/react-query";
-import { queryClient } from "./lib/queryClient";
-import { useAuth } from "./hooks/useAuth";
-import { useQuery } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
-import Landing from "./pages/landing";
-import Dashboard from "./pages/dashboard";
-import Programs from "./pages/programs";
-import Assessment from "./pages/assessment";
-import Calendar from "./pages/calendar";
-import Workouts from "./pages/workouts";
-import RandomWorkout from "./pages/random-workout";
-import FreeWorkouts from "./pages/free-workouts";
-import Progress from "./pages/progress";
-import Profile from "./pages/profile";
-import Settings from "./pages/settings";
-import Admin from "./pages/admin";
-import SubscriptionSuccess from "./pages/subscription-success";
+import { Switch, Route, Router } from "wouter";
+import { useAuth } from "@/hooks/useAuth";
+import { queryClient } from "@/lib/queryClient";
+import { Logo } from "@/components/Logo";
+import { Card, CardContent } from "@/components/ui/card";
+import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
+
+// Pages
+import Landing from "@/pages/landing";
+import Dashboard from "@/pages/dashboard";
+import Assessment from "@/pages/assessment";
+import Workouts from "@/pages/workouts";
+import Programs from "@/pages/programs";
+import Calendar from "@/pages/calendar";
+import Progress from "@/pages/progress";
+import Profile from "@/pages/profile";
+import Settings from "@/pages/settings";
+import Admin from "@/pages/admin";
+import RandomWorkout from "@/pages/random-workout";
+import FreeWorkouts from "@/pages/free-workouts";
+import SubscriptionSuccess from "@/pages/subscription-success";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
-  
+
   const { data: userStatus, isLoading: statusLoading } = useQuery({
     queryKey: ["/api/user-onboarding-status"],
     enabled: isAuthenticated,
@@ -78,6 +82,7 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <Router />
       <Toaster />
+      <PWAInstallPrompt />
     </QueryClientProvider>
   );
 }

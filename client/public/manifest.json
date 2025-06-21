@@ -1,13 +1,18 @@
 {
-  "name": "Hybrid X Training",
-  "short_name": "Hybrid X",
-  "description": "Complete HYROX training application with personalized programs, workout tracking, and progress monitoring",
-  "start_url": "/",
+  "name": "HybridX Training - HYROX Workout App",
+  "short_name": "HybridX",
+  "description": "Complete HYROX training application with personalized programs, workout tracking, progress monitoring, and Strava integration",
+  "start_url": "/?utm_source=pwa",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
   "background_color": "#ffffff",
   "theme_color": "#facc15",
   "orientation": "portrait-primary",
   "scope": "/",
+  "prefer_related_applications": false,
+  "edge_side_panel": {
+    "preferred_width": 400
+  },
   "icons": [
     {
       "src": "/icon-192.png",
@@ -28,8 +33,73 @@
       "purpose": "any"
     }
   ],
-  "splash_pages": null,
-  "categories": ["fitness", "health", "sports"],
+  "screenshots": [
+    {
+      "src": "/splash-screen.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "HybridX Training Dashboard"
+    },
+    {
+      "src": "/splash-screen.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Mobile Training Interface"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Start Workout",
+      "short_name": "Workout",
+      "description": "Jump directly to today's workout",
+      "url": "/dashboard?action=workout",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Random Workout",
+      "short_name": "Random",
+      "description": "Generate a random HYROX workout",
+      "url": "/random-workout",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Progress",
+      "short_name": "Progress",
+      "description": "View your training progress",
+      "url": "/progress",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ],
+  "categories": ["fitness", "health", "sports", "lifestyle"],
   "lang": "en",
-  "dir": "ltr"
+  "dir": "ltr",
+  "launch_handler": {
+    "client_mode": "focus-existing"
+  },
+  "handle_links": "preferred",
+  "file_handlers": [
+    {
+      "action": "/",
+      "accept": {
+        "text/csv": [".csv"]
+      }
+    }
+  ]
 }

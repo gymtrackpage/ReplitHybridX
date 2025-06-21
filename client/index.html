@@ -2,22 +2,60 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Hybrid X - Personal Training</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>HybridX Training - HYROX Workout App</title>
+    
+    <!-- PWA Icons -->
     <link rel="icon" type="image/png" href="/icon-192.png" />
     <link rel="apple-touch-icon" href="/icon-192.png" />
-    <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#facc15" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="Hybrid X" />
-    <meta name="description" content="Complete HYROX training application with personalized programs, workout tracking, and progress monitoring" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="application-name" content="Hybrid X" />
+    <link rel="mask-icon" href="/icon-192.png" color="#facc15" />
     
-    <!-- Splash screen meta tags for iOS -->
-    <link rel="apple-touch-startup-image" href="/splash-screen.png" />
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+    
+    <!-- Theme Colors -->
+    <meta name="theme-color" content="#facc15" />
+    <meta name="msapplication-TileColor" content="#facc15" />
+    <meta name="msapplication-navbutton-color" content="#facc15" />
+    
+    <!-- Apple PWA -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="HybridX" />
+    <meta name="apple-touch-fullscreen" content="yes" />
+    
+    <!-- Mobile App -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="application-name" content="HybridX" />
+    
+    <!-- SEO & Description -->
+    <meta name="description" content="Complete HYROX training application with personalized programs, workout tracking, progress monitoring, and Strava integration. Train like a pro with HybridX." />
+    <meta name="keywords" content="HYROX, training, fitness, workout, crossfit, functional fitness, competition, hybrid training" />
+    <meta name="author" content="HybridX Training" />
+    
+    <!-- Social Media -->
+    <meta property="og:title" content="HybridX Training - HYROX Workout App" />
+    <meta property="og:description" content="Complete HYROX training application with personalized programs and workout tracking" />
+    <meta property="og:image" content="/splash-screen.png" />
+    <meta property="og:url" content="/" />
+    <meta property="og:type" content="website" />
+    
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="HybridX Training" />
+    <meta name="twitter:description" content="HYROX training app with personalized programs" />
+    <meta name="twitter:image" content="/splash-screen.png" />
+    
+    <!-- iOS Splash Screens -->
+    <link rel="apple-touch-startup-image" href="/splash-screen.png" />
+    <link rel="apple-touch-startup-image" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="/splash-screen.png" />
+    <link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="/splash-screen.png" />
+    <link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="/splash-screen.png" />
+    <link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="/splash-screen.png" />
+    
+    <!-- Preload critical resources -->
+    <link rel="preload" href="/logo-x.png" as="image" />
+    <link rel="dns-prefetch" href="//fonts.googleapis.com" />
   </head>
   <body>
     <div id="root"></div>
