@@ -40,7 +40,7 @@ export class StravaImageService {
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
             font-family: 'Arial', sans-serif;
             width: 1200px;
@@ -51,7 +51,7 @@ export class StravaImageService {
             justify-content: center;
             overflow: hidden;
         }
-        
+
         .share-container {
             width: 1100px;
             height: 530px;
@@ -63,19 +63,19 @@ export class StravaImageService {
             justify-content: space-between;
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
         }
-        
+
         .header {
             display: flex;
             align-items: center;
             justify-content: space-between;
         }
-        
+
         .logo {
             display: flex;
             align-items: center;
             gap: 15px;
         }
-        
+
         .logo-icon {
             width: 50px;
             height: 50px;
@@ -88,13 +88,13 @@ export class StravaImageService {
             font-weight: bold;
             font-size: 20px;
         }
-        
+
         .logo-text {
             font-size: 28px;
             font-weight: bold;
             color: #2d3748;
         }
-        
+
         .badge {
             background: #48bb78;
             color: white;
@@ -103,7 +103,7 @@ export class StravaImageService {
             font-size: 14px;
             font-weight: 600;
         }
-        
+
         .workout-content {
             text-align: center;
             flex: 1;
@@ -112,14 +112,14 @@ export class StravaImageService {
             justify-content: center;
             gap: 20px;
         }
-        
+
         .workout-title {
             font-size: 48px;
             font-weight: bold;
             color: #2d3748;
             margin-bottom: 10px;
         }
-        
+
         .workout-description {
             font-size: 20px;
             color: #4a5568;
@@ -127,35 +127,35 @@ export class StravaImageService {
             max-width: 900px;
             margin: 0 auto;
         }
-        
+
         .footer {
             display: flex;
             align-items: center;
             justify-content: space-between;
         }
-        
+
         .stats {
             display: flex;
             gap: 30px;
         }
-        
+
         .stat {
             text-align: center;
         }
-        
+
         .stat-value {
             font-size: 24px;
             font-weight: bold;
             color: #667eea;
         }
-        
+
         .stat-label {
             font-size: 12px;
             color: #718096;
             text-transform: uppercase;
             letter-spacing: 1px;
         }
-        
+
         .app-info {
             text-align: right;
             color: #718096;
@@ -172,12 +172,12 @@ export class StravaImageService {
             </div>
             <div class="badge">Workout Completed</div>
         </div>
-        
+
         <div class="workout-content">
             <div class="workout-title">${workoutName}</div>
             <div class="workout-description">${description}</div>
         </div>
-        
+
         <div class="footer">
             <div class="stats">
                 <div class="stat">
@@ -203,10 +203,41 @@ export class StravaImageService {
 </html>`;
   }
 
-  static async generateWorkoutImage(workoutName: string, exercises: any[]): Promise<Buffer> {
+  static async generateWorkoutImage(workoutName: string, exercises: any[]): Promise<Buffer | null> {
+    try {
+      console.log("🖼️ Generating workout image for:", workoutName);
+      console.log("🖼️ Exercises data type:", typeof exercises, "length:", Array.isArray(exercises) ? exercises.length : 'N/A');
+
+      // Validate input
+      if (!workoutName || typeof workoutName !== 'string') {
+        console.warn("⚠️ Invalid workout name provided for image generation");
+        workoutName = "HybridX Workout";
+      }
+
+      // Ensure exercises is an array and has valid data
+      if (!Array.isArray(exercises)) {
+        console.warn("⚠️ Exercises is not an array, converting:", typeof exercises);
+        if (typeof exercises === 'string') {
+          try {
+            exercises = JSON.parse(exercises);
+          } catch {
+            exercises = [{ name: exercises, type: "exercise" }];
+          }
+        } else if (exercises && typeof exercises === 'object') {
+          exercises = [exercises];
+        } else {
+          exercises = [];
+        }
+      }
+
+      // Filter out invalid exercises
+      exercises = exercises.filter(ex => ex && (ex.name || ex.exercise || ex.type));
+
+      console.log("🖼️ Processed exercises for image generation:", exercises.length, "valid exercises");
+
     console.log('🖼️ Starting image generation for workout:', workoutName);
     console.log('🖼️ Exercises data:', exercises ? exercises.length : 'none');
-    
+
     let browser = null;
     let page = null;
 
@@ -252,7 +283,7 @@ export class StravaImageService {
       const htmlTemplate = this.createHtmlTemplate(safeName, safeDescription);
 
       console.log('🖼️ Setting page content...');
-      
+
       // Set viewport first
       await page.setViewport({ width: 1200, height: 630 });
       console.log('🖼️ Viewport set to 1200x630');
@@ -267,7 +298,7 @@ export class StravaImageService {
       await page.waitForTimeout(3000);
 
       console.log('🖼️ Taking screenshot...');
-      
+
       // Generate image with higher quality
       const imageBuffer = await page.screenshot({
         type: 'png',
@@ -292,7 +323,7 @@ export class StravaImageService {
       console.error('💥 Error generating workout image:');
       console.error('  Error message:', error.message);
       console.error('  Error stack:', error.stack);
-      
+
       // Don't throw error, return null to allow activity creation without image
       console.warn('⚠️ Image generation failed, continuing without image');
       throw error;

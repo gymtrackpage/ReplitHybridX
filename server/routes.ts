@@ -2512,12 +2512,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (result.success) {
         console.log("✅ Strava activity created successfully with ID:", result.activityId);
+        
+        let message = "Workout shared to Strava successfully!";
+        if (result.warning) {
+          message = `Workout shared to Strava! ${result.warning}`;
+        }
+        
         res.json({ 
           success: true, 
-          message: result.activityId ? 
-            "Workout shared to Strava successfully!" : 
-            "Workout shared to Strava successfully! (Image upload may still be processing)",
-          activityId: result.activityId 
+          message: message,
+          activityId: result.activityId,
+          warning: result.warning || null
         });
       } else {
         console.error("❌ Failed to create Strava activity");

@@ -266,26 +266,41 @@ export class StravaService {
 
           // Wait for the activity to be fully processed by Strava - increased delay
           console.log('⏱️ Waiting for Strava activity to be fully processed...');
-          await new Promise(resolve => setTimeout(resolve, 15000)); // Increased to 15 seconds
+          await new Promise(resolve => setTimeout(resolve, 20000)); // Increased to 20 seconds
 
           // Retry logic for image upload with longer delays
           let uploadSuccess = false;
           let attempts = 0;
-          const maxAttempts = 5; // Increased attempts
+          const maxAttempts = 6; // Increased attempts
 
           while (!uploadSuccess && attempts < maxAttempts) {
             attempts++;
             try {
               console.log(`🔄 Image upload attempt ${attempts}/${maxAttempts}...`);
-              await this.uploadActivityPhoto(accessToken, activityId, imageBuffer);
-              console.log('✅ Successfully uploaded workout image to Strava activity');
-              uploadSuccess = true;
+              
+              // Verify activity exists before trying to upload image
+              const activityCheck = await axios.get(`${STRAVA_BASE_URL}/activities/${activityId}`, {
+                headers: {
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Accept': 'application/json'
+                },
+                timeout: 10000
+              });
+              
+              if (activityCheck.status === 200) {
+                console.log('✅ Activity verified, proceeding with image upload');
+                await this.uploadActivityPhoto(accessToken, activityId, imageBuffer);
+                console.log('✅ Successfully uploaded workout image to Strava activity');
+                uploadSuccess = true;
+              } else {
+                throw new Error(`Activity not ready (status: ${activityCheck.status})`);
+              }
             } catch (photoError: any) {
               console.error(`❌ Image upload attempt ${attempts} failed:`, photoError.message);
               
               if (attempts < maxAttempts) {
                 // Wait before retry, with exponential backoff
-                const waitTime = 5000 * Math.pow(2, attempts - 1); // 5s, 10s, 20s, 40s
+                const waitTime = 8000 * Math.pow(1.5, attempts - 1); // 8s, 12s, 18s, 27s, 40s
                 console.log(`⏱️ Waiting ${waitTime}ms before retry...`);
                 await new Promise(resolve => setTimeout(resolve, waitTime));
               }
@@ -294,11 +309,21 @@ export class StravaService {
 
           if (!uploadSuccess) {
             console.warn('⚠️ All image upload attempts failed, but activity was created successfully');
-            // Don't fail the entire operation if photo upload fails
+            // Return success but with a warning message
+            return { 
+              success: true, 
+              activityId, 
+              warning: 'Activity created successfully, but image upload failed. You can manually add images in the Strava app.' 
+            };
           }
         } catch (error) {
           console.warn('⚠️ Image upload process failed, but activity was created successfully:', error);
-          // Don't fail the entire operation if photo upload fails
+          // Return success but with a warning message
+          return { 
+            success: true, 
+            activityId, 
+            warning: 'Activity created successfully, but image upload failed. You can manually add images in the Strava app.' 
+          };
         }
       } else {
         if (!imageBuffer) {
