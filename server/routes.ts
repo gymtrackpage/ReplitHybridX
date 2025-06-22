@@ -1762,8 +1762,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
 
-      const Stripe = require('stripe');
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+      if (!stripe) {
+        return res.status(500).json({ message: "Stripe not configured" });
+      }
 
       let customerId = user.stripeCustomerId;
 
@@ -1790,23 +1791,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Create new subscription with default monthly price
+      // Create new subscription with £5/month price
       const subscription = await stripe.subscriptions.create({
         customer: customerId,
         items: [{
           price_data: {
-            currency: 'usd',
+            currency: 'gbp',
             product_data: {
-              name: 'Hybrid X Training Program',
-              description: 'Access to all HYROX training programs and features'
+              name: 'HybridX Premium',
+              description: 'Access to all HYROX training programs and premium features'
             },
-            unit_amount: 2999, // $29.99/month
+            unit_amount: 500, // £5.00
             recurring: {
               interval: 'month'
             }
           }
         }],
         payment_behavior: 'default_incomplete',
+        payment_settings: {
+          save_default_payment_method: 'on_subscription'
+        },
         expand: ['latest_invoice.payment_intent'],
       });
 
