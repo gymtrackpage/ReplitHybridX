@@ -86,90 +86,32 @@ app.use((req, res, next) => {
     // Port 5000 is recommended for Replit as it gets forwarded to 80/443 in production
     const port = parseInt(process.env.PORT || "5000");
 
-    async function killExistingProcesses() {
-      try {
-        const { exec } = require('child_process');
-        const util = require('util');
-        const execAsync = util.promisify(exec);
-
-        console.log(`🔍 Checking for processes on port ${port}...`);
-
-        try {
-          // More comprehensive process cleanup
-          await execAsync(`pkill -f "node.*server|tsx.*server|npm.*dev" || true`);
-          await execAsync(`lsof -ti:${port} | xargs kill -9 || true`);
-          await new Promise(resolve => setTimeout(resolve, 3000));
-          console.log("✅ Cleared any existing processes");
-        } catch (error) {
-          console.log("⚠️ No existing processes to clear");
-        }
-      } catch (error) {
-        console.log("⚠️ Could not clear existing processes:", error.message);
+    // Handle server startup errors
+    const server = await registerRoutes(app);
+    
+    server.on('error', (error: any) => {
+      if (error.code === 'EADDRINUSE') {
+        console.error(`❌ Port ${port} is already in use. Please stop any running processes and try again.`);
+        process.exit(1);
+      } else {
+        console.error('❌ Server error:', error);
+        process.exit(1);
       }
-    }
+    });
 
-    async function startServer() {
-      try {
-        await killExistingProcesses();
+    server.listen(port, "0.0.0.0", () => {
+      console.log(`✅ HybridX server running on http://0.0.0.0:${port}`);
+      console.log(`🌐 Access your app at: https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`);
+    });
 
-        console.log("🔌 Attempting database connection...");
-        const { db, users } = await import('./db');
-        await db.select().from(users).limit(1);
-        console.log("✅ Database connection established successfully");
-
-        console.log("🚀 Starting HybridX server...");
-        const { performStartupChecks } = await import('./startup-check');
-        console.log("🔍 Performing startup checks...");
-        const checksPass = await performStartupChecks();
-
-        if (!checksPass) {
-          console.error("❌ Startup checks failed. Exiting...");
-          process.exit(1);
-        }
-
-        console.log("🎉 All startup checks passed!");
-        const server = await registerRoutes(app);
-
-        // Handle server startup errors
-        server.on('error', (error: any) => {
-          if (error.code === 'EADDRINUSE') {
-            console.error(`❌ Port ${port} is already in use. Trying to kill existing process...`);
-            process.exit(1);
-          } else {
-            console.error('❌ Server error:', error);
-            process.exit(1);
-          }
-        });
-
-        server.listen(port, "0.0.0.0", () => {
-          console.log(`✅ HybridX server running on http://0.0.0.0:${port}`);
-          console.log(`🌐 Access your app at: https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`);
-        });
-
-        // Graceful shutdown
-        process.on('SIGTERM', () => {
-          console.log('🛑 Received SIGTERM, shutting down gracefully');
-          server.close(() => {
-            console.log('✅ Server closed');
-            process.exit(0);
-          });
-        });
-
-      } catch (error) {
-        console.error("❌ Server startup error:", error);
-        if (error.code === 'EADDRINUSE') {
-          console.log(`❌ Port ${port} is still in use after cleanup attempt`);
-          console.log("🔄 Retrying in 5 seconds...`);
-          setTimeout(() => {
-            startServer();
-          }, 5000);
-        } else {
-          process.exit(1);
-        }
-      }
-    }
-
-    startServer();
+    // Graceful shutdown
+    process.on('SIGTERM', () => {
+      console.log('🛑 Received SIGTERM, shutting down gracefully');
+      server.close(() => {
+        console.log('✅ Server closed');
+        process.exit(0);
+      });
+    });
 
     // Handle server errors
     // server.on('error', (error: any) => {
