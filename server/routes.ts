@@ -2265,6 +2265,118 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get Strava connection URL
+  app.get('/api/strava/connect', isAuthenticated, async (req: any, res) => {
+    try {
+      if (!process.env.STRAVA_CLIENT_ID || !process.env.STRAVA_CLIENT_SECRET) {
+        return res.json({ 
+          configured: false,
+          message: "Strava integration not configured" 
+        });
+      }
+      
+      const authUrl = StravaService.getAuthorizationUrl();
+      res.json({ authUrl, configured: true });
+    } catch (error) {
+      console.error("Error getting Strava connection:", error);
+      res.status(500).json({ message: "Failed to get Strava connection" });
+    }
+  });
+
+  // Push workout to Strava (alternative endpoint name)
+  app.post('/api/strava/push-workout', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { workoutId, duration, notes } = req.body;
+
+      console.log("Strava push-workout request:", { userId, workoutId, duration, notes });
+
+      // Get user's Strava connection status
+      const user = await storage.getUser(userId);
+      if (!user?.stravaConnected || !user.stravaAccessToken) {
+        return res.status(400).json({ 
+          message: "Please connect your Strava account first",
+          needsAuth: true 
+        });
+      }
+
+      // Get workout details
+      const workout = await storage.getWorkout(workoutId);
+      if (!workout) {
+        return res.status(404).json({ message: "Workout not found" });
+      }
+
+      // Generate workout image
+      let imageBuffer;
+      try {
+        const { StravaImageService } = await import('./stravaImageService');
+        imageBuffer = await StravaImageService.generateWorkoutImage(
+          workout.name, 
+          workout.exercises as any[]
+        );
+        console.log("Generated workout image, size:", imageBuffer?.length || 0, "bytes");
+      } catch (imageError) {
+        console.error('Image generation failed:', imageError);
+        // Continue without image if generation fails
+      }
+
+      // Prepare workout data for Strava
+      const workoutData = {
+        name: workout.name,
+        description: notes || `HybridX Training Session\n\n${workout.description || ''}`,
+        duration: duration || 3600, // Default to 1 hour if not provided
+        type: 'workout' as const,
+        start_date_local: new Date().toISOString()
+      };
+
+      console.log("Pushing workout to Strava:", workoutData);
+
+      // Push to Strava
+      const result = await StravaService.pushWorkoutToStrava(
+        userId, 
+        workoutData, 
+        imageBuffer
+      );
+
+      console.log("Strava push result:", result);
+
+      if (result.success) {
+        res.json({ 
+          success: true, 
+          message: result.warning || "Workout shared to Strava successfully!",
+          activityId: result.activityId 
+        });
+      } else {
+        res.status(500).json({ 
+          message: "Failed to share workout to Strava" 
+        });
+      }
+    } catch (error: any) {
+      console.error("Error pushing workout to Strava:", error);
+      
+      // Handle different types of Strava errors
+      if (error.response?.status === 401) {
+        return res.status(401).json({ 
+          message: "Strava authentication expired. Please reconnect your account.",
+          needsAuth: true 
+        });
+      } else if (error.response?.status === 403) {
+        return res.status(403).json({ 
+          message: "Access denied. Please check your Strava permissions.",
+          needsAuth: true 
+        });
+      } else if (error.response?.status === 422) {
+        return res.status(422).json({ 
+          message: "Invalid workout data for Strava: " + (error.response.data?.message || error.message)
+        });
+      }
+      
+      res.status(500).json({ 
+        message: error.message || "Failed to share workout to Strava" 
+      });
+    }
+  });
+
   // Strava OAuth callback
   app.get('/api/strava/callback', async (req, res) => {
     try {
@@ -2346,6 +2458,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const { workoutId, duration, notes } = req.body;
 
+      console.log("Strava share request:", { userId, workoutId, duration, notes });
+
       // Get user's Strava connection status
       const user = await storage.getUser(userId);
       if (!user?.stravaConnected || !user.stravaAccessToken) {
@@ -2364,10 +2478,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate workout image
       let imageBuffer;
       try {
+        const { StravaImageService } = await import('./stravaImageService');
         imageBuffer = await StravaImageService.generateWorkoutImage(
           workout.name, 
           workout.exercises as any[]
         );
+        console.log("Generated workout image, size:", imageBuffer?.length || 0, "bytes");
       } catch (imageError) {
         console.error('Image generation failed:', imageError);
         // Continue without image if generation fails
@@ -2382,6 +2498,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         start_date_local: new Date().toISOString()
       };
 
+      console.log("Pushing workout to Strava:", workoutData);
+
       // Push to Strava
       const result = await StravaService.pushWorkoutToStrava(
         userId, 
@@ -2389,10 +2507,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         imageBuffer
       );
 
+      console.log("Strava push result:", result);
+
       if (result.success) {
         res.json({ 
           success: true, 
-          message: "Workout shared to Strava successfully!",
+          message: result.warning || "Workout shared to Strava successfully!",
           activityId: result.activityId 
         });
       } else {
@@ -2400,10 +2520,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message: "Failed to share workout to Strava" 
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error sharing to Strava:", error);
+      
+      // Handle different types of Strava errors
+      if (error.response?.status === 401) {
+        return res.status(401).json({ 
+          message: "Strava authentication expired. Please reconnect your account.",
+          needsAuth: true 
+        });
+      } else if (error.response?.status === 403) {
+        return res.status(403).json({ 
+          message: "Access denied. Please check your Strava permissions.",
+          needsAuth: true 
+        });
+      } else if (error.response?.status === 422) {
+        return res.status(422).json({ 
+          message: "Invalid workout data for Strava: " + (error.response.data?.message || error.message)
+        });
+      }
+      
       res.status(500).json({ 
-        message: "Failed to share workout to Strava" 
+        message: error.message || "Failed to share workout to Strava" 
       });
     }
   });
