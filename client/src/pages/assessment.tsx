@@ -123,20 +123,26 @@ export default function Assessment() {
 
   const completeAssessmentMutation = useMutation({
     mutationFn: async (data: { assessmentData: AssessmentData; programId: number; subscriptionChoice: string }) => {
-      await apiRequest("POST", "/api/complete-assessment", data);
+      console.log("Completing assessment with data:", data);
+      const response = await apiRequest("POST", "/api/complete-assessment", data);
+      return response;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log("Assessment completed successfully:", data);
       queryClient.invalidateQueries({ queryKey: ["/api/user-onboarding-status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       toast({
         title: "Assessment Complete!",
-        description: "Your training program has been set up successfully.",
+        description: "Welcome to HybridX! You can upgrade to Premium anytime for full access.",
       });
-      setLocation("/");
+      // Redirect to dashboard instead of home
+      setLocation("/dashboard");
     },
-    onError: () => {
+    onError: (error: any) => {
+      console.error("Assessment completion error:", error);
       toast({
         title: "Error",
-        description: "Failed to complete assessment. Please try again.",
+        description: error.message || "Failed to complete assessment. Please try again.",
         variant: "destructive",
       });
     },
@@ -148,15 +154,38 @@ export default function Assessment() {
       return response;
     },
     onSuccess: (data: any) => {
-      if (data.paymentUrl) {
-        window.location.href = data.paymentUrl;
-      } else {
-        completeAssessmentMutation.mutate({
+      console.log("Subscription creation response:", data);
+      if (data.url) {
+        // Store assessment data for completion after payment
+        localStorage.setItem('pendingAssessment', JSON.stringify({
           assessmentData,
           programId: recommendation!.recommendedProgram.id,
-          subscriptionChoice: "subscribed"
+          subscriptionChoice: "premium"
+        }));
+        window.location.href = data.url;
+      } else if (data.paymentUrl) {
+        // Store assessment data for completion after payment
+        localStorage.setItem('pendingAssessment', JSON.stringify({
+          assessmentData,
+          programId: recommendation!.recommendedProgram.id,
+          subscriptionChoice: "premium"
+        }));
+        window.location.href = data.paymentUrl;
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to create subscription. Please try again.",
+          variant: "destructive"
         });
       }
+    },
+    onError: (error: any) => {
+      console.error("Subscription creation error:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create subscription. Please try again.",
+        variant: "destructive"
+      });
     },
   });
 
@@ -182,13 +211,6 @@ export default function Assessment() {
   };
 
   const handleSubscribe = () => {
-    // Store assessment data and recommendation for payment completion
-    localStorage.setItem('pendingAssessment', JSON.stringify({
-      assessmentData,
-      programId: recommendation!.recommendedProgram.id,
-      subscriptionChoice: "premium"
-    }));
-    
     createSubscriptionMutation.mutate();
   };
 
