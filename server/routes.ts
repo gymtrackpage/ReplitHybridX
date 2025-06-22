@@ -1784,7 +1784,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (subscription.status === 'active') {
           return res.json({
             subscriptionId: subscription.id,
-            status: subscription.status,
+            status:```text
+subscription.status,
             clientSecret: subscription.latest_invoice?.payment_intent?.client_secret
           });
         }
@@ -2473,6 +2474,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: "Failed to share workout to Strava" 
       });
     }
+  });
+
+  // Domain verification endpoint
+  app.get('/api/domain-info', async (req, res) => {
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    const host = req.headers['x-forwarded-host'] || req.headers.host;
+    const currentDomain = `${protocol}://${host}`;
+
+    res.json({
+      currentDomain,
+      stravaCallbackUrl: `${currentDomain}/api/strava/callback`,
+      configuredCallbackUrl: `https://0fcc3a45-589d-49fb-a059-7d9954da233f-00-8sst6tp6qylm.spock.replit.dev/api/strava/callback`,
+      match: `${currentDomain}/api/strava/callback` === `https://0fcc3a45-589d-49fb-a059-7d9954da233f-00-8sst6tp6qylm.spock.replit.dev/api/strava/callback`
+    });
   });
 
   const httpServer = createServer(app);
