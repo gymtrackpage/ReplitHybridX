@@ -110,10 +110,10 @@ app.use((req, res, next) => {
 
     async function startServer() {
       try {
-        const { db, users } = await import('./db');
         await killExistingProcesses();
 
         console.log("🔌 Attempting database connection...");
+        const { db, users } = await import('./db');
         await db.select().from(users).limit(1);
         console.log("✅ Database connection established successfully");
 
@@ -130,6 +130,17 @@ app.use((req, res, next) => {
         console.log("🎉 All startup checks passed!");
         const server = await registerRoutes(app);
 
+        // Handle server startup errors
+        server.on('error', (error: any) => {
+          if (error.code === 'EADDRINUSE') {
+            console.error(`❌ Port ${port} is already in use. Trying to kill existing process...`);
+            process.exit(1);
+          } else {
+            console.error('❌ Server error:', error);
+            process.exit(1);
+          }
+        });
+
         server.listen(port, "0.0.0.0", () => {
           console.log(`✅ HybridX server running on http://0.0.0.0:${port}`);
           console.log(`🌐 Access your app at: https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`);
@@ -145,12 +156,16 @@ app.use((req, res, next) => {
         });
 
       } catch (error) {
-        console.error("❌ Server error:", error);
+        console.error("❌ Server startup error:", error);
         if (error.code === 'EADDRINUSE') {
           console.log(`❌ Port ${port} is still in use after cleanup attempt`);
-          console.log("🔄 Please try running the app again in a moment");
+          console.log("🔄 Retrying in 5 seconds...`);
+          setTimeout(() => {
+            startServer();
+          }, 5000);
+        } else {
+          process.exit(1);
         }
-        process.exit(1);
       }
     }
 
