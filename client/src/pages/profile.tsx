@@ -11,7 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { SubscriptionModal } from "@/components/subscription/SubscriptionModal";
 import { User, Calendar, Target, Trophy, Settings, Save, ExternalLink } from "lucide-react";
 
 const profileSchema = z.object({
@@ -29,6 +30,9 @@ type ProfileData = z.infer<typeof profileSchema>;
 export default function Profile() {
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+  const [formData, setFormData] = useState({
+  });
 
   const { data: user, isLoading } = useQuery({
     queryKey: ["/api/auth/user"],
@@ -446,21 +450,29 @@ export default function Profile() {
                   <CardTitle>Subscription</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <Badge 
-                    className={
-                      user.subscriptionStatus === "active" 
+                  <div className="flex items-center justify-between">
+                      <Badge className={user?.subscriptionStatus === "active" 
                         ? "bg-green-100 text-green-800" 
                         : "bg-gray-100 text-gray-800"
-                    }
-                  >
-                    {user.subscriptionStatus}
-                  </Badge>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    {user.subscriptionStatus === "active" 
-                      ? "You have full access to all features"
-                      : "Upgrade to access premium features"
-                    }
-                  </p>
+                      }>
+                        {user?.subscriptionStatus || "free"}
+                      </Badge>
+                      {user?.subscriptionStatus !== "active" && (
+                        <Button 
+                          onClick={() => setShowSubscriptionModal(true)}
+                          size="sm"
+                          className="bg-yellow-500 hover:bg-yellow-600 text-black"
+                        >
+                          Upgrade
+                        </Button>
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      {user?.subscriptionStatus === "active" 
+                        ? "You have full access to all features"
+                        : "Upgrade to access premium features"
+                      }
+                    </p>
                 </CardContent>
               </Card>
             )}
@@ -508,6 +520,7 @@ export default function Profile() {
           </div>
         </div>
       </div>
+      <SubscriptionModal show={showSubscriptionModal} onClose={() => setShowSubscriptionModal(false)} />
     </MobileLayout>
   );
 }
