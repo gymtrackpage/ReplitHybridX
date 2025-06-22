@@ -95,8 +95,10 @@ app.use((req, res, next) => {
         console.log(`🔍 Checking for processes on port ${port}...`);
 
         try {
-          await execAsync(`pkill -f ".*${port}" || true`);
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          // More comprehensive process cleanup
+          await execAsync(`pkill -f "node.*server|tsx.*server|npm.*dev" || true`);
+          await execAsync(`lsof -ti:${port} | xargs kill -9 || true`);
+          await new Promise(resolve => setTimeout(resolve, 3000));
           console.log("✅ Cleared any existing processes");
         } catch (error) {
           console.log("⚠️ No existing processes to clear");

@@ -77,6 +77,10 @@ export class StravaService {
         client_secret: process.env.STRAVA_CLIENT_SECRET,
         refresh_token: refreshToken,
         grant_type: 'refresh_token'
+      }, {
+        headers: {
+          'Content-Type': 'application/json'
+        }
       });
 
       return response.data;
@@ -179,11 +183,9 @@ export class StravaService {
       const response = await axios.post(`${STRAVA_BASE_URL}/activities`, activityData, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
+          'Content-Type': 'application/json'
         },
-        timeout: 10000, // 10 second timeout
-        responseType: 'json'
+        timeout: 10000 // 10 second timeout
       });
 
       console.log('Raw Strava response:', {

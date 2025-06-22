@@ -11,7 +11,7 @@ build = ["sh", "-c", "npm run build"]
 run = ["sh", "-c", "NODE_ENV=production npm run start"]
 
 [workflows]
-runButton = "Start Server"
+runButton = "Clean Start"
 
 [[workflows.workflow]]
 name = "Project"
@@ -56,6 +56,27 @@ mode = "sequential"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = 'pkill -f "node.*5000\|tsx.*server\|npm.*dev" || true'
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "sleep 3"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev"
+
+[[workflows.workflow]]
+name = "Clean Start"
+author = 43406964
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pkill -f \"node.*server|tsx.*server|npm.*dev\" || true"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "lsof -ti:5000 | xargs kill -9 || true"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"

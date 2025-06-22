@@ -2460,6 +2460,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log("Strava share request:", { userId, workoutId, duration, notes });
 
+      // Validate request data
+      if (!workoutId) {
+        return res.status(400).json({ message: "Workout ID is required" });
+      }
+
       // Get user's Strava connection status
       const user = await storage.getUser(userId);
       if (!user?.stravaConnected || !user.stravaAccessToken) {
