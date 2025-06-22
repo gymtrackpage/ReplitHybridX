@@ -1784,8 +1784,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (subscription.status === 'active') {
           return res.json({
             subscriptionId: subscription.id,
-            status:```text
-subscription.status,
+            status: subscription.status,
             clientSecret: subscription.latest_invoice?.payment_intent?.client_secret
           });
         }
