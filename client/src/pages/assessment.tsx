@@ -16,10 +16,13 @@ import {
   Trophy, 
   Calendar,
   CreditCard,
-  Zap
+  Zap,
+  Crown
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { usePremiumAccess } from "@/hooks/useSubscription";
+import { SubscriptionGate } from "@/components/subscription/SubscriptionGate";
 
 interface AssessmentData {
   hyroxEventsCompleted?: number;
@@ -85,6 +88,7 @@ export default function Assessment() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { hasAccess, isAdmin } = usePremiumAccess();
 
   const getRecommendationMutation = useMutation({
     mutationFn: async (data: AssessmentData) => {
@@ -163,6 +167,9 @@ export default function Assessment() {
   const nextStep = () => {
     if (currentStep === 2) {
       getRecommendationMutation.mutate(assessmentData);
+    } else if (currentStep === 3 && !hasAccess && !isAdmin) {
+      // If user doesn't have premium access, skip to subscription step
+      setCurrentStep(4);
     } else if (currentStep < assessmentSteps.length - 1) {
       setCurrentStep(prev => prev + 1);
     }
@@ -389,15 +396,24 @@ export default function Assessment() {
 
       case 3:
         return recommendation ? (
-          <Card className="mobile-card">
-            <CardHeader>
-              <CardTitle className="mobile-header flex items-center gap-2">
-                <Trophy className="h-5 w-5 text-yellow-500" />
-                Your Recommended Program
-              </CardTitle>
-              <CardDescription>Based on your assessment responses</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <div className="space-y-4">
+            {!hasAccess && !isAdmin ? (
+              <SubscriptionGate 
+                feature="Program Recommendations"
+                description="Get access to personalized HYROX training programs based on your assessment"
+              >
+                <div />
+              </SubscriptionGate>
+            ) : (
+              <Card className="mobile-card">
+                <CardHeader>
+                  <CardTitle className="mobile-header flex items-center gap-2">
+                    <Trophy className="h-5 w-5 text-yellow-500" />
+                    Your Recommended Program
+                  </CardTitle>
+                  <CardDescription>Based on your assessment responses</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
               <div className="p-4 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg border-2 border-yellow-200">
                 <h3 className="text-xl font-bold text-yellow-800 mb-2">{recommendation.recommendedProgram.name}</h3>
                 <p className="text-sm text-yellow-700 mb-3">{recommendation.recommendedProgram.description}</p>
@@ -434,8 +450,10 @@ export default function Assessment() {
                   </ul>
                 </div>
               )}
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         ) : null;
 
       case 4:
@@ -551,7 +569,7 @@ export default function Assessment() {
                assessmentData.goals && 
                assessmentData.goals.length > 0;
       case 3:
-        return recommendation !== null;
+        return recommendation !== null && (hasAccess || isAdmin);
       default:
         return true;
     }

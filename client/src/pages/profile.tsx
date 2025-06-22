@@ -31,8 +31,6 @@ export default function Profile() {
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
-  const [formData, setFormData] = useState({
-  });
 
   const { data: user, isLoading } = useQuery({
     queryKey: ["/api/auth/user"],
@@ -520,7 +518,11 @@ export default function Profile() {
           </div>
         </div>
       </div>
-      <SubscriptionModal show={showSubscriptionModal} onClose={() => setShowSubscriptionModal(false)} />
+      <SubscriptionModal 
+        open={showSubscriptionModal} 
+        onOpenChange={setShowSubscriptionModal}
+        feature="Profile Upgrade"
+      />
     </MobileLayout>
   );
 }
