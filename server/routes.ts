@@ -1003,6 +1003,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/assessment', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      const { subscriptionChoice, paymentIntentId } = req.body;
+
+      // If user chose premium but no payment confirmation, reject
+      if (subscriptionChoice === "premium" && !paymentIntentId) {
+        return res.status(400).json({ 
+          message: "Payment confirmation required for premium subscription" 
+        });
+      }
 
       // Get available programs from database
       const programs = await storage.getPrograms();

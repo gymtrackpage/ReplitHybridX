@@ -394,7 +394,7 @@ export default function Assessment() {
               <div className="p-4 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg border-2 border-yellow-200">
                 <h3 className="text-xl font-bold text-yellow-800 mb-2">{recommendation.recommendedProgram.name}</h3>
                 <p className="text-sm text-yellow-700 mb-3">{recommendation.recommendedProgram.description}</p>
-                
+
                 <div className="flex flex-wrap gap-2 mb-3">
                   <Badge className="bg-yellow-100 text-yellow-800">
                     {recommendation.recommendedProgram.difficulty}
@@ -456,7 +456,7 @@ export default function Assessment() {
                       <p className="text-sm text-gray-600">/month</p>
                     </div>
                   </div>
-                  
+
                   <ul className="space-y-2 mb-4">
                     {[
                       "Personalized training programs",
@@ -492,7 +492,7 @@ export default function Assessment() {
                       <p className="text-2xl font-bold text-gray-700">Free</p>
                     </div>
                   </div>
-                  
+
                   <ul className="space-y-2 mb-4">
                     {[
                       "Random workout generator",
@@ -597,7 +597,7 @@ export default function Assessment() {
                 Back
               </Button>
             )}
-            
+
             <Button 
               onClick={nextStep}
               disabled={!canProceed() || getRecommendationMutation.isPending}

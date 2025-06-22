@@ -69,9 +69,19 @@ export function useSubscription() {
 export function usePremiumAccess() {
   const { subscriptionStatus, isLoading } = useSubscription();
   
+  // Get user data to check admin status
+  const { data: user } = useQuery({
+    queryKey: ['/api/auth/user'],
+    staleTime: 5 * 60 * 1000,
+  });
+  
+  // Admins bypass subscription requirements
+  const isAdmin = (user as any)?.isAdmin || false;
+  
   return {
-    hasAccess: subscriptionStatus?.isSubscribed || false,
+    hasAccess: isAdmin || subscriptionStatus?.isSubscribed || false,
     isLoading,
     subscriptionStatus: subscriptionStatus?.subscriptionStatus,
+    isAdmin,
   };
 }

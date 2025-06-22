@@ -68,6 +68,8 @@ function Router() {
       <Route path="/random-workout" component={RandomWorkout} />
       <Route path="/free-workouts" component={FreeWorkouts} />
       <Route path="/subscription-success" component={SubscriptionSuccess} />
+      <Route path="/payment" component={() => import("./pages/payment").then(m => m.default)} />
+      <Route path="/random-workout" component={RandomWorkout} />
       <Route path="/progress" component={Progress} />
       <Route path="/profile" component={Profile} />
       <Route path="/settings" component={Settings} />
