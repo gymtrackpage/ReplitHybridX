@@ -11,9 +11,8 @@ import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-// Temporarily disabled to fix React hook errors
-// import { SubscriptionGate } from "@/components/subscription/SubscriptionGate";
-// import { usePremiumAccess } from "@/hooks/useSubscription";
+import { SubscriptionGate } from "@/components/subscription/SubscriptionGate";
+import { usePremiumAccess } from "@/hooks/useSubscription";
 import { Trophy, Clock, Target, Users, Calendar } from "lucide-react";
 
 export default function Programs() {
@@ -22,9 +21,7 @@ export default function Programs() {
   const [open, setOpen] = useState(false);
   const [programSelectionMode, setProgramSelectionMode] = useState("continue"); // continue, restart, enddate
   const [endDate, setEndDate] = useState("");
-  // Temporarily disabled to fix React hook errors
-  // const { hasAccess } = usePremiumAccess();
-  const hasAccess = true; // Temporarily allow access to fix app
+  const { hasAccess } = usePremiumAccess();
 
   const { data: programs, isLoading } = useQuery({
     queryKey: ["/api/programs"],
@@ -139,8 +136,8 @@ export default function Programs() {
           </Card>
         )}
 
-        {/* Temporarily disabled subscription gate to fix React hook errors */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <SubscriptionGate feature="Training Programs" description="Access to professional HYROX training programs requires a premium subscription">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {safePrograms.map((program: any) => (
               <Card 
                 key={program.id} 
@@ -214,6 +211,7 @@ export default function Programs() {
               </Card>
             )}
           </div>
+        </SubscriptionGate>
         </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
