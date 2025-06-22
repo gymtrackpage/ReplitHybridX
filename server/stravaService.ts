@@ -6,8 +6,8 @@ import FormData from 'form-data';
 
 const STRAVA_BASE_URL = 'https://www.strava.com/api/v3';
 const STRAVA_AUTH_URL = 'https://www.strava.com/oauth/token';
-// Use the configured Replit domain for redirect URI
-const REDIRECT_URI = `https://0fcc3a45-589d-49fb-a059-7d9954da233f-00-8sst6tp6qylm.spock.replit.dev/api/strava/callback`;
+// Use the configured domain for redirect URI - will be set dynamically
+const REDIRECT_URI = process.env.STRAVA_REDIRECT_URI || `https://app.hybridx.club/api/strava/callback`;
 
 export interface StravaTokens {
   access_token: string;
@@ -36,6 +36,7 @@ export class StravaService {
     }
 
     console.log("Strava Client ID:", process.env.STRAVA_CLIENT_ID ? "Set" : "Not set");
+    console.log("Strava Client Secret:", process.env.STRAVA_CLIENT_SECRET ? "Set" : "Not set");
     console.log("Redirect URI:", REDIRECT_URI);
 
     // According to Strava API docs, use approval_prompt=auto for better UX
