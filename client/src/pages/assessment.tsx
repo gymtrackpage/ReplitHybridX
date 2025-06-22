@@ -175,6 +175,13 @@ export default function Assessment() {
   };
 
   const handleSubscribe = () => {
+    // Store assessment data and recommendation for payment completion
+    localStorage.setItem('pendingAssessment', JSON.stringify({
+      assessmentData,
+      programId: recommendation!.recommendedProgram.id,
+      subscriptionChoice: "premium"
+    }));
+    
     createSubscriptionMutation.mutate();
   };
 

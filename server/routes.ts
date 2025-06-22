@@ -999,6 +999,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Complete assessment after payment success
+  app.post('/api/complete-assessment', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { assessmentData, programId, subscriptionChoice } = req.body;
+
+      // Create assessment record
+      const assessment = await storage.createAssessment({
+        userId,
+        data: JSON.stringify(assessmentData),
+        ...assessmentData
+      });
+
+      // Update user profile
+      await storage.updateUserProfile(userId, {
+        assessmentCompleted: true,
+        subscriptionStatus: subscriptionChoice === "premium" ? "active" : "free_trial",
+        currentProgramId: programId,
+        updatedAt: new Date()
+      });
+
+      // Create initial progress tracking
+      const existingProgress = await storage.getUserProgress(userId);
+      if (!existingProgress) {
+        await storage.createUserProgress({
+          userId,
+          programId,
+          currentWeek: 1,
+          currentDay: 1,
+          startDate: new Date().toISOString(),
+          completedWorkouts: 0,
+          totalWorkouts: 84 // Default for 12-week program
+        });
+      }
+
+      res.json({ success: true, assessment });
+    } catch (error) {
+      console.error("Error completing assessment:", error);
+      res.status(500).json({ message: "Failed to complete assessment" });
+    }
+  });
+
   // Assessment routes
   app.post('/api/assessment', isAuthenticated, async (req: any, res) => {
     try {
@@ -1629,7 +1671,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return res.json({
               subscriptionId: existingSubscription.id,
               status: existingSubscription.status,
-              clientSecret: existingSubscription.latest_invoice?.payment_intent?.client_secret
+              paymentUrl: '/subscription-success'
             });
           }
         } catch (error) {
@@ -1662,9 +1704,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await storage.updateUserStripeInfo(userId, customerId, subscription.id);
 
+      const clientSecret = subscription.latest_invoice?.payment_intent?.client_secret;
+      
       res.json({
         subscriptionId: subscription.id,
-        clientSecret: subscription.latest_invoice?.payment_intent?.client_secret
+        clientSecret,
+        paymentUrl: `/payment?client_secret=${clientSecret}&subscription_id=${subscription.id}`
       });
     } catch (error: any) {
       console.error("Subscription creation error:", error);

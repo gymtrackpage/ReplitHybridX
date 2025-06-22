@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { loadStripe } from "@stripe/stripe-js";
@@ -54,19 +53,15 @@ function CheckoutForm({ clientSecret, subscriptionId }: { clientSecret: string, 
         const pendingAssessment = localStorage.getItem('pendingAssessment');
         if (pendingAssessment) {
           const assessmentData = JSON.parse(pendingAssessment);
-          await apiRequest("POST", "/api/assessment", {
-            ...assessmentData,
-            subscriptionChoice: "premium",
-            paymentIntentId: paymentIntent.id
-          });
+          await apiRequest("POST", "/api/complete-assessment", assessmentData);
           localStorage.removeItem('pendingAssessment');
         }
-        
+
         toast({
           title: "Payment Successful!",
           description: "Welcome to HybridX Premium! Your assessment has been completed.",
         });
-        
+
         setLocation("/subscription-success");
       } catch (error) {
         console.error("Assessment completion error:", error);
@@ -130,12 +125,12 @@ export default function Payment() {
     const urlParams = new URLSearchParams(window.location.search);
     const secret = urlParams.get('client_secret');
     const subId = urlParams.get('subscription_id');
-    
+
     if (!secret || !subId) {
       setLocation('/assessment');
       return;
     }
-    
+
     setClientSecret(secret);
     setSubscriptionId(subId);
   }, [setLocation]);
@@ -164,7 +159,7 @@ export default function Payment() {
                 Enter your payment details to activate HybridX Premium
               </CardDescription>
             </CardHeader>
-            
+
             <CardContent>
               <div className="mb-6 p-4 bg-white rounded-lg border border-yellow-100">
                 <h3 className="font-semibold mb-2">HybridX Premium - £5/month</h3>

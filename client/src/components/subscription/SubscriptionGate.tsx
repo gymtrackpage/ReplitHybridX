@@ -18,7 +18,7 @@ export function SubscriptionGate({
   description = "This feature requires a premium subscription",
   showUpgrade = true 
 }: SubscriptionGateProps) {
-  const { hasAccess, isLoading } = usePremiumAccess();
+  const { hasAccess, isLoading, isAdmin } = usePremiumAccess();
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
 
   if (isLoading) {
@@ -52,7 +52,7 @@ export function SubscriptionGate({
               Get access to professional training programs, progress tracking, and more.
             </p>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div className="flex items-center gap-2">
               <Zap className="h-4 w-4 text-yellow-500" />
@@ -103,9 +103,9 @@ export function SubscriptionGate({
 export function PremiumBadge({ feature, className = "" }: { feature: string; className?: string }) {
   const { hasAccess } = usePremiumAccess();
   const [showModal, setShowModal] = useState(false);
-  
+
   if (hasAccess) return null;
-  
+
   return (
     <>
       <Button
