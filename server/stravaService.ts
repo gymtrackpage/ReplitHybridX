@@ -166,8 +166,15 @@ export class StravaService {
         startDate = new Date().toISOString();
       }
 
+      // Add timestamp to prevent duplicate activity conflicts (409 errors)
+      const timestamp = new Date().toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: false 
+      });
+      
       const activityData = {
-        name: workoutData.name.trim(),
+        name: `${workoutData.name.trim()} - ${timestamp}`,
         type: this.mapWorkoutTypeToStravaType(workoutData.type),
         sport_type: this.mapWorkoutTypeToStravaSportType(workoutData.type),
         start_date_local: startDate,
@@ -341,6 +348,22 @@ export class StravaService {
       console.error('Error response status:', error.response?.status);
       console.error('Error response data:', error.response?.data);
       console.error('Error message:', error.message);
+
+      // Handle specific Strava error codes
+      if (error.response?.status === 409) {
+        // Activity already exists - this can happen if user tries to share the same workout multiple times
+        throw new Error('This workout has already been shared to Strava, or a similar activity already exists.');
+      } else if (error.response?.status === 422) {
+        // Invalid data
+        const errorDetail = error.response?.data?.errors?.[0]?.field || 'data';
+        throw new Error(`Invalid workout data for Strava: ${errorDetail}`);
+      } else if (error.response?.status === 401) {
+        // Unauthorized
+        throw new Error('Strava authentication expired. Please reconnect your account.');
+      } else if (error.response?.status === 403) {
+        // Forbidden
+        throw new Error('Access denied. Please check your Strava permissions.');
+      }
 
       // Re-throw the error so it can be handled by the calling function
       throw error;
