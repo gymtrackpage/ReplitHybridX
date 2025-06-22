@@ -1,3 +1,4 @@
+
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
@@ -36,7 +37,7 @@ app.use((req, res, next) => {
   next();
 });
 
-(async () => {
+async function startServer() {
   try {
     console.log("🚀 Starting HybridX server...");
 
@@ -49,9 +50,11 @@ app.use((req, res, next) => {
       process.exit(1);
     }
 
+    // Register routes and get server instance
     const server = await registerRoutes(app);
     console.log("✅ Routes registered successfully");
 
+    // Error handling middleware
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
       const status = err.status || err.statusCode || 500;
       const message = err.message || "Internal Server Error";
@@ -60,19 +63,13 @@ app.use((req, res, next) => {
       res.status(status).json({ message });
     });
 
-    // importantly only setup vite in development and after
-    // setting up all the other routes so the catch-all route
-    // doesn't interfere with the other routes
+    // Setup Vite or static files
     if (app.get("env") === "development") {
       console.log("🔧 Setting up Vite development server...");
       await setupVite(app, server);
       console.log("✅ Vite development server ready");
     } else {
       console.log("📦 Setting up static file serving...");
-      console.log("🔍 Environment:", process.env.NODE_ENV);
-      console.log("🔍 App env:", app.get("env"));
-      console.log("🔍 Current directory:", process.cwd());
-      console.log("🔍 Server dirname:", import.meta.dirname);
       try {
         serveStatic(app);
         console.log("✅ Static files ready");
@@ -83,12 +80,9 @@ app.use((req, res, next) => {
     }
 
     // Use PORT environment variable or default to 5000
-    // Port 5000 is recommended for Replit as it gets forwarded to 80/443 in production
     const port = parseInt(process.env.PORT || "5000");
 
     // Handle server startup errors
-    const server = await registerRoutes(app);
-    
     server.on('error', (error: any) => {
       if (error.code === 'EADDRINUSE') {
         console.error(`❌ Port ${port} is already in use. Please stop any running processes and try again.`);
@@ -113,16 +107,18 @@ app.use((req, res, next) => {
       });
     });
 
-    // Handle server errors
-    // server.on('error', (error: any) => {
-    //   console.error('❌ Server error:', error);
-    //   if (error.code === 'EADDRINUSE') {
-    //     console.error(`Port ${port} is already in use. Trying to kill existing process...`);
-    //   }
-    // });
+    process.on('SIGINT', () => {
+      console.log('🛑 Received SIGINT, shutting down gracefully');
+      server.close(() => {
+        console.log('✅ Server closed');
+        process.exit(0);
+      });
+    });
 
   } catch (error) {
     console.error("❌ Failed to start server:", error);
     process.exit(1);
   }
-})();
+}
+
+startServer();

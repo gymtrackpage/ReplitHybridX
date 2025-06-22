@@ -1753,7 +1753,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  
+
 
   // Phase transition management
   app.post("/api/check-phase-transition", isAuthenticated, async (req: any, res) => {
@@ -2274,7 +2274,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message: "Strava integration not configured" 
         });
       }
-      
+
       const authUrl = StravaService.getAuthorizationUrl();
       res.json({ authUrl, configured: true });
     } catch (error) {
@@ -2353,7 +2353,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } catch (error: any) {
       console.error("Error pushing workout to Strava:", error);
-      
+
       // Handle different types of Strava errors
       if (error.response?.status === 401) {
         return res.status(401).json({ 
@@ -2370,7 +2370,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message: "Invalid workout data for Strava: " + (error.response.data?.message || error.message)
         });
       }
-      
+
       res.status(500).json({ 
         message: error.message || "Failed to share workout to Strava" 
       });
@@ -2527,7 +2527,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } catch (error: any) {
       console.error("Error sharing to Strava:", error);
-      
+
       // Handle different types of Strava errors
       if (error.response?.status === 401) {
         return res.status(401).json({ 
@@ -2544,7 +2544,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message: "Invalid workout data for Strava: " + (error.response.data?.message || error.message)
         });
       }
-      
+
       res.status(500).json({ 
         message: error.message || "Failed to share workout to Strava" 
       });
