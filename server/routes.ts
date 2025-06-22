@@ -1753,78 +1753,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/create-subscription", isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      if (!stripe) {
-        return res.status(500).json({ message: "Stripe not configured" });
-      }
-
-      let customerId = user.stripeCustomerId;
-
-      // Create customer if doesn't exist
-      if (!customerId) {
-        const customer = await stripe.customers.create({
-          email: user.email,
-          name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
-          metadata: { userId }
-        });
-        customerId = customer.id;
-        await storage.updateUserStripeInfo(userId, customerId, "");
-      }
-
-      // Check for existing subscription
-      if (user.stripeSubscriptionId) {
-        const subscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
-        if (subscription.status === 'active') {
-          return res.json({
-            subscriptionId: subscription.id,
-            status: subscription.status,
-            clientSecret: subscription.latest_invoice?.payment_intent?.client_secret
-          });
-        }
-      }
-
-      // Create new subscription with £5/month price
-      const subscription = await stripe.subscriptions.create({
-        customer: customerId,
-        items: [{
-          price_data: {
-            currency: 'gbp',
-            product_data: {
-              name: 'HybridX Premium',
-              description: 'Access to all HYROX training programs and premium features'
-            },
-            unit_amount: 500, // £5.00
-            recurring: {
-              interval: 'month'
-            }
-          }
-        }],
-        payment_behavior: 'default_incomplete',
-        payment_settings: {
-          save_default_payment_method: 'on_subscription'
-        },
-        expand: ['latest_invoice.payment_intent'],
-      });
-
-      await storage.updateUserStripeInfo(userId, customerId, subscription.id);
-
-      res.json({
-        subscriptionId: subscription.id,
-        clientSecret: subscription.latest_invoice?.payment_intent?.client_secret
-      });
-    } catch (error: any) {
-      console.error("Subscription creation error:", error);
-      res.status(500).json({ message: "Error creating subscription: " + error.message });
-    }
-  });
+  
 
   // Phase transition management
   app.post("/api/check-phase-transition", isAuthenticated, async (req: any, res) => {
