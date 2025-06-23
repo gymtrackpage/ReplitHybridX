@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import { createServer, type Server } from "http";
 import path from "path";
 import fs from "fs";
@@ -53,8 +53,6 @@ if (process.env.STRIPE_SECRET_KEY) {
 } else {
   console.warn('Stripe not initialized: STRIPE_SECRET_KEY not provided');
 }
-
-import type { Request, Response, NextFunction } from "express";
 
 // Extend Request interface to include user
 interface AuthenticatedRequest extends Request {
