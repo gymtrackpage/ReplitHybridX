@@ -62,7 +62,7 @@ function CheckoutForm({ clientSecret, subscriptionId }: { clientSecret: string, 
           description: "Welcome to HybridX Premium! Your assessment has been completed.",
         });
 
-        setLocation("/subscription-success");
+        setLocation("/dashboard");
       } catch (error) {
         console.error("Assessment completion error:", error);
         toast({

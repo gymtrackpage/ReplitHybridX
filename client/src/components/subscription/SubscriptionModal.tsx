@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Crown, Zap, Check } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
 // import { useLocation } from "wouter";
 
 interface SubscriptionModalProps {
@@ -17,14 +18,9 @@ export function SubscriptionModal({ open, onOpenChange, feature }: SubscriptionM
   const handleSubscribe = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch("/api/create-subscription", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" }
-      });
-      
-      if (response.ok) {
-        const { url } = await response.json();
-        window.location.href = url;
+      const response = await apiRequest("POST", "/api/create-subscription");
+      if (response.url) {
+        window.location.href = response.url;
       }
     } catch (error) {
       console.error("Subscription error:", error);
