@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Crown, Lock, CreditCard } from "lucide-react";
 
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "pk_test_...");
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY!);
 
 function CheckoutForm({ clientSecret, subscriptionId }: { clientSecret: string, subscriptionId: string }) {
   const stripe = useStripe();
@@ -48,12 +48,22 @@ function CheckoutForm({ clientSecret, subscriptionId }: { clientSecret: string, 
         variant: "destructive"
       });
     } else if (paymentIntent?.status === 'succeeded') {
-      // Payment succeeded - complete assessment
+      // Payment succeeded - update subscription status and complete assessment
       try {
+        // Update subscription status
+        await apiRequest("POST", "/api/subscription-confirmed", {
+          subscriptionId,
+          paymentIntentId: paymentIntent.id
+        });
+
         const pendingAssessment = localStorage.getItem('pendingAssessment');
         if (pendingAssessment) {
           const assessmentData = JSON.parse(pendingAssessment);
-          await apiRequest("POST", "/api/complete-assessment", assessmentData);
+          await apiRequest("POST", "/api/complete-assessment", {
+            ...assessmentData,
+            subscriptionChoice: "premium",
+            paymentIntentId: paymentIntent.id
+          });
           localStorage.removeItem('pendingAssessment');
         }
 

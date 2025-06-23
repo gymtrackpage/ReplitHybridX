@@ -1193,6 +1193,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/create-subscription', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      
+      if (!stripe) {
+        return res.status(500).json({ message: "Payment processing not configured" });
+      }
+
       const user = await storage.getUser(userId);
 
       if (!user) {
@@ -1200,15 +1205,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (user.stripeSubscriptionId) {
-        const subscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
-        const invoice = subscription.latest_invoice;
-        const clientSecret = typeof invoice === 'object' && invoice?.payment_intent 
-          ? (typeof invoice.payment_intent === 'object' ? invoice.payment_intent.client_secret : null)
-          : null;
-        return res.json({
-          subscriptionId: subscription.id,
-          clientSecret,
-        });
+        try {
+          const subscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
+          const invoice = subscription.latest_invoice;
+          const clientSecret = typeof invoice === 'object' && invoice?.payment_intent 
+            ? (typeof invoice.payment_intent === 'object' ? invoice.payment_intent.client_secret : null)
+            : null;
+          return res.json({
+            subscriptionId: subscription.id,
+            clientSecret,
+          });
+        } catch (stripeError) {
+          console.error("Existing subscription not found:", stripeError);
+          // Continue to create new subscription
+        }
       }
 
       if (!user.email) {
@@ -1717,6 +1727,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Confirm subscription after successful payment
+  app.post("/api/subscription-confirmed", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { subscriptionId, paymentIntentId } = req.body;
+
+      if (!stripe) {
+        return res.status(500).json({ message: "Stripe not configured" });
+      }
+
+      // Verify payment intent is successful
+      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      if (paymentIntent.status !== 'succeeded') {
+        return res.status(400).json({ message: "Payment not confirmed" });
+      }
+
+      // Update user subscription status
+      await storage.updateUserProfile(userId, {
+        subscriptionStatus: "active",
+        updatedAt: new Date()
+      });
+
+      res.json({
+        success: true,
+        message: "Subscription confirmed successfully"
+      });
+    } catch (error: any) {
+      console.error("Subscription confirmation error:", error);
+      res.status(500).json({ message: "Error confirming subscription: " + error.message });
+    }
+  });
+
   // Cancel subscription endpoint
   app.post("/api/cancel-subscription", isAuthenticated, async (req: any, res) => {
     try {
@@ -1748,6 +1790,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Subscription cancellation error:", error);
       res.status(500).json({ message: "Error canceling subscription: " + error.message });
     }
+  });
+
+  // Stripe webhook handler
+  app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), async (req, res) => {
+    const sig = req.headers['stripe-signature'];
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+    if (!stripe || !webhookSecret) {
+      return res.status(400).send('Webhook secret not configured');
+    }
+
+    let event;
+
+    try {
+      event = stripe.webhooks.constructEvent(req.body, sig!, webhookSecret);
+    } catch (err: any) {
+      console.error('Webhook signature verification failed:', err.message);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    // Handle the event
+    switch (event.type) {
+      case 'invoice.payment_succeeded':
+        const invoice = event.data.object;
+        const subscriptionId = invoice.subscription;
+        if (subscriptionId) {
+          // Find user by subscription ID and update status
+          const user = await storage.getUserByStripeSubscriptionId(subscriptionId as string);
+          if (user) {
+            await storage.updateUserProfile(user.id, {
+              subscriptionStatus: "active",
+              updatedAt: new Date()
+            });
+          }
+        }
+        break;
+      case 'invoice.payment_failed':
+        // Handle failed payment
+        break;
+      case 'customer.subscription.deleted':
+        const subscription = event.data.object;
+        const deletedUser = await storage.getUserByStripeSubscriptionId(subscription.id);
+        if (deletedUser) {
+          await storage.updateUserProfile(deletedUser.id, {
+            subscriptionStatus: "cancelled",
+            updatedAt: new Date()
+          });
+        }
+        break;
+      default:
+        console.log(`Unhandled event type ${event.type}`);
+    }
+
+    res.json({received: true});
   });
 
   // Resume subscription endpoint
