@@ -16,16 +16,24 @@ import {
   Trash2,
   Download,
   RefreshCw,
-  ExternalLink
+  ExternalLink,
+  Plus,
+  AlertCircle
 } from "lucide-react";
 
 export default function Settings() {
   const { toast } = useToast();
   const [isConnectingStrava, setIsConnectingStrava] = useState(false);
-  const { subscriptionStatus: subscription, cancelSubscription } = useSubscription();
+  const [isUpdatingPaymentMethod, setIsUpdatingPaymentMethod] = useState(false);
+  const { subscriptionStatus: subscription, cancelSubscription, updatePaymentMethod, retryPayment } = useSubscription();
 
   const { data: user } = useQuery({
     queryKey: ["/api/auth/user"],
+  });
+
+  const { data: paymentMethodsData } = useQuery({
+    queryKey: ["/api/payment-methods"],
+    enabled: !!subscription?.isSubscribed,
   });
 
   const connectStravaMutation = useMutation({
@@ -116,6 +124,67 @@ export default function Settings() {
       });
     },
   });
+
+  const deletePaymentMethodMutation = useMutation({
+    mutationFn: async (paymentMethodId: string) => {
+      await apiRequest("DELETE", `/api/payment-methods/${paymentMethodId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/payment-methods"] });
+      toast({
+        title: "Payment Method Removed",
+        description: "Payment method has been removed successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to remove payment method",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleUpdatePaymentMethod = async () => {
+    try {
+      setIsUpdatingPaymentMethod(true);
+      const response = await updatePaymentMethod();
+      
+      // In a real implementation, you'd redirect to Stripe's hosted page or open a modal
+      // For now, just show a message
+      toast({
+        title: "Payment Method Update",
+        description: "Redirecting to secure payment form...",
+      });
+      
+      // You would redirect to Stripe's hosted page here:
+      // window.location.href = response.url;
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update payment method",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdatingPaymentMethod(false);
+    }
+  };
+
+  const handleRetryPayment = async () => {
+    try {
+      await retryPayment();
+      toast({
+        title: "Payment Retry",
+        description: "Payment retry initiated successfully.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Retry Failed",
+        description: error.message || "Failed to retry payment",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleStravaConnect = () => {
     setIsConnectingStrava(true);
@@ -208,14 +277,29 @@ export default function Settings() {
                 </div>
                 <Badge 
                   className={
-                    subscription?.isSubscribed 
+                    subscription?.subscriptionStatus === 'past_due'
+                      ? "bg-red-100 text-red-800"
+                      : subscription?.isSubscribed 
                       ? "bg-green-100 text-green-800" 
                       : "bg-gray-100 text-gray-800"
                   }
                 >
-                  {subscription?.isSubscribed ? "active" : "free"}
+                  {subscription?.subscriptionStatus === 'past_due' 
+                    ? "payment failed" 
+                    : subscription?.isSubscribed 
+                    ? "active" 
+                    : "free"}
                 </Badge>
               </div>
+
+              {subscription?.subscriptionStatus === 'past_due' && (
+                <div className="flex items-center gap-2 p-3 bg-red-50 text-red-800 rounded border border-red-200">
+                  <AlertCircle className="h-4 w-4" />
+                  <div className="text-sm">
+                    Your payment failed. Please update your payment method or retry payment.
+                  </div>
+                </div>
+              )}
 
               {subscription?.currentPeriodEnd && subscription?.isSubscribed && (
                 <div className="text-sm">
@@ -242,11 +326,20 @@ export default function Settings() {
                   </Button>
                 ) : (
                   <>
+                    {subscription?.subscriptionStatus === 'past_due' && (
+                      <Button 
+                        className="w-full bg-red-600 hover:bg-red-700"
+                        onClick={handleRetryPayment}
+                      >
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Retry Payment
+                      </Button>
+                    )}
+                    
                     {subscription?.cancelAtPeriodEnd ? (
                       <Button 
                         className="w-full"
                         onClick={() => {
-                          // Add resume subscription logic here
                           toast({
                             title: "Resume Subscription",
                             description: "Contact support to resume your subscription.",
@@ -308,6 +401,55 @@ export default function Settings() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Payment Methods - Only show if subscribed */}
+          {subscription?.isSubscribed && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CreditCard className="h-5 w-5" />
+                  Payment Methods
+                </CardTitle>
+                <CardDescription>Manage your payment methods</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {paymentMethodsData?.paymentMethods?.map((pm: any) => (
+                  <div key={pm.id} className="flex justify-between items-center p-3 border rounded">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-6 bg-gray-100 rounded flex items-center justify-center text-xs font-mono">
+                        {pm.brand?.toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="font-medium">•••• •••• •••• {pm.last4}</div>
+                        <div className="text-sm text-muted-foreground">
+                          Expires {pm.expMonth}/{pm.expYear}
+                          {pm.isDefault && <span className="ml-2 text-green-600">(Default)</span>}
+                        </div>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => deletePaymentMethodMutation.mutate(pm.id)}
+                      disabled={pm.isDefault}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={handleUpdatePaymentMethod}
+                  disabled={isUpdatingPaymentMethod}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  {isUpdatingPaymentMethod ? "Setting up..." : "Add Payment Method"}
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Integrations */}
           <Card>

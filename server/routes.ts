@@ -1882,34 +1882,96 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Handle the event
     switch (event.type) {
       case 'invoice.payment_succeeded':
-        const invoice = event.data.object;
-        const subscriptionId = invoice.subscription;
-        if (subscriptionId) {
-          // Find user by subscription ID and update status
-          const user = await storage.getUserByStripeSubscriptionId(subscriptionId as string);
+        const successfulInvoice = event.data.object;
+        const successSubscriptionId = successfulInvoice.subscription;
+        if (successSubscriptionId) {
+          const user = await storage.getUserByStripeSubscriptionId(successSubscriptionId as string);
           if (user) {
             await storage.updateUserProfile(user.id, {
               subscriptionStatus: "active",
               updatedAt: new Date()
             });
+            console.log(`Payment succeeded for user ${user.id}`);
           }
         }
         break;
+
       case 'invoice.payment_failed':
-        // Handle failed payment
+        const failedInvoice = event.data.object;
+        const failedSubscriptionId = failedInvoice.subscription;
+        if (failedSubscriptionId) {
+          const user = await storage.getUserByStripeSubscriptionId(failedSubscriptionId as string);
+          if (user) {
+            console.log(`Payment failed for user ${user.id}. Attempt: ${failedInvoice.attempt_count}`);
+            
+            // Update user status to indicate payment issues
+            await storage.updateUserProfile(user.id, {
+              subscriptionStatus: "past_due",
+              updatedAt: new Date()
+            });
+
+            // Store failed payment information for retry logic
+            await storage.createFailedPaymentRecord({
+              userId: user.id,
+              invoiceId: failedInvoice.id,
+              attemptCount: failedInvoice.attempt_count,
+              amount: failedInvoice.amount_due,
+              currency: failedInvoice.currency,
+              failureReason: failedInvoice.last_finalization_error?.message || 'Payment failed',
+              nextRetryAt: failedInvoice.next_payment_attempt ? new Date(failedInvoice.next_payment_attempt * 1000) : null,
+              createdAt: new Date()
+            });
+
+            // Send notification (you would implement email service here)
+            console.log(`Would send payment failure notification to user ${user.id} (${user.email})`);
+          }
+        }
         break;
+
+      case 'invoice.finalization_failed':
+        const finalizationFailedInvoice = event.data.object;
+        console.log(`Invoice finalization failed: ${finalizationFailedInvoice.id}`);
+        break;
+
       case 'customer.subscription.deleted':
-        const subscription = event.data.object;
-        const deletedUser = await storage.getUserByStripeSubscriptionId(subscription.id);
+        const deletedSubscription = event.data.object;
+        const deletedUser = await storage.getUserByStripeSubscriptionId(deletedSubscription.id);
         if (deletedUser) {
           await storage.updateUserProfile(deletedUser.id, {
             subscriptionStatus: "free_trial",
             updatedAt: new Date()
           });
-          // Clear Stripe subscription ID when cancelled
           await storage.updateUserStripeInfo(deletedUser.id, deletedUser.stripeCustomerId || "", "");
+          console.log(`Subscription deleted for user ${deletedUser.id}`);
         }
         break;
+
+      case 'customer.subscription.updated':
+        const updatedSubscription = event.data.object;
+        const updatedUser = await storage.getUserByStripeSubscriptionId(updatedSubscription.id);
+        if (updatedUser) {
+          let newStatus = "active";
+          if (updatedSubscription.status === 'past_due') {
+            newStatus = "past_due";
+          } else if (updatedSubscription.status === 'canceled') {
+            newStatus = "free_trial";
+          } else if (updatedSubscription.status === 'unpaid') {
+            newStatus = "past_due";
+          }
+
+          await storage.updateUserProfile(updatedUser.id, {
+            subscriptionStatus: newStatus,
+            updatedAt: new Date()
+          });
+          console.log(`Subscription updated for user ${updatedUser.id}: ${updatedSubscription.status}`);
+        }
+        break;
+
+      case 'payment_method.attached':
+        const attachedPaymentMethod = event.data.object;
+        console.log(`Payment method attached: ${attachedPaymentMethod.id}`);
+        break;
+
       default:
         console.log(`Unhandled event type ${event.type}`);
     }
@@ -1947,6 +2009,214 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Subscription resume error:", error);
       res.status(500).json({ message: "Error resuming subscription: " + error.message });
+    }
+  });
+
+  // Update payment method endpoint
+  app.post("/api/update-payment-method", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+
+      if (!user || !user.stripeCustomerId) {
+        return res.status(404).json({ message: "No customer found" });
+      }
+
+      if (!stripe) {
+        return res.status(500).json({ message: "Stripe not configured" });
+      }
+
+      // Create a setup intent for updating payment method
+      const setupIntent = await stripe.setupIntents.create({
+        customer: user.stripeCustomerId,
+        payment_method_types: ['card'],
+        usage: 'off_session'
+      });
+
+      res.json({
+        clientSecret: setupIntent.client_secret,
+        setupIntentId: setupIntent.id
+      });
+    } catch (error: any) {
+      console.error("Payment method update error:", error);
+      res.status(500).json({ message: "Error updating payment method: " + error.message });
+    }
+  });
+
+  // Confirm payment method update
+  app.post("/api/confirm-payment-method-update", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { setupIntentId, paymentMethodId } = req.body;
+      const user = await storage.getUser(userId);
+
+      if (!user || !user.stripeCustomerId || !user.stripeSubscriptionId) {
+        return res.status(404).json({ message: "Customer or subscription not found" });
+      }
+
+      if (!stripe) {
+        return res.status(500).json({ message: "Stripe not configured" });
+      }
+
+      // Verify setup intent succeeded
+      const setupIntent = await stripe.setupIntents.retrieve(setupIntentId);
+      if (setupIntent.status !== 'succeeded') {
+        return res.status(400).json({ message: "Payment method setup failed" });
+      }
+
+      // Update the subscription's default payment method
+      await stripe.subscriptions.update(user.stripeSubscriptionId, {
+        default_payment_method: paymentMethodId
+      });
+
+      // Set as customer's default payment method
+      await stripe.customers.update(user.stripeCustomerId, {
+        invoice_settings: {
+          default_payment_method: paymentMethodId
+        }
+      });
+
+      res.json({
+        success: true,
+        message: "Payment method updated successfully"
+      });
+    } catch (error: any) {
+      console.error("Payment method confirmation error:", error);
+      res.status(500).json({ message: "Error confirming payment method: " + error.message });
+    }
+  });
+
+  // Get customer's payment methods
+  app.get("/api/payment-methods", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+
+      if (!user || !user.stripeCustomerId) {
+        return res.json({ paymentMethods: [] });
+      }
+
+      if (!stripe) {
+        return res.status(500).json({ message: "Stripe not configured" });
+      }
+
+      const paymentMethods = await stripe.paymentMethods.list({
+        customer: user.stripeCustomerId,
+        type: 'card'
+      });
+
+      // Get customer's default payment method
+      const customer = await stripe.customers.retrieve(user.stripeCustomerId);
+      const defaultPaymentMethodId = typeof customer !== 'string' 
+        ? customer.invoice_settings?.default_payment_method 
+        : null;
+
+      const formattedPaymentMethods = paymentMethods.data.map(pm => ({
+        id: pm.id,
+        last4: pm.card?.last4,
+        brand: pm.card?.brand,
+        expMonth: pm.card?.exp_month,
+        expYear: pm.card?.exp_year,
+        isDefault: pm.id === defaultPaymentMethodId
+      }));
+
+      res.json({ paymentMethods: formattedPaymentMethods });
+    } catch (error: any) {
+      console.error("Payment methods fetch error:", error);
+      res.status(500).json({ message: "Error fetching payment methods: " + error.message });
+    }
+  });
+
+  // Delete payment method
+  app.delete("/api/payment-methods/:paymentMethodId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { paymentMethodId } = req.params;
+      const user = await storage.getUser(userId);
+
+      if (!user || !user.stripeCustomerId) {
+        return res.status(404).json({ message: "Customer not found" });
+      }
+
+      if (!stripe) {
+        return res.status(500).json({ message: "Stripe not configured" });
+      }
+
+      // Detach the payment method
+      await stripe.paymentMethods.detach(paymentMethodId);
+
+      res.json({
+        success: true,
+        message: "Payment method removed successfully"
+      });
+    } catch (error: any) {
+      console.error("Payment method deletion error:", error);
+      res.status(500).json({ message: "Error removing payment method: " + error.message });
+    }
+  });
+
+  // Retry failed payment
+  app.post("/api/retry-payment", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { paymentMethodId } = req.body;
+      const user = await storage.getUser(userId);
+
+      if (!user || !user.stripeSubscriptionId) {
+        return res.status(404).json({ message: "Subscription not found" });
+      }
+
+      if (!stripe) {
+        return res.status(500).json({ message: "Stripe not configured" });
+      }
+
+      // Get the latest invoice
+      const invoices = await stripe.invoices.list({
+        subscription: user.stripeSubscriptionId,
+        limit: 1
+      });
+
+      if (invoices.data.length === 0) {
+        return res.status(404).json({ message: "No invoice found" });
+      }
+
+      const invoice = invoices.data[0];
+      
+      if (invoice.status === 'paid') {
+        return res.status(400).json({ message: "Invoice is already paid" });
+      }
+
+      // Update payment method if provided
+      if (paymentMethodId) {
+        await stripe.subscriptions.update(user.stripeSubscriptionId, {
+          default_payment_method: paymentMethodId
+        });
+      }
+
+      // Retry the payment
+      const paidInvoice = await stripe.invoices.pay(invoice.id);
+
+      if (paidInvoice.status === 'paid') {
+        // Update user subscription status if payment succeeded
+        await storage.updateUserProfile(userId, {
+          subscriptionStatus: "active",
+          updatedAt: new Date()
+        });
+
+        res.json({
+          success: true,
+          message: "Payment retry successful"
+        });
+      } else {
+        res.json({
+          success: false,
+          message: "Payment retry failed",
+          invoiceStatus: paidInvoice.status
+        });
+      }
+    } catch (error: any) {
+      console.error("Payment retry error:", error);
+      res.status(500).json({ message: "Error retrying payment: " + error.message });
     }
   });
 

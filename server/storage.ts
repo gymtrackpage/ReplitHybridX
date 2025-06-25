@@ -611,6 +611,27 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async createFailedPaymentRecord(failedPayment: {
+    userId: string;
+    invoiceId: string;
+    attemptCount: number;
+    amount: number;
+    currency: string;
+    failureReason: string;
+    nextRetryAt: Date | null;
+    createdAt: Date;
+  }): Promise<void> {
+    // In a real implementation, you'd have a failedPayments table
+    // For now, we'll just log it
+    console.log('Failed payment record created:', failedPayment);
+  }
+
+  async getFailedPayments(userId: string): Promise<any[]> {
+    // In a real implementation, you'd query the failedPayments table
+    // For now, return empty array
+    return [];
+  }
+
   // Additional methods needed by routes
   async disconnectStrava(userId: string): Promise<User> {
     const [user] = await db

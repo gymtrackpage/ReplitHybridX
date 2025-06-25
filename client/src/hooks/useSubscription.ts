@@ -74,6 +74,24 @@ export function useSubscription() {
     },
   });
 
+  const updatePaymentMethodMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/update-payment-method");
+      return response.json();
+    },
+  });
+
+  const retryPaymentMutation = useMutation({
+    mutationFn: async (paymentMethodId?: string) => {
+      const response = await apiRequest("POST", "/api/retry-payment", { paymentMethodId });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/subscription-status'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+    },
+  });
+
   return {
     subscriptionStatus,
     isLoading,
@@ -83,11 +101,15 @@ export function useSubscription() {
     resumeSubscription: resumeSubscriptionMutation.mutateAsync,
     downgradeToFree: downgradeToFreeMutation.mutateAsync,
     cancelImmediately: cancelImmediatelyMutation.mutateAsync,
+    updatePaymentMethod: updatePaymentMethodMutation.mutateAsync,
+    retryPayment: retryPaymentMutation.mutateAsync,
     isCreatingSubscription: createSubscriptionMutation.isPending,
     isCancelingSubscription: cancelSubscriptionMutation.isPending,
     isResumingSubscription: resumeSubscriptionMutation.isPending,
     isDowngrading: downgradeToFreeMutation.isPending,
     isCancelingImmediately: cancelImmediatelyMutation.isPending,
+    isUpdatingPaymentMethod: updatePaymentMethodMutation.isPending,
+    isRetryingPayment: retryPaymentMutation.isPending,
   };
 }
 
