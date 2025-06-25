@@ -2659,7 +2659,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         imageBuffer
       );
 
-```tool_code
       console.log("Strava push result:", result);
 
       if (result.success) {
