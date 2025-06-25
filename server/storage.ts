@@ -186,12 +186,24 @@ export class DatabaseStorage implements IStorage {
     return newProgram;
   }
 
-  async updateProgram(id: number, program: Partial<InsertProgram>): Promise<Program> {
+  async updateProgram(programId: number, updateData: any): Promise<any> {
+    console.log("Storage: Updating program", programId, "with data:", updateData);
+
     const [updatedProgram] = await db
       .update(programs)
-      .set(program)
-      .where(eq(programs.id, id))
+      .set({
+        name: updateData.name,
+        description: updateData.description,
+        difficulty: updateData.difficulty,
+        category: updateData.category,
+        duration: updateData.duration,
+        frequency: updateData.frequency,
+        updatedAt: new Date()
+      })
+      .where(eq(programs.id, programId))
       .returning();
+
+    console.log("Storage: Program updated successfully:", updatedProgram?.id);
     return updatedProgram;
   }
 
