@@ -603,6 +603,14 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async getUserByStripeSubscriptionId(subscriptionId: string): Promise<User | undefined> {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.stripeSubscriptionId, subscriptionId));
+    return user;
+  }
+
   // Additional methods needed by routes
   async disconnectStrava(userId: string): Promise<User> {
     const [user] = await db

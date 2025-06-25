@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useSubscription } from "@/hooks/useSubscription";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { 
   Settings as SettingsIcon, 
@@ -21,13 +22,10 @@ import {
 export default function Settings() {
   const { toast } = useToast();
   const [isConnectingStrava, setIsConnectingStrava] = useState(false);
+  const { subscriptionStatus: subscription, cancelSubscription } = useSubscription();
 
   const { data: user } = useQuery({
     queryKey: ["/api/auth/user"],
-  });
-
-  const { data: subscription } = useQuery({
-    queryKey: ["/api/subscription-status"],
   });
 
   const connectStravaMutation = useMutation({
@@ -205,33 +203,109 @@ export default function Settings() {
                 <div>
                   <div className="font-medium">Current Plan</div>
                   <div className="text-sm text-muted-foreground">
-                    {subscription?.status === "active" ? "Premium Monthly" : "Free Trial"}
+                    {subscription?.isSubscribed ? "Premium Monthly" : "Free Plan"}
                   </div>
                 </div>
                 <Badge 
                   className={
-                    subscription?.status === "active" 
+                    subscription?.isSubscribed 
                       ? "bg-green-100 text-green-800" 
                       : "bg-gray-100 text-gray-800"
                   }
                 >
-                  {subscription?.status || "inactive"}
+                  {subscription?.isSubscribed ? "active" : "free"}
                 </Badge>
               </div>
 
-              {subscription?.nextBillingDate && (
+              {subscription?.currentPeriodEnd && subscription?.isSubscribed && (
                 <div className="text-sm">
-                  <span className="text-muted-foreground">Next billing: </span>
+                  <span className="text-muted-foreground">
+                    {subscription?.cancelAtPeriodEnd ? "Cancels on: " : "Next billing: "}
+                  </span>
                   <span className="font-medium">
-                    {new Date(subscription.nextBillingDate).toLocaleDateString()}
+                    {new Date(subscription.currentPeriodEnd).toLocaleDateString()}
                   </span>
                 </div>
               )}
 
-              <Button className="w-full">
-                <CreditCard className="h-4 w-4 mr-2" />
-                {subscription?.status === "active" ? "Manage Billing" : "Upgrade to Premium"}
-              </Button>
+              {subscription?.cancelAtPeriodEnd && (
+                <div className="text-sm p-2 bg-yellow-50 text-yellow-800 rounded">
+                  Your subscription will be cancelled at the end of this billing period.
+                </div>
+              )}
+
+              <div className="space-y-2">
+                {!subscription?.isSubscribed ? (
+                  <Button className="w-full">
+                    <CreditCard className="h-4 w-4 mr-2" />
+                    Upgrade to Premium
+                  </Button>
+                ) : (
+                  <>
+                    {subscription?.cancelAtPeriodEnd ? (
+                      <Button 
+                        className="w-full"
+                        onClick={() => {
+                          // Add resume subscription logic here
+                          toast({
+                            title: "Resume Subscription",
+                            description: "Contact support to resume your subscription.",
+                          });
+                        }}
+                      >
+                        Resume Subscription
+                      </Button>
+                    ) : (
+                      <>
+                        <Button 
+                          variant="outline" 
+                          className="w-full"
+                          onClick={async () => {
+                            try {
+                              await cancelSubscription();
+                              toast({
+                                title: "Subscription Cancelled",
+                                description: "Your subscription will be cancelled at the end of this billing period.",
+                              });
+                            } catch (error) {
+                              toast({
+                                title: "Error",
+                                description: "Failed to cancel subscription",
+                                variant: "destructive",
+                              });
+                            }
+                          }}
+                        >
+                          Cancel at Period End
+                        </Button>
+                        <Button 
+                          variant="destructive" 
+                          className="w-full"
+                          onClick={async () => {
+                            try {
+                              const response = await apiRequest("POST", "/api/downgrade-to-free");
+                              queryClient.invalidateQueries({ queryKey: ["/api/subscription-status"] });
+                              queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+                              toast({
+                                title: "Downgraded to Free",
+                                description: "You now have free access to basic features.",
+                              });
+                            } catch (error) {
+                              toast({
+                                title: "Error",
+                                description: "Failed to downgrade subscription",
+                                variant: "destructive",
+                              });
+                            }
+                          }}
+                        >
+                          Downgrade to Free Now
+                        </Button>
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
             </CardContent>
           </Card>
 

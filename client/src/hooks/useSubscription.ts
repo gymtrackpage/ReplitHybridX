@@ -52,6 +52,28 @@ export function useSubscription() {
     },
   });
 
+  const downgradeToFreeMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/downgrade-to-free");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/subscription-status'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+    },
+  });
+
+  const cancelImmediatelyMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/cancel-subscription", { immediate: true });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/subscription-status'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+    },
+  });
+
   return {
     subscriptionStatus,
     isLoading,
@@ -59,9 +81,13 @@ export function useSubscription() {
     createSubscription: createSubscriptionMutation.mutateAsync,
     cancelSubscription: cancelSubscriptionMutation.mutateAsync,
     resumeSubscription: resumeSubscriptionMutation.mutateAsync,
+    downgradeToFree: downgradeToFreeMutation.mutateAsync,
+    cancelImmediately: cancelImmediatelyMutation.mutateAsync,
     isCreatingSubscription: createSubscriptionMutation.isPending,
     isCancelingSubscription: cancelSubscriptionMutation.isPending,
     isResumingSubscription: resumeSubscriptionMutation.isPending,
+    isDowngrading: downgradeToFreeMutation.isPending,
+    isCancelingImmediately: cancelImmediatelyMutation.isPending,
   };
 }
 

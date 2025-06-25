@@ -1757,10 +1757,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Cancel subscription endpoint
+  // Cancel subscription endpoint with immediate downgrade option
   app.post("/api/cancel-subscription", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      const { immediate = false } = req.body;
       const user = await storage.getUser(userId);
 
       if (!user || !user.stripeSubscriptionId) {
@@ -1771,22 +1772,92 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ message: "Stripe not configured" });
       }
 
-      const subscription = await stripe.subscriptions.update(user.stripeSubscriptionId, {
-        cancel_at_period_end: true
-      });
+      let subscription;
+      
+      if (immediate) {
+        // Cancel immediately and downgrade to free plan
+        subscription = await stripe.subscriptions.cancel(user.stripeSubscriptionId);
+        
+        // Update user profile to free status immediately
+        await storage.updateUserProfile(userId, {
+          subscriptionStatus: "free_trial",
+          updatedAt: new Date()
+        });
 
-      res.json({
-        success: true,
-        subscription: {
-          id: subscription.id,
-          status: subscription.status,
-          cancelAtPeriodEnd: subscription.cancel_at_period_end,
-          currentPeriodEnd: new Date(subscription.current_period_end * 1000).toISOString()
-        }
-      });
+        // Clear Stripe info from user record
+        await storage.updateUserStripeInfo(userId, user.stripeCustomerId || "", "");
+
+        res.json({
+          success: true,
+          message: "Subscription cancelled immediately. You now have free access.",
+          subscription: {
+            id: subscription.id,
+            status: "canceled",
+            cancelAtPeriodEnd: true,
+            currentPeriodEnd: new Date().toISOString()
+          }
+        });
+      } else {
+        // Cancel at period end (existing behavior)
+        subscription = await stripe.subscriptions.update(user.stripeSubscriptionId, {
+          cancel_at_period_end: true
+        });
+
+        res.json({
+          success: true,
+          message: "Subscription will be cancelled at the end of your billing period.",
+          subscription: {
+            id: subscription.id,
+            status: subscription.status,
+            cancelAtPeriodEnd: subscription.cancel_at_period_end,
+            currentPeriodEnd: new Date(subscription.current_period_end * 1000).toISOString()
+          }
+        });
+      }
     } catch (error: any) {
       console.error("Subscription cancellation error:", error);
       res.status(500).json({ message: "Error canceling subscription: " + error.message });
+    }
+  });
+
+  // Downgrade to free plan endpoint
+  app.post("/api/downgrade-to-free", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // If user has active Stripe subscription, cancel it immediately
+      if (user.stripeSubscriptionId && stripe) {
+        try {
+          await stripe.subscriptions.cancel(user.stripeSubscriptionId);
+          console.log(`Cancelled Stripe subscription ${user.stripeSubscriptionId} for user ${userId}`);
+        } catch (stripeError) {
+          console.error("Error cancelling Stripe subscription:", stripeError);
+          // Continue with downgrade even if Stripe cancellation fails
+        }
+      }
+
+      // Update user to free plan status
+      await storage.updateUserProfile(userId, {
+        subscriptionStatus: "free_trial",
+        updatedAt: new Date()
+      });
+
+      // Clear Stripe info
+      await storage.updateUserStripeInfo(userId, user.stripeCustomerId || "", "");
+
+      res.json({
+        success: true,
+        message: "Successfully downgraded to free plan. You still have access to basic features.",
+        subscriptionStatus: "free_trial"
+      });
+    } catch (error: any) {
+      console.error("Downgrade error:", error);
+      res.status(500).json({ message: "Error downgrading to free plan: " + error.message });
     }
   });
 
@@ -1832,9 +1903,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const deletedUser = await storage.getUserByStripeSubscriptionId(subscription.id);
         if (deletedUser) {
           await storage.updateUserProfile(deletedUser.id, {
-            subscriptionStatus: "cancelled",
+            subscriptionStatus: "free_trial",
             updatedAt: new Date()
           });
+          // Clear Stripe subscription ID when cancelled
+          await storage.updateUserStripeInfo(deletedUser.id, deletedUser.stripeCustomerId || "", "");
         }
         break;
       default:
