@@ -232,19 +232,31 @@ export default function Admin() {
   const fetchProgramWorkouts = async (programId: number) => {
     try {
       console.log("Fetching workouts for program:", programId);
-      const workouts = await apiRequest("GET", `/api/admin/programs/${programId}/workouts`);
+      const response = await apiRequest("GET", `/api/admin/programs/${programId}/workouts`);
+      
+      console.log("API response:", response);
       
       // Ensure workouts is an array
-      const workoutArray = Array.isArray(workouts) ? workouts : [];
+      let workoutArray = [];
+      if (Array.isArray(response)) {
+        workoutArray = response;
+      } else if (response && response.workouts && Array.isArray(response.workouts)) {
+        workoutArray = response.workouts;
+      } else if (response && typeof response === 'object') {
+        // Handle case where response might be a single workout object
+        workoutArray = [response];
+      }
       
       console.log("Final workout array for program", programId, ":", workoutArray);
+      console.log("Workout count:", workoutArray.length);
+      
       setProgramWorkouts(prev => ({ ...prev, [programId]: workoutArray }));
     } catch (error) {
       console.error("Failed to fetch workouts for program", programId, ":", error);
       setProgramWorkouts(prev => ({ ...prev, [programId]: [] }));
       toast({
         title: "Error",
-        description: "Failed to load workouts for this program",
+        description: `Failed to load workouts for program ${programId}: ${error.message}`,
         variant: "destructive"
       });
     }
@@ -445,7 +457,20 @@ export default function Admin() {
                                           </span>
                                           <span>•</span>
                                           <span className="flex items-center gap-1">
-                                            💪 {Array.isArray(workout.exercises) ? workout.exercises.length : 0} exercises
+                                            💪 {(() => {
+                                              if (Array.isArray(workout.exercises)) {
+                                                return workout.exercises.length;
+                                              } else if (typeof workout.exercises === 'string') {
+                                                try {
+                                                  const parsed = JSON.parse(workout.exercises);
+                                                  return Array.isArray(parsed) ? parsed.length : 1;
+                                                } catch {
+                                                  return workout.exercises ? 1 : 0;
+                                                }
+                                              } else {
+                                                return workout.exercises ? 1 : 0;
+                                              }
+                                            })()} exercises
                                           </span>
                                         </div>
                                       </div>

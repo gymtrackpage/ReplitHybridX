@@ -1191,7 +1191,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/create-subscription', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      
+
       if (!stripe) {
         return res.status(500).json({ message: "Payment processing not configured" });
       }
@@ -1713,7 +1713,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.updateUserStripeInfo(userId, customerId, subscription.id);
 
       const clientSecret = subscription.latest_invoice?.payment_intent?.client_secret;
-      
+
       res.json({
         subscriptionId: subscription.id,
         clientSecret,
@@ -2659,6 +2659,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         imageBuffer
       );
 
+```tool_code
       console.log("Strava push result:", result);
 
       if (result.success) {
@@ -2710,6 +2711,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       configuredCallbackUrl: `https://0fcc3a45-589d-49fb-a059-7d9954da233f-00-8sst6tp6qylm.spock.replit.dev/api/strava/callback`,
       match: `${currentDomain}/api/strava/callback` === `https://0fcc3a45-589d-49fb-a059-7d9954da233f-00-8sst6tp6qylm.spock.replit.dev/api/strava/callback`
     });
+  });
+
+  // Get workouts for a specific program (admin)
+  app.get("/api/admin/programs/:id/workouts", isAuthenticated, requireAdmin, async (req, res) => {
+    try {
+      const programId = parseInt(req.params.id);
+      console.log("Fetching workouts for program ID:", programId);
+
+      const programWorkouts = await db.query.workouts.findMany({
+        where: eq(workouts.programId, programId),
+        orderBy: [asc(workouts.week), asc(workouts.day)]
+      });
+
+      console.log(`Found ${programWorkouts.length} workouts for program ${programId}`);
+
+      // Transform the workouts to ensure all fields are properly formatted
+      const transformedWorkouts = programWorkouts.map(workout => ({
+        id: workout.id,
+        programId: workout.programId,
+        week: workout.week,
+        day: workout.day,
+        name: workout.name,
+        description: workout.description,
+        duration: workout.duration || workout.estimatedDuration || 60,
+        exercises: workout.exercises || [],
+        difficulty: workout.difficulty,
+        workoutType: workout.workoutType || "Training",
+        isCompleted: workout.isCompleted || false
+      }));
+
+      res.json(transformedWorkouts);
+    } catch (error) {
+      console.error("Error fetching program workouts:", error);
+      res.status(500).json({ message: "Failed to fetch program workouts" });
+    }
   });
 
   const httpServer = createServer(app);
