@@ -62,7 +62,6 @@ function Router() {
 
   return (
     <Switch>
-      <Route path="/" component={Landing} />
       <Route path="/login" component={CustomLogin} />
       <Route path="/programs" component={Programs} />
       <Route path="/assessment" component={Assessment} />
@@ -72,12 +71,12 @@ function Router() {
       <Route path="/free-workouts" component={FreeWorkouts} />
       <Route path="/subscription-success" component={SubscriptionSuccess} />
       <Route path="/payment" component={() => import("./pages/payment").then(m => m.default)} />
-      <Route path="/random-workout" component={RandomWorkout} />
       <Route path="/progress" component={Progress} />
       <Route path="/profile" component={Profile} />
       <Route path="/settings" component={Settings} />
       <Route path="/admin" component={Admin} />
       <Route path="/dashboard" component={Dashboard} />
+      <Route path="/" component={Dashboard} />
       <Route component={Dashboard} />
     </Switch>
   );
