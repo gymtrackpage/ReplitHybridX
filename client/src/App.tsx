@@ -10,17 +10,19 @@ import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 // Pages
 import Landing from "@/pages/landing";
 import Dashboard from "@/pages/dashboard";
-import Assessment from "@/pages/assessment";
-import Workouts from "@/pages/workouts";
-import Programs from "@/pages/programs";
-import Calendar from "@/pages/calendar";
-import Progress from "@/pages/progress";
 import Profile from "@/pages/profile";
+import Programs from "@/pages/programs";
+import Progress from "@/pages/progress";
+import Calendar from "@/pages/calendar";
 import Settings from "@/pages/settings";
+import Assessment from "@/pages/assessment";
 import Admin from "@/pages/admin";
+import Workouts from "@/pages/workouts";
+import Payment from "@/pages/payment";
+import SubscriptionSuccess from "@/pages/subscription-success";
 import RandomWorkout from "@/pages/random-workout";
 import FreeWorkouts from "@/pages/free-workouts";
-import SubscriptionSuccess from "@/pages/subscription-success";
+import CustomLogin from "@/pages/custom-login";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -60,7 +62,8 @@ function Router() {
 
   return (
     <Switch>
-      <Route path="/" component={Dashboard} />
+      <Route path="/" component={Landing} />
+      <Route path="/login" component={CustomLogin} />
       <Route path="/programs" component={Programs} />
       <Route path="/assessment" component={Assessment} />
       <Route path="/calendar" component={Calendar} />
@@ -74,6 +77,7 @@ function Router() {
       <Route path="/profile" component={Profile} />
       <Route path="/settings" component={Settings} />
       <Route path="/admin" component={Admin} />
+      <Route path="/dashboard" component={Dashboard} />
       <Route component={Dashboard} />
     </Switch>
   );

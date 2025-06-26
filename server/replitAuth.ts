@@ -122,6 +122,16 @@ export async function setupAuth(app: Express) {
     })(req, res, next);
   });
 
+  // Custom branded login route
+  app.get("/api/auth/login", (req, res, next) => {
+    const hostname = req.hostname;
+    
+    passport.authenticate(`replitauth:${hostname}`, {
+      prompt: "login consent",
+      scope: ["openid", "email", "profile", "offline_access"],
+    })(req, res, next);
+  });
+
   app.get("/api/callback", (req, res, next) => {
     // Use the first domain from REPLIT_DOMAINS for localhost requests
     const hostname = req.hostname === 'localhost' ? 
