@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { MobileLayout } from "@/components/layout/mobile-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,11 +18,14 @@ import {
   Calendar,
   X,
   User,
-  MapPin
+  MapPin,
+  WifiOff,
+  Download
 } from "lucide-react";
 import { ShareToStravaButton } from "@/components/ShareToStravaButton";
 import { WorkoutCompletionDialog } from "@/components/WorkoutCompletionDialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { OfflineIndicator } from "@/components/OfflineIndicator";
 
 export default function Workouts() {
   const { toast } = useToast();
@@ -31,6 +34,20 @@ export default function Workouts() {
   const [workoutToComplete, setWorkoutToComplete] = useState<any>(null);
   const [showWorkoutDetails, setShowWorkoutDetails] = useState(false);
   const [workoutDetailsData, setWorkoutDetailsData] = useState<any>(null);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   const { data: todayWorkout, error: todayWorkoutError } = useQuery({
     queryKey: ["/api/today-workout"],
@@ -63,12 +80,33 @@ export default function Workouts() {
 
   const completeWorkoutMutation = useMutation({
     mutationFn: async (workoutId: number) => {
+      if (!isOnline) {
+        // Store completion offline for sync later
+        const pendingCompletions = JSON.parse(localStorage.getItem('pendingCompletions') || '[]');
+        pendingCompletions.push({
+          workoutId,
+          completedAt: new Date().toISOString(),
+          rating: 5,
+          notes: 'Completed offline',
+          duration: 30
+        });
+        localStorage.setItem('pendingCompletions', JSON.stringify(pendingCompletions));
+        
+        // Register background sync if available
+        if ('serviceWorker' in navigator && 'sync' in window.ServiceWorkerRegistration.prototype) {
+          const registration = await navigator.serviceWorker.ready;
+          await registration.sync.register('workout-completion-sync');
+        }
+        
+        return Promise.resolve();
+      }
+      
       await apiRequest("POST", "/api/complete-workout", { workoutId });
     },
     onSuccess: () => {
       toast({
         title: "Workout Completed!",
-        description: "Great job on completing your workout.",
+        description: isOnline ? "Great job on completing your workout." : "Workout saved offline and will sync when connected.",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/today-workout"] });
       queryClient.invalidateQueries({ queryKey: ["/api/recent-workouts"] });
@@ -127,6 +165,7 @@ export default function Workouts() {
 
   return (
     <MobileLayout>
+      <OfflineIndicator />
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
@@ -139,7 +178,9 @@ export default function Workouts() {
             onClick={() => generateRandomWorkout()}
             variant="outline"
             className="gap-2"
+            title={!isOnline ? "Works offline with bodyweight exercises" : "Generate random workout"}
           >
+            {!isOnline && <WifiOff className="h-3 w-3" />}
             <Shuffle className="h-4 w-4" />
             Random Workout
           </Button>
@@ -154,6 +195,12 @@ export default function Workouts() {
                   <CardTitle className="flex items-center gap-2">
                     <Target className="h-5 w-5" />
                     Today's Workout
+                    {todayWorkout.isOffline && (
+                      <Badge variant="outline" className="text-xs bg-orange-100 text-orange-800">
+                        <WifiOff className="h-3 w-3 mr-1" />
+                        Offline
+                      </Badge>
+                    )}
                   </CardTitle>
                   <CardDescription>{todayWorkout.name}</CardDescription>
                 </div>
@@ -259,6 +306,12 @@ export default function Workouts() {
                   <CardTitle className="flex items-center gap-2">
                     <Shuffle className="h-5 w-5" />
                     Random Workout
+                    {randomWorkout.isOffline && (
+                      <Badge variant="outline" className="text-xs bg-orange-100 text-orange-800">
+                        <WifiOff className="h-3 w-3 mr-1" />
+                        Offline
+                      </Badge>
+                    )}
                   </CardTitle>
                   <CardDescription>{randomWorkout.name}</CardDescription>
                 </div>
