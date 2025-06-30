@@ -19,8 +19,15 @@ export function SubscriptionModal({ open, onOpenChange, feature }: SubscriptionM
     setIsLoading(true);
     try {
       const response = await apiRequest("POST", "/api/create-subscription");
-      if (response.url) {
-        window.location.href = response.url;
+      const data = await response.json();
+      
+      if (data.paymentUrl) {
+        window.location.href = data.paymentUrl;
+      } else if (data.clientSecret && data.subscriptionId) {
+        // Redirect to payment page with required parameters
+        window.location.href = `/payment?client_secret=${data.clientSecret}&subscription_id=${data.subscriptionId}`;
+      } else {
+        throw new Error("Invalid subscription response");
       }
     } catch (error) {
       console.error("Subscription error:", error);

@@ -22,7 +22,15 @@ export function useSubscription() {
   const createSubscriptionMutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest("POST", "/api/create-subscription");
-      return response.json();
+      const data = await response.json();
+      
+      if (data.paymentUrl) {
+        window.location.href = data.paymentUrl;
+      } else if (data.clientSecret && data.subscriptionId) {
+        window.location.href = `/payment?client_secret=${data.clientSecret}&subscription_id=${data.subscriptionId}`;
+      }
+      
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/subscription-status'] });

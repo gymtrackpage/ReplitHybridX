@@ -151,6 +151,15 @@ export default function Assessment() {
   const createSubscriptionMutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest("POST", "/api/create-subscription");
+      const data = await response.json();
+
+      if (data.paymentUrl) {
+        window.location.href = data.paymentUrl;
+      } else if (data.clientSecret && data.subscriptionId) {
+        window.location.href = `/payment?client_secret=${data.clientSecret}&subscription_id=${data.subscriptionId}`;
+      } else {
+        throw new Error("Invalid subscription response");
+      }
       return response;
     },
     onSuccess: (data: any) => {
