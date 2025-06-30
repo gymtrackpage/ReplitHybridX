@@ -76,8 +76,8 @@ function Router() {
       <Route path="/progress" component={Progress} />
       <Route path="/profile" component={Profile} />
       <Route path="/settings" component={Settings} />
-      <Route path="/referrals" component={ReferralDashboard} />
       <Route path="/admin" component={Admin} />
+      <Route path="/referral" component={() => import("./pages/ReferralDashboard").then(m => m.default)} />
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/" component={Dashboard} />
       <Route component={Dashboard} />
