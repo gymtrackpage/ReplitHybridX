@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { SubscriptionModal } from "@/components/subscription/SubscriptionModal";
-import { User, Calendar, Target, Trophy, Settings, Save, ExternalLink } from "lucide-react";
+import { User, Calendar, Target, Trophy, Settings, Save, ExternalLink, Share2, Copy, Gift } from "lucide-react";
 
 const profileSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -474,6 +474,39 @@ export default function Profile() {
                 </CardContent>
               </Card>
             )}
+
+            {/* Referral System */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Gift className="h-5 w-5" />
+                  Referral Program
+                </CardTitle>
+                <CardDescription>
+                  Share with friends and earn free months
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm">
+                    <p className="font-medium">Earn 1 month free</p>
+                    <p className="text-muted-foreground">When friends complete 2 months</p>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => window.location.href = "/referral"}
+                    className="gap-2"
+                  >
+                    <Share2 className="h-4 w-4" />
+                    Get Link
+                  </Button>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Share your referral code and both you and your friend get rewarded
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Strava Integration */}
             <Card>
