@@ -6,6 +6,7 @@ import { queryClient } from "@/lib/queryClient";
 import { Logo } from "@/components/Logo";
 import { Card, CardContent } from "@/components/ui/card";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
+import { ReferralTracker } from "@/components/ReferralTracker";
 
 // Pages
 import Landing from "@/pages/landing";
@@ -88,6 +89,7 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <Router />
+      <ReferralTracker />
       <Toaster />
       <PWAInstallPrompt />
     </QueryClientProvider>

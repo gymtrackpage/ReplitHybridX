@@ -52,7 +52,8 @@ HybridX is a comprehensive HYROX training application designed to provide person
 
 ### Third-Party Integrations
 - **Strava**: OAuth integration for workout sharing and activity sync
-- **Stripe**: Payment processing for subscription management (optional)
+- **Stripe**: Payment processing for subscription management and referral reward tracking
+- **Referral System**: Complete referral tracking with 6-character codes and automatic reward processing
 
 ### Mobile Features
 - Progressive Web App (PWA) capabilities
@@ -105,6 +106,7 @@ HybridX is a comprehensive HYROX training application designed to provide person
 Changelog:
 - June 16, 2025: Initial setup
 - June 16, 2025: Successfully implemented complete Strava integration with OAuth authentication, workout sharing, and automated image generation. Fixed sport_type validation issues, response stream handling errors, and activity detection logic. Strava sharing now works perfectly with custom workout images uploaded to activities. All workouts consistently categorized as "WeightTraining" sport type.
+- June 30, 2025: Implemented comprehensive referral system with 6-character codes, shareable URLs, automatic tracking, Stripe webhook integration for milestone monitoring, and reward processing. Added referral dashboard with stats display and mobile-friendly UI components. System prevents duplicate referrals and includes proper error handling.
 
 ## User Preferences
 
