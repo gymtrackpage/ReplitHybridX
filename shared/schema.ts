@@ -50,6 +50,9 @@ export const users = pgTable("users", {
   hyroxEventDate: timestamp("hyrox_event_date"),
   hyroxEventLocation: varchar("hyrox_event_location"),
   targetTime: varchar("target_time"),
+  referralCode: varchar("referral_code").unique(),
+  referredBy: varchar("referred_by"), // referral code of the person who referred this user
+  freeMonthsEarned: integer("free_months_earned").default(0),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -135,6 +138,32 @@ export const weightEntries = pgTable("weight_entries", {
   recordedAt: timestamp("recorded_at").defaultNow(),
 });
 
+// Referral system tables
+export const referrals = pgTable("referrals", {
+  id: serial("id").primaryKey(),
+  referrerId: varchar("referrer_id").notNull(), // User who made the referral
+  refereeId: varchar("referee_id").notNull(), // User who was referred
+  referralCode: varchar("referral_code").notNull(),
+  status: varchar("status").default("pending"), // pending, qualified, rewarded
+  rewardClaimed: boolean("reward_claimed").default(false),
+  qualifiedAt: timestamp("qualified_at"), // When referee completed 2 months
+  rewardClaimedAt: timestamp("reward_claimed_at"), // When referrer got free month
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const subscriptions = pgTable("subscriptions", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull(),
+  stripeSubscriptionId: varchar("stripe_subscription_id").unique(),
+  status: varchar("status").notNull(), // active, cancelled, past_due, unpaid
+  currentPeriodStart: timestamp("current_period_start"),
+  currentPeriodEnd: timestamp("current_period_end"),
+  monthsPaid: integer("months_paid").default(0),
+  freeMonthsRemaining: integer("free_months_remaining").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ one, many }) => ({
   currentProgram: one(programs, {
@@ -145,6 +174,8 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   completions: many(workoutCompletions),
   assessments: many(assessments),
   weightEntries: many(weightEntries),
+  referralsMade: many(referrals, { relationName: "referrer" }),
+  subscription: one(subscriptions),
 }));
 
 export const programsRelations = relations(programs, ({ many }) => ({
@@ -196,6 +227,26 @@ export const weightEntriesRelations = relations(weightEntries, ({ one }) => ({
   }),
 }));
 
+export const referralsRelations = relations(referrals, ({ one }) => ({
+  referrer: one(users, {
+    fields: [referrals.referrerId],
+    references: [users.id],
+    relationName: "referrer",
+  }),
+  referee: one(users, {
+    fields: [referrals.refereeId],
+    references: [users.id],
+    relationName: "referee",
+  }),
+}));
+
+export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
+  user: one(users, {
+    fields: [subscriptions.userId],
+    references: [users.id],
+  }),
+}));
+
 // Zod schemas
 export const insertUserSchema = createInsertSchema(users);
 export const insertProgramSchema = createInsertSchema(programs);
@@ -204,6 +255,8 @@ export const insertUserProgressSchema = createInsertSchema(userProgress);
 export const insertWorkoutCompletionSchema = createInsertSchema(workoutCompletions);
 export const insertAssessmentSchema = createInsertSchema(assessments);
 export const insertWeightEntrySchema = createInsertSchema(weightEntries);
+export const insertReferralSchema = createInsertSchema(referrals);
+export const insertSubscriptionSchema = createInsertSchema(subscriptions);
 
 // Types
 export type UpsertUser = typeof users.$inferInsert;
@@ -220,6 +273,10 @@ export type Assessment = typeof assessments.$inferSelect;
 export type InsertAssessment = z.infer<typeof insertAssessmentSchema>;
 export type WeightEntry = typeof weightEntries.$inferSelect;
 export type InsertWeightEntry = z.infer<typeof insertWeightEntrySchema>;
+export type Referral = typeof referrals.$inferSelect;
+export type InsertReferral = z.infer<typeof insertReferralSchema>;
+export type Subscription = typeof subscriptions.$inferSelect;
+export type InsertSubscription = z.infer<typeof insertSubscriptionSchema>;
 
 // Additional interface for API responses
 export interface ApiResponse<T = any> {
