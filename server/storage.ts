@@ -6,6 +6,8 @@ import {
   workoutCompletions,
   assessments,
   weightEntries,
+  referrals,
+  subscriptions,
   type User,
   type UpsertUser,
   type Program,
@@ -20,6 +22,10 @@ import {
   type InsertAssessment,
   type WeightEntry,
   type InsertWeightEntry,
+  type Referral,
+  type InsertReferral,
+  type Subscription,
+  type InsertSubscription,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, gte, lte, sql, isNotNull } from "drizzle-orm";
@@ -70,6 +76,23 @@ export interface IStorage {
   // Weight tracking operations
   getUserWeightEntries(userId: string): Promise<WeightEntry[]>;
   createWeightEntry(entry: InsertWeightEntry): Promise<WeightEntry>;
+
+  // Referral operations
+  getUserByReferralCode(referralCode: string): Promise<User | undefined>;
+  getReferralByReferee(refereeId: string): Promise<Referral | undefined>;
+  createReferral(referral: InsertReferral): Promise<Referral>;
+  updateUserReferredBy(userId: string, referralCode: string): Promise<User>;
+  updateReferralStatus(referralId: number, status: string, qualifiedAt?: Date): Promise<Referral>;
+  updateReferralRewardClaimed(referralId: number, claimedAt: Date): Promise<Referral>;
+  getUserReferrals(userId: string): Promise<Referral[]>;
+  incrementUserFreeMonths(userId: string): Promise<User>;
+
+  // Subscription operations
+  getUserSubscription(userId: string): Promise<Subscription | undefined>;
+  createSubscription(subscription: InsertSubscription): Promise<Subscription>;
+  updateSubscription(id: number, updates: Partial<InsertSubscription>): Promise<Subscription>;
+  addFreeMonthToSubscription(subscriptionId: number): Promise<Subscription>;
+  updateSubscriptionMonthsPaid(userId: string, monthsPaid: number): Promise<Subscription>;
 
   // Admin operations
   getAllUsers(): Promise<User[]>;
@@ -653,6 +676,133 @@ export class DatabaseStorage implements IStorage {
     // For now, just return true as placeholder
     console.log(`Pushing workout to Strava for user ${userId}:`, workoutData);
     return true;
+  }
+
+  // Referral system methods
+  async getUserByReferralCode(referralCode: string): Promise<User | undefined> {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.referralCode, referralCode));
+    return user;
+  }
+
+  async getReferralByReferee(refereeId: string): Promise<Referral | undefined> {
+    const [referral] = await db
+      .select()
+      .from(referrals)
+      .where(eq(referrals.refereeId, refereeId));
+    return referral;
+  }
+
+  async createReferral(referral: InsertReferral): Promise<Referral> {
+    const [newReferral] = await db
+      .insert(referrals)
+      .values(referral)
+      .returning();
+    return newReferral;
+  }
+
+  async updateUserReferredBy(userId: string, referralCode: string): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({ referredBy: referralCode, updatedAt: new Date() })
+      .where(eq(users.id, userId))
+      .returning();
+    return user;
+  }
+
+  async updateReferralStatus(referralId: number, status: string, qualifiedAt?: Date): Promise<Referral> {
+    const updateData: any = { status };
+    if (qualifiedAt) {
+      updateData.qualifiedAt = qualifiedAt;
+    }
+    
+    const [referral] = await db
+      .update(referrals)
+      .set(updateData)
+      .where(eq(referrals.id, referralId))
+      .returning();
+    return referral;
+  }
+
+  async updateReferralRewardClaimed(referralId: number, claimedAt: Date): Promise<Referral> {
+    const [referral] = await db
+      .update(referrals)
+      .set({ 
+        rewardClaimed: true, 
+        rewardClaimedAt: claimedAt,
+        status: 'rewarded'
+      })
+      .where(eq(referrals.id, referralId))
+      .returning();
+    return referral;
+  }
+
+  async getUserReferrals(userId: string): Promise<Referral[]> {
+    return await db
+      .select()
+      .from(referrals)
+      .where(eq(referrals.referrerId, userId));
+  }
+
+  async incrementUserFreeMonths(userId: string): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({ 
+        freeMonthsEarned: sql`${users.freeMonthsEarned} + 1`,
+        updatedAt: new Date()
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    return user;
+  }
+
+  // Subscription system methods
+  async getUserSubscription(userId: string): Promise<Subscription | undefined> {
+    const [subscription] = await db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.userId, userId));
+    return subscription;
+  }
+
+  async createSubscription(subscription: InsertSubscription): Promise<Subscription> {
+    const [newSubscription] = await db
+      .insert(subscriptions)
+      .values(subscription)
+      .returning();
+    return newSubscription;
+  }
+
+  async updateSubscription(id: number, updates: Partial<InsertSubscription>): Promise<Subscription> {
+    const [subscription] = await db
+      .update(subscriptions)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(subscriptions.id, id))
+      .returning();
+    return subscription;
+  }
+
+  async addFreeMonthToSubscription(subscriptionId: number): Promise<Subscription> {
+    const [subscription] = await db
+      .update(subscriptions)
+      .set({ 
+        freeMonthsRemaining: sql`${subscriptions.freeMonthsRemaining} + 1`,
+        updatedAt: new Date()
+      })
+      .where(eq(subscriptions.id, subscriptionId))
+      .returning();
+    return subscription;
+  }
+
+  async updateSubscriptionMonthsPaid(userId: string, monthsPaid: number): Promise<Subscription> {
+    const [subscription] = await db
+      .update(subscriptions)
+      .set({ monthsPaid, updatedAt: new Date() })
+      .where(eq(subscriptions.userId, userId))
+      .returning();
+    return subscription;
   }
 }
 

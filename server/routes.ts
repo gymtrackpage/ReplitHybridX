@@ -16,6 +16,7 @@ import { seedHyroxPrograms } from "./seedData";
 import { createMinimalPrograms } from "./quickProgramSetup";
 import Stripe from "stripe";
 import { insertProgramSchema, insertWorkoutSchema, insertAssessmentSchema, insertWeightEntrySchema } from "../shared/schema";
+import { generateReferralCode, trackReferral, processReferralReward, getUserReferralStats, createReferralUrl } from "./referralService";
 import { db } from "./db";
 import { workouts, workoutCompletions, users, programs } from "../shared/schema";
 import { eq, and, gte, desc, asc } from "drizzle-orm";
