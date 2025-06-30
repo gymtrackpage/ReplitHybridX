@@ -3091,6 +3091,139 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============= REFERRAL SYSTEM ROUTES =============
+
+  // Get user's referral stats and code
+  app.get("/api/referral/stats", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const stats = await getUserReferralStats(userId);
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching referral stats:", error);
+      res.status(500).json({ message: "Failed to fetch referral stats" });
+    }
+  });
+
+  // Generate or get user's referral code
+  app.post("/api/referral/generate-code", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      let user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // If user already has a referral code, return it
+      if (user.referralCode) {
+        const referralUrl = createReferralUrl(user.referralCode);
+        return res.json({ 
+          referralCode: user.referralCode,
+          referralUrl 
+        });
+      }
+
+      // Generate new referral code
+      const referralCode = await generateReferralCode();
+      
+      // Update user with the new referral code
+      user = await storage.updateUser(userId, { referralCode });
+      
+      const referralUrl = createReferralUrl(referralCode);
+      
+      res.json({ 
+        referralCode,
+        referralUrl 
+      });
+    } catch (error) {
+      console.error("Error generating referral code:", error);
+      res.status(500).json({ message: "Failed to generate referral code" });
+    }
+  });
+
+  // Track referral when someone signs up with a referral code
+  app.post("/api/referral/track", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { referralCode } = req.body;
+
+      if (!referralCode) {
+        return res.status(400).json({ message: "Referral code is required" });
+      }
+
+      await trackReferral(referralCode, userId);
+      res.json({ message: "Referral tracked successfully" });
+    } catch (error: any) {
+      console.error("Error tracking referral:", error);
+      res.status(400).json({ message: error.message || "Failed to track referral" });
+    }
+  });
+
+  // Webhook endpoint for Stripe subscription updates
+  app.post("/api/webhook/subscription", async (req, res) => {
+    try {
+      const { userId, monthsPaid, subscriptionStatus } = req.body;
+
+      if (!userId || monthsPaid === undefined) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      // Update subscription in our database
+      let subscription = await storage.getUserSubscription(userId);
+      
+      if (!subscription) {
+        // Create new subscription record
+        subscription = await storage.createSubscription({
+          userId,
+          status: subscriptionStatus || 'active',
+          monthsPaid
+        });
+      } else {
+        // Update existing subscription
+        subscription = await storage.updateSubscriptionMonthsPaid(userId, monthsPaid);
+      }
+
+      // Check if referral milestone is reached (2 months paid)
+      if (monthsPaid >= 2) {
+        await processReferralReward(userId);
+      }
+
+      res.json({ message: "Subscription updated successfully" });
+    } catch (error) {
+      console.error("Error processing subscription webhook:", error);
+      res.status(500).json({ message: "Failed to process subscription update" });
+    }
+  });
+
+  // Landing page for referral links
+  app.get("/join", (req, res) => {
+    const referralCode = req.query.ref as string;
+    
+    // Store referral code in session for signup process
+    if (referralCode) {
+      req.session = req.session || {};
+      (req.session as any).referralCode = referralCode;
+    }
+
+    // Redirect to home page - the frontend will handle the referral signup flow
+    res.redirect(`/?ref=${referralCode || ''}`);
+  });
+
+  // Get referral code from session (for frontend to use during signup)
+  app.get("/api/referral/session-code", (req, res) => {
+    const referralCode = (req.session as any)?.referralCode || null;
+    res.json({ referralCode });
+  });
+
+  // Clear referral code from session after successful signup
+  app.delete("/api/referral/session-code", (req, res) => {
+    if (req.session) {
+      delete (req.session as any).referralCode;
+    }
+    res.json({ message: "Referral code cleared from session" });
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

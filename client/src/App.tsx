@@ -23,6 +23,7 @@ import SubscriptionSuccess from "@/pages/subscription-success";
 import RandomWorkout from "@/pages/random-workout";
 import FreeWorkouts from "@/pages/free-workouts";
 import CustomLogin from "@/pages/custom-login";
+import ReferralDashboard from "@/pages/ReferralDashboard";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -74,6 +75,7 @@ function Router() {
       <Route path="/progress" component={Progress} />
       <Route path="/profile" component={Profile} />
       <Route path="/settings" component={Settings} />
+      <Route path="/referrals" component={ReferralDashboard} />
       <Route path="/admin" component={Admin} />
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/" component={Dashboard} />
