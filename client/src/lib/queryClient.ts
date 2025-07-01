@@ -42,45 +42,18 @@ export async function apiRequest(method: string, url: string, body?: any) {
     const response = await fetch(url, options);
 
     if (!response.ok) {
-      let errorMessage = `HTTP ${response.status}`;
-      let errorData: any = {};
-
+      let errorMessage;
       try {
-        const contentType = response.headers.get('content-type');
-        if (contentType && contentType.includes('application/json')) {
-          errorData = await response.json();
-          errorMessage = errorData.message || errorMessage;
-        } else {
-          const textError = await response.text();
-          errorMessage = textError || errorMessage;
-          errorData = { message: errorMessage };
-        }
-      } catch (parseError) {
-        console.error("Failed to parse error response:", parseError);
-        errorMessage = `HTTP ${response.status} - Unable to parse error response`;
+        const errorData = await response.json();
+        errorMessage = errorData.message || `HTTP ${response.status}`;
+      } catch {
+        errorMessage = await response.text() || `HTTP ${response.status}`;
       }
-
-      const error = new Error(errorMessage) as any;
-      error.status = response.status;
-      error.data = errorData;
-      error.needsAuth = errorData.needsAuth;
-      error.success = false;
-
-      console.error(`API Error ${method} ${url}:`, {
-        status: response.status,
-        message: errorMessage,
-        data: errorData
-      });
-
-      throw error;
+      throw new Error(errorMessage);
     }
 
-    const contentType = response.headers.get('content-type');
-    if (contentType && contentType.includes('application/json')) {
-      return response.json();
-    } else {
-      return response.text();
-    }
+    // Return parsed JSON data directly
+    return response.json();
   } catch (error: any) {
     if (error.status) {
       // Already processed API error, re-throw

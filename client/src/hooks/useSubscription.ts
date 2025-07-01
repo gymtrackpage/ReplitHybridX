@@ -21,8 +21,7 @@ export function useSubscription() {
 
   const createSubscriptionMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/create-subscription");
-      const data = await response.json();
+      const data = await apiRequest("POST", "/api/create-subscription");
       
       if (data.paymentUrl) {
         window.location.href = data.paymentUrl;

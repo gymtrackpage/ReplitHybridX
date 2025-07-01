@@ -150,8 +150,7 @@ export default function Assessment() {
 
   const createSubscriptionMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/create-subscription");
-      const data = await response.json();
+      const data = await apiRequest("POST", "/api/create-subscription");
 
       if (data.paymentUrl) {
         window.location.href = data.paymentUrl;
@@ -160,7 +159,7 @@ export default function Assessment() {
       } else {
         throw new Error("Invalid subscription response");
       }
-      return response;
+      return data;
     },
     onSuccess: (data: any) => {
       console.log("Subscription creation response:", data);
