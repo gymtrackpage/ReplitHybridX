@@ -43,17 +43,46 @@ export async function apiRequest(method: string, url: string, body?: any) {
 
     if (!response.ok) {
       let errorMessage;
+      let errorData: any = {};
+      
       try {
-        const errorData = await response.json();
-        errorMessage = errorData.message || `HTTP ${response.status}`;
-      } catch {
-        errorMessage = await response.text() || `HTTP ${response.status}`;
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          errorData = await response.json();
+          errorMessage = errorData.message || `HTTP ${response.status}`;
+        } else {
+          const textError = await response.text();
+          errorMessage = textError || `HTTP ${response.status}`;
+          errorData = { message: errorMessage };
+        }
+      } catch (parseError) {
+        console.error('Failed to parse error response:', parseError);
+        errorMessage = `HTTP ${response.status} - Unable to parse error response`;
       }
-      throw new Error(errorMessage);
+
+      const error = new Error(errorMessage) as any;
+      error.status = response.status;
+      error.data = errorData;
+      error.needsAuth = errorData.needsAuth || response.status === 401;
+      
+      // Handle authentication errors consistently
+      if (response.status === 401) {
+        console.warn('Authentication required, redirecting to login');
+        // You might want to trigger a global auth state update here
+      }
+
+      throw error;
     }
 
-    // Return parsed JSON data directly
-    return response.json();
+    // Ensure we always return JSON
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      return response.json();
+    } else {
+      // Wrap non-JSON responses
+      const text = await response.text();
+      return { data: text, success: true };
+    }
   } catch (error: any) {
     if (error.status) {
       // Already processed API error, re-throw
@@ -61,9 +90,9 @@ export async function apiRequest(method: string, url: string, body?: any) {
     } else {
       // Network or other error
       console.error(`Network Error ${method} ${url}:`, error);
-      const networkError = new Error('Network error occurred') as any;
+      const networkError = new Error('Network connection failed') as any;
       networkError.status = 0;
-      networkError.data = { message: 'Network error occurred' };
+      networkError.data = { message: 'Network connection failed' };
       networkError.originalError = error;
       throw networkError;
     }

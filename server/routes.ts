@@ -20,6 +20,12 @@ import { generateReferralCode, trackReferral, processReferralReward, getUserRefe
 import { db } from "./db";
 import { workouts, workoutCompletions, users, programs } from "../shared/schema";
 import { eq, and, gte, desc, asc } from "drizzle-orm";
+import { rateLimit } from "./middleware";
+
+// Rate limiting configurations
+const generalRateLimit = rateLimit(15 * 60 * 1000, 100); // 100 requests per 15 minutes
+const authRateLimit = rateLimit(15 * 60 * 1000, 20); // 20 auth requests per 15 minutes
+const uploadRateLimit = rateLimit(60 * 60 * 1000, 5); // 5 uploads per hour
 
 // Enhanced async error wrapper with logging
 const asyncHandler = (fn: Function) => (req: Request, res: Response, next: NextFunction) => {
@@ -85,10 +91,31 @@ const requireAdmin = async (req: AuthenticatedRequest, res: Response, next: Next
   }
 };
 
-// Configure multer for file uploads
+// Configure multer for file uploads with better limits
 const upload = multer({ 
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+  limits: { 
+    fileSize: 5 * 1024 * 1024, // 5MB limit (reduced from 10MB)
+    files: 1, // Only allow 1 file upload at a time
+    fields: 10, // Limit number of fields
+    fieldSize: 1024 * 1024 // 1MB per field
+  },
+  fileFilter: (req, file, cb) => {
+    // Only allow CSV and XLSX files
+    const allowedTypes = [
+      'text/csv',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    ];
+    
+    if (allowedTypes.includes(file.mimetype) || 
+        file.originalname?.endsWith('.csv') || 
+        file.originalname?.endsWith('.xlsx')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only CSV and XLSX files are allowed'));
+    }
+  }
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -108,8 +135,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     };
 
     try {
-      // Test database connection
-      await storage.getPrograms();
+      // Test database connection with timeout
+      const dbTest = Promise.race([
+        storage.getPrograms(),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Database connection timeout')), 5000)
+        )
+      ]);
+      
+      await dbTest;
       healthStatus.checks.database = 'connected';
       console.log('✅ Health check passed');
       res.json(healthStatus);
@@ -117,9 +151,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('❌ Health check failed:', error);
       healthStatus.status = 'unhealthy';
       healthStatus.checks.database = 'failed';
+      
+      // Provide more specific error information
+      let errorMessage = 'Database connection failed';
+      if (error instanceof Error) {
+        if (error.message.includes('timeout')) {
+          errorMessage = 'Database connection timeout';
+        } else if (error.message.includes('ENOTFOUND')) {
+          errorMessage = 'Database host not found';
+        } else if (error.message.includes('authentication')) {
+          errorMessage = 'Database authentication failed';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
       res.status(503).json({ 
         ...healthStatus,
-        error: error instanceof Error ? error.message : 'Database connection failed'
+        error: errorMessage
       });
     }
   });
@@ -290,58 +339,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/workout-calendar', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { month } = req.query;
-      const targetMonth = month ? new Date(month as string) : new Date();
+      const monthYear = req.query.queryKey ? req.query.queryKey.split(',')[1] : req.query.month;
 
-      // Get user's current program
+      if (!monthYear) {
+        return res.status(400).json({ message: "Month parameter required (YYYY-MM format)" });
+      }
+
+      // Get user and check access level
       const user = await storage.getUser(userId);
-      if (!user?.currentProgramId) {
+      const userProgress = await storage.getUserProgress(userId);
+
+      // Check if user has proper access to programs
+      const hasAssessment = user?.assessmentCompleted;
+      const hasActiveProgram = userProgress?.programId;
+      const isAdmin = user?.isAdmin;
+      const isPremium = user?.subscriptionStatus === 'active';
+
+      // Only show calendar for users with proper access
+      if (!isAdmin && !hasAssessment) {
         return res.json({ workouts: [] });
       }
 
-      // Get program workouts
-      const programWorkouts = await storage.getProgramWorkouts(user.currentProgramId);
+      if (!hasActiveProgram) {
+        return res.json({ workouts: [] });
+      }
 
-      // Get user's workout history for the month
-      const workoutHistory = await storage.getUserWorkoutHistory(userId);
+      // Get actual workout completions/skips from database
+      const completions = await storage.getUserWorkoutCompletions(userId);
 
-      // Generate calendar data for the month
-      const startOfMonth = new Date(targetMonth.getFullYear(), targetMonth.getMonth(), 1);
-      const endOfMonth = new Date(targetMonth.getFullYear(), targetMonth.getMonth() + 1, 0);
+      // Create calendar entries only from actual historical data
       const calendarWorkouts = [];
 
-      for (let date = new Date(startOfMonth); date <= endOfMonth; date.setDate(date.getDate() + 1)) {
-        const daysSinceStart = Math.floor((date.getTime() - new Date(user.programStartDate || Date.now()).getTime()) / (1000 * 60 * 60 * 24));
-        const programIndex = Math.max(0, daysSinceStart) % programWorkouts.length;
-        const programWorkout = programWorkouts[programIndex];
+      // Add completed/skipped workouts
+      for (const completion of completions) {
+        const completedDate = new Date(completion.completedAt);
+        const completedMonthYear = completedDate.toISOString().substring(0, 7); // YYYY-MM
 
-        if (programWorkout) {
-          // Check if this workout was completed
-          const completedWorkout = workoutHistory.find((h: any) => 
-            new Date(h.completedAt).toDateString() === date.toDateString()
-          );
-
-          let status = 'upcoming';
-          let comments = '';
-
-          if (completedWorkout) {
-            status = completedWorkout.status || 'completed';
-            comments = completedWorkout.comments || '';
-          } else if (date < new Date()) {
-            status = 'missed';
+        if (completedMonthYear === monthYear) {
+          const workout = await storage.getWorkout(completion.workoutId);
+          if (workout) {
+            calendarWorkouts.push({
+              date: completedDate.toISOString().split('T')[0],
+              status: completion.skipped ? 'skipped' : 'completed',
+              workout: {
+                id: workout.id,
+                name: workout.name,
+                description: workout.description,
+                estimatedDuration: workout.estimatedDuration || 60,
+                workoutType: workout.workoutType || 'training',
+                week: workout.week,
+                day: workout.day,
+                exercises: workout.exercises || [],
+                completedAt: completion.completedAt,
+                comments: completion.notes,
+                rating: completion.rating
+              }
+            });
           }
-
-          calendarWorkouts.push({
-            date: date.toISOString().split('T')[0],
-            status,
-            workout: {
-              ...programWorkout,
-              completedAt: completedWorkout?.completedAt,
-              comments
-            }
-          });
         }
       }
+
+      // For premium/admin users, add today's workout if it exists and hasn't been completed
+      if ((isPremium || isAdmin) && userProgress) {
+        const today = new Date();
+        const todayString = today.toISOString().split('T')[0];
+        const todayMonthYear = today.toISOString().substring(0, 7);
+
+        if (todayMonthYear === monthYear) {
+          // Check if today's workout already exists in calendar
+          const todayWorkoutExists = calendarWorkouts.some(w => w.date === todayString);
+
+          if (!todayWorkoutExists) {
+            // Get today's scheduled workout
+            const todaysWorkout = await storage.getTodaysWorkout(userId);
+            if (todaysWorkout) {
+              calendarWorkouts.push({
+                date: todayString,
+                status: 'upcoming',
+                workout: {
+                  id: todaysWorkout.id,
+                  name: todaysWorkout.name,
+                  description: todaysWorkout.description,
+                  estimatedDuration: todaysWorkout.estimatedDuration || 60,
+                  workoutType: todaysWorkout.workoutType || 'training',
+                  week: todaysWorkout.week,
+                  day: todaysWorkout.day,
+                  exercises: todaysWorkout.exercises || []
+                }
+              });
+            }
+          }
+        }
+      }
+
+      // Sort workouts by date
+      calendarWorkouts.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
       res.json({ workouts: calendarWorkouts });
     } catch (error) {
@@ -2389,10 +2481,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log("Workout completion request:", { userId, workoutId, rating, notes, skipped, duration });
 
-      // Validate workoutId
-      if (!workoutId || isNaN(parseInt(workoutId))) {
-        console.error("Invalid or missing workoutId:", workoutId);
-        return res.status(400).json({ message: "Valid workout ID is required" });
+      // Validate required fields
+      if (!workoutId) {
+        return res.status(400).json({ message: "Workout ID is required" });
+      }
+
+      const parsedWorkoutId = parseInt(workoutId);
+      if (isNaN(parsedWorkoutId)) {
+        return res.status(400).json({ message: "Valid workout ID must be a number" });
+      }
+
+      // Validate optional fields
+      if (rating !== null && rating !== undefined && (isNaN(rating) || rating < 1 || rating > 5)) {
+        return res.status(400).json({ message: "Rating must be between 1 and 5" });
+      }
+
+      if (duration !== null && duration !== undefined && (isNaN(duration) || duration < 0)) {
+        return res.status(400).json({ message: "Duration must be a positive number" });
       }
 
       // Validate user exists
@@ -2403,7 +2508,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Verify workout exists
-      const workout = await storage.getWorkout(parseInt(workoutId));
+      const workout = await storage.getWorkout(parsedWorkoutId);
       if (!workout) {
         console.error("Workout not found:", workoutId);
         return res.status(404).json({ message: "Workout not found" });
@@ -2413,7 +2518,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const progress = await storage.getUserProgress(userId);
       if (!progress) {
         console.error("User progress not found for user:", userId);
-        return res.status(404).json({ message: "User progress not found" });
+        // Create initial progress if it doesn't exist
+        const initialProgress = await storage.createUserProgress({
+          userId,
+          programId: workout.programId,
+          currentWeek: 1,
+          currentDay: 1,
+          startDate: new Date().toISOString(),
+          completedWorkouts: 0,
+          totalWorkouts: 84 // Default for 12-week program
+        });
+        console.log("Created initial progress for user:", userId);
       }
 
       // Create workout completion record

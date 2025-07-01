@@ -7,6 +7,7 @@ import { Logo } from "@/components/Logo";
 import { Card, CardContent } from "@/components/ui/card";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import { ReferralTracker } from "@/components/ReferralTracker";
+import { ErrorBoundary } from 'react-error-boundary'
 
 // Pages
 import Landing from "@/pages/landing";
@@ -85,13 +86,30 @@ function Router() {
   );
 }
 
+function ErrorFallback({ error, resetErrorBoundary }) {
+  return (
+    <div role="alert">
+      <p>Something went wrong:</p>
+      <pre>{error.message}</pre>
+      <button onClick={resetErrorBoundary}>Try again</button>
+    </div>
+  )
+}
+
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <Router />
-      <ReferralTracker />
-      <Toaster />
-      <PWAInstallPrompt />
-    </QueryClientProvider>
+    <ErrorBoundary 
+      FallbackComponent={ErrorFallback}
+      onError={(error, errorInfo) => {
+        console.error('App Error Boundary caught an error:', error, errorInfo);
+      }}
+    >
+      <QueryClientProvider client={queryClient}>
+        <Router />
+        <ReferralTracker />
+        <Toaster />
+        <PWAInstallPrompt />
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }

@@ -21,19 +21,42 @@ export function useSubscription() {
 
   const createSubscriptionMutation = useMutation({
     mutationFn: async () => {
-      const data = await apiRequest("POST", "/api/create-subscription");
-      
-      if (data.paymentUrl) {
-        window.location.href = data.paymentUrl;
-      } else if (data.clientSecret && data.subscriptionId) {
-        window.location.href = `/payment?client_secret=${data.clientSecret}&subscription_id=${data.subscriptionId}`;
+      try {
+        const data = await apiRequest("POST", "/api/create-subscription");
+
+        if (data.paymentUrl) {
+          // Small delay to ensure mutation state is updated before redirect
+          setTimeout(() => {
+            window.location.href = data.paymentUrl;
+          }, 100);
+        } else if (data.clientSecret) {
+          // Handle Stripe Elements integration if needed
+          return data;
+        } else {
+          throw new Error("Invalid subscription response - missing payment URL");
+        }
+        return data;
+      } catch (error: any) {
+        console.error("Subscription creation failed:", error);
+        throw new Error(error.message || "Failed to create subscription");
       }
-      
-      return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/subscription-status'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+    onSuccess: (data: any) => {
+      console.log("Subscription creation successful:", data);
+      if (!data.paymentUrl && !data.clientSecret) {
+        toast({
+          title: "Success",
+          description: "Subscription created successfully!",
+        });
+      }
+    },
+    onError: (error: any) => {
+      console.error("Subscription creation error:", error);
+      toast({
+        title: "Subscription Error",
+        description: error.message || "Failed to create subscription. Please try again.",
+        variant: "destructive",
+      });
     },
   });
 
@@ -123,16 +146,16 @@ export function useSubscription() {
 // Hook to check if user has access to premium features
 export function usePremiumAccess() {
   const { subscriptionStatus, isLoading } = useSubscription();
-  
+
   // Get user data to check admin status
   const { data: user } = useQuery({
     queryKey: ['/api/auth/user'],
     staleTime: 5 * 60 * 1000,
   });
-  
+
   // Admins bypass subscription requirements
   const isAdmin = (user as any)?.isAdmin || false;
-  
+
   return {
     hasAccess: isAdmin || subscriptionStatus?.isSubscribed || false,
     isLoading,
