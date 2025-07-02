@@ -132,6 +132,47 @@ const upload = multer({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Stripe configuration validation endpoint
+  app.get('/api/stripe/validate', isAuthenticated, async (req: any, res) => {
+    try {
+      const validationResults = {
+        stripeConfigured: !!stripe,
+        priceIdValid: false,
+        webhookSecretConfigured: !!process.env.STRIPE_WEBHOOK_SECRET,
+        errors: []
+      };
+
+      if (!stripe) {
+        validationResults.errors.push("Stripe secret key not configured");
+        return res.json(validationResults);
+      }
+
+      // Validate price ID
+      const PRICE_ID = 'price_1RgOOZGKLIEfAkDGfqPezReg';
+      try {
+        const price = await stripe.prices.retrieve(PRICE_ID);
+        validationResults.priceIdValid = true;
+        validationResults.priceDetails = {
+          id: price.id,
+          amount: price.unit_amount,
+          currency: price.currency,
+          recurring: price.recurring,
+          active: price.active
+        };
+      } catch (priceError) {
+        validationResults.errors.push(`Price ID ${PRICE_ID} not found in Stripe`);
+      }
+
+      res.json(validationResults);
+    } catch (error) {
+      console.error("Stripe validation error:", error);
+      res.status(500).json({ 
+        message: "Failed to validate Stripe configuration",
+        error: error.message 
+      });
+    }
+  });
+
   // Health check endpoint
   app.get('/health', async (req, res) => {
     const healthStatus = {
@@ -1779,7 +1820,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUser(userId);
 
       if (!user) {
-        return res.status(404.json({ message: "User not found" });
+        return res.status(404).json({ message: "User not found" });
       }
 
       let subscriptionStatus = {
@@ -1834,7 +1875,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (!stripe) {
-        return res.status(500).json({ message: "Stripe not configured" });
+        console.error("Stripe not configured - missing STRIPE_SECRET_KEY");
+        return res.status(500).json({ 
+          message: "Payment processing not configured. Please contact support.",
+          error: "STRIPE_NOT_CONFIGURED"
+        });
+      }
+
+      // Validate price ID exists
+      const PRICE_ID = 'price_1RgOOZGKLIEfAkDGfqPezReg';
+      if (!PRICE_ID) {
+        console.error("Stripe price ID not configured");
+        return res.status(500).json({ 
+          message: "Subscription pricing not configured. Please contact support.",
+          error: "PRICE_ID_NOT_CONFIGURED"
+        });
       }
 
       let customerId = user.stripeCustomerId;
@@ -1866,11 +1921,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Create new subscription with validated price ID
+      const PRICE_ID = 'price_1RgOOZGKLIEfAkDGfqPezReg';
+      
+      // Verify price exists in Stripe
+      try {
+        await stripe.prices.retrieve(PRICE_ID);
+      } catch (priceError) {
+        console.error("Price ID not found in Stripe:", PRICE_ID);
+        return res.status(500).json({ 
+          message: "Subscription pricing configuration error. Please contact support.",
+          error: "INVALID_PRICE_ID"
+        });
+      }
+
       // Create new subscription
       const subscription = await stripe.subscriptions.create({
         customer: customerId,
         items: [{
-          price: 'price_1RgOOZGKLIEfAkDGfqPezReg'
+          price: PRICE_ID
         }],
         payment_behavior: 'default_incomplete',
         payment_settings: {
@@ -1881,7 +1950,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await storage.updateUserStripeInfo(userId, customerId, subscription.id);
 
-      const clientSecret = subscription.latest_invoice?.payment_intent?.client_secret;
+      // Extract payment intent client secret safely
+      const invoice = subscription.latest_invoice;
+      let clientSecret = null;
+
+      if (invoice && typeof invoice === 'object' && invoice.payment_intent) {
+        if (typeof invoice.payment_intent === 'object' && invoice.payment_intent.client_secret) {
+          clientSecret = invoice.payment_intent.client_secret;
+        }
+      }
+
+      if (!clientSecret) {
+        console.error("No payment intent client secret found for subscription:", subscription.id);
+        return res.status(500).json({ 
+          message: "Failed to create payment intent. Please try again.",
+          error: "NO_CLIENT_SECRET"
+        });
+      }
 
       res.json({
         subscriptionId: subscription.id,
@@ -2035,16 +2120,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const sig = req.headers['stripe-signature'];
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
-    console.log("Webhook received, signature present:", !!sig);
+    console.log("Webhook received:", {
+      signature: !!sig,
+      webhookSecret: !!webhookSecret,
+      bodySize: req.body?.length || 0
+    });
 
     if (!stripe) {
       console.error("Stripe not configured for webhook processing");
-      return res.status(400).send('Stripe not configured');
+      return res.status(400).json({ error: 'Stripe not configured' });
     }
 
     if (!webhookSecret) {
       console.error("Webhook secret not configured");
-      return res.status(400).send('Webhook secret not configured');
+      return res.status(400).json({ error: 'Webhook secret not configured' });
+    }
+
+    if (!sig) {
+      console.error("No stripe signature header found");
+      return res.status(400).json({ error: 'No signature header' });
     }
 
     let event;
@@ -3337,6 +3431,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching program workouts:", error);
       res.status(500).json({ message: "Failed to fetch program workouts" });
+    }
+  });
+
+  // Test Stripe integration (admin only)
+  app.post('/api/stripe/test', isAuthenticated, requireAdmin, async (req: any, res) => {
+    try {
+      if (!stripe) {
+        return res.status(500).json({ message: "Stripe not configured" });
+      }
+
+      const PRICE_ID = 'price_1RgOOZGKLIEfAkDGfqPezReg';
+      
+      // Test creating a customer (won't be saved)
+      const testCustomer = await stripe.customers.create({
+        email: 'test@example.com',
+        metadata: { test: 'true' }
+      });
+
+      // Test retrieving the price
+      const price = await stripe.prices.retrieve(PRICE_ID);
+
+      // Test creating a checkout session (won't be completed)
+      const checkoutSession = await stripe.checkout.sessions.create({
+        customer: testCustomer.id,
+        line_items: [{
+          price: PRICE_ID,
+          quantity: 1
+        }],
+        mode: 'subscription',
+        success_url: 'https://example.com/success',
+        cancel_url: 'https://example.com/cancel'
+      });
+
+      // Clean up test customer
+      await stripe.customers.del(testCustomer.id);
+
+      res.json({
+        success: true,
+        message: "All Stripe operations successful",
+        tests: {
+          customerCreation: !!testCustomer.id,
+          priceRetrieval: !!price.id,
+          checkoutSession: !!checkoutSession.id,
+          priceDetails: {
+            amount: price.unit_amount,
+            currency: price.currency,
+            recurring: price.recurring?.interval
+          }
+        }
+      });
+    } catch (error: any) {
+      console.error("Stripe test error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Stripe test failed",
+        error: error.message,
+        code: error.code
+      });
     }
   });
 
