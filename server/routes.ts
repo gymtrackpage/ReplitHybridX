@@ -2082,6 +2082,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         break;
 
+      case 'invoice.upcoming':
+        const upcomingInvoice = event.data.object;
+        const upcomingSubscriptionId = upcomingInvoice.subscription;
+        if (upcomingSubscriptionId) {
+          const user = await storage.getUserByStripeSubscriptionId(upcomingSubscriptionId as string);
+          if (user) {
+            console.log(`Upcoming invoice for user ${user.id} - amount: ${upcomingInvoice.amount_due}`);
+            // You could send email reminder here
+          }
+        }
+        break;
+
+      case 'invoice.payment_action_required':
+        const actionRequiredInvoice = event.data.object;
+        const actionSubscriptionId = actionRequiredInvoice.subscription;
+        if (actionSubscriptionId) {
+          const user = await storage.getUserByStripeSubscriptionId(actionSubscriptionId as string);
+          if (user) {
+            await storage.updateUserProfile(user.id, {
+              subscriptionStatus: "incomplete",
+              updatedAt: new Date()
+            });
+            console.log(`Payment action required for user ${user.id}`);
+            // Send notification about authentication required
+          }
+        }
+        break;
+
+      case 'customer.subscription.trial_will_end':
+        const trialEndSubscription = event.data.object;
+        const trialUser = await storage.getUserByStripeSubscriptionId(trialEndSubscription.id);
+        if (trialUser) {
+          console.log(`Trial ending in 3 days for user ${trialUser.id}`);
+          // Send trial ending notification
+        }
+        break;
+
+      case 'payment_method.automatically_updated':
+        const updatedPaymentMethod = event.data.object;
+        console.log(`Payment method automatically updated: ${updatedPaymentMethod.id}`);
+        // Could notify user about card update
+        break;
+
       case 'invoice.payment_failed':
         const failedInvoice = event.data.object;
         const failedSubscriptionId = failedInvoice.subscription;
