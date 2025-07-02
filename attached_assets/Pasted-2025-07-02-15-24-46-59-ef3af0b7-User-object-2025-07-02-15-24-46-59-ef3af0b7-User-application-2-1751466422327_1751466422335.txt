@@ -1,0 +1,196 @@
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'object',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'application',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'application_fee_percent',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'automatic_tax',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'billing_cycle_anchor',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'billing_cycle_anchor_config',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'billing_mode',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'billing_thresholds',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'cancel_at',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'cancel_at_period_end',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'canceled_at',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'cancellation_details',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'collection_method',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'created',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'currency',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'customer',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'days_until_due',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'default_payment_method',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'default_source',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'default_tax_rates',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'description',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'discounts',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'ended_at',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'invoice_settings',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'items',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'latest_invoice',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'livemode',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'metadata',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'next_pending_invoice_item_invoice',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'on_behalf_of',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'pause_collection',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'payment_settings',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'pending_invoice_item_interval',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'pending_setup_intent',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'pending_update',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'plan',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'quantity',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'schedule',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'start_date',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'status',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'test_clock',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'transfer_data',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'trial_end',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'trial_settings',
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+'trial_start'
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+]
+2025-07-02 15:24:46.59
+ef3af0b7
+User
+Creating setup intent as fallback...
+2025-07-02 15:24:46.80
+ef3af0b7
+User
+Using setup intent client secret as fallback
+2025-07-02 15:24:46.80
+ef3af0b7
+User
+Subscription creation successful: sub_1RgRabGKLIEfAkDGSZh74ut1
