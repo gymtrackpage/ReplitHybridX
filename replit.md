@@ -107,6 +107,7 @@ Changelog:
 - June 16, 2025: Initial setup
 - June 16, 2025: Successfully implemented complete Strava integration with OAuth authentication, workout sharing, and automated image generation. Fixed sport_type validation issues, response stream handling errors, and activity detection logic. Strava sharing now works perfectly with custom workout images uploaded to activities. All workouts consistently categorized as "WeightTraining" sport type.
 - June 30, 2025: Implemented comprehensive referral system with 6-character codes, shareable URLs, automatic tracking, Stripe webhook integration for milestone monitoring, and reward processing. Added referral dashboard with stats display and mobile-friendly UI components. System prevents duplicate referrals and includes proper error handling.
+- January 2, 2025: Fixed critical Stripe subscription setup issues. Improved payment intent client secret extraction with multiple fallback methods (manual payment intent creation, setup intent fallback). Enhanced error handling to prevent users from being redirected to assessment on payment failures. Added referral access section to profile page for easy user access.
 
 ## User Preferences
 

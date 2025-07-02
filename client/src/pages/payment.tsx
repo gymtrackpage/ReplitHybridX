@@ -59,9 +59,13 @@ function CheckoutForm({ clientSecret, subscriptionId }: { clientSecret: string, 
       console.error("Payment/Setup failed:", error);
       toast({
         title: "Payment Failed",
-        description: error.message || "Your payment could not be processed.",
+        description: error.message || "Your payment could not be processed. Please try again.",
         variant: "destructive"
       });
+      
+      // Don't redirect to assessment on payment failure - stay on payment page
+      // User can retry payment or go back manually
+      
     } else if (paymentIntent?.status === 'succeeded' || setupIntent?.status === 'succeeded') {
       // Payment or setup succeeded - update subscription status and complete assessment
       try {

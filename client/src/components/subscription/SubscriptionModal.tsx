@@ -47,8 +47,8 @@ export function SubscriptionModal({ open, onOpenChange, feature }: SubscriptionM
       } 
       
       if (data.clientSecret && data.subscriptionId) {
-        // Validate client secret format
-        if (!data.clientSecret.startsWith('pi_')) {
+        // Validate client secret format (accept both payment intents and setup intents)
+        if (!data.clientSecret.startsWith('pi_') && !data.clientSecret.startsWith('seti_')) {
           throw new Error("Invalid payment session format");
         }
         
