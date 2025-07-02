@@ -877,7 +877,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.createUserProgress({
           userId,
           programId,
-```text
           currentWeek: currentWeek,
           currentDay: currentDay,
           startDate: startDate.toISOString(),
