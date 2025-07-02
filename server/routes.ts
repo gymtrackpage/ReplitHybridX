@@ -1372,18 +1372,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log("Using Stripe customer:", customerId);
 
-      // Create subscription
+      // Create subscription using actual price ID
       const subscription = await stripe.subscriptions.create({
         customer: customerId,
         items: [{
-          price_data: {
-            currency: 'gbp',
-            product: 'HybridX Premium',
-            unit_amount: 500, // £5.00/month (500 pence)
-            recurring: {
-              interval: 'month'
-            }
-          }
+          price: 'price_1RgOOZGKLIEfAkDGfqPezReg'
         }],
         payment_behavior: 'default_incomplete',
         payment_settings: {
@@ -1425,7 +1418,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(response);
     } catch (error: any) {
       console.error("Subscription creation error:", error);
-      
+
       let message = "Failed to create subscription. Please try again.";
       let errorCode = "SUBSCRIPTION_ERROR";
 
@@ -1786,7 +1779,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUser(userId);
 
       if (!user) {
-        return res.status(404).json({ message: "User not found" });
+        return res.status(404.json({ message: "User not found" });
       }
 
       let subscriptionStatus = {
@@ -1877,14 +1870,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const subscription = await stripe.subscriptions.create({
         customer: customerId,
         items: [{
-          price_data: {
-            currency: 'gbp',
-            product: 'HybridX Premium',
-            unit_amount: 500, // £5.00
-            recurring: {
-              interval: 'month'
-            }
-          }
+          price: 'price_1RgOOZGKLIEfAkDGfqPezReg'
         }],
         payment_behavior: 'default_incomplete',
         payment_settings: {
@@ -2702,7 +2688,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Program has ${allWorkouts.length} total workouts`);
 
       // Calculate next day/week progression
-      const currentDay = progress.currentDay || 1;
+      const currentDay =progress.currentDay || 1;
       const currentWeek = progress.currentWeek || 1;
       let nextDay = currentDay + 1;
       let nextWeek = currentWeek;
@@ -3550,9 +3536,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     };
   }
 
-  
 
-  
+
+
 
   const httpServer = createServer(app);
   return httpServer;
