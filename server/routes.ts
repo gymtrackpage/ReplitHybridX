@@ -1362,10 +1362,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         items: [{
           price_data: {
             currency: 'gbp',
-            product_data: {
-              name: 'HybridX Premium',
-              description: 'Access to all HYROX training programs and premium features'
-            },
+            product: 'HybridX Premium',
             unit_amount: 500, // £5.00/month (500 pence)
             recurring: {
               interval: 'month'
@@ -1863,10 +1860,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         items: [{
           price_data: {
             currency: 'gbp',
-            product_data: {
-              name: 'HybridX Premium',
-              description: 'Access to all HYROX training programs and premium features'
-            },
+            product: 'HybridX Premium',
             unit_amount: 500, // £5.00
             recurring: {
               interval: 'month'
