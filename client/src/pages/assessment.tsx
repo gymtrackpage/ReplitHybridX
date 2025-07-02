@@ -150,45 +150,41 @@ export default function Assessment() {
 
   const createSubscriptionMutation = useMutation({
     mutationFn: async () => {
-      const data = await apiRequest("POST", "/api/create-subscription");
+      console.log("Creating subscription...");
+      
+      // Store assessment data before payment
+      localStorage.setItem('pendingAssessment', JSON.stringify({
+        assessmentData,
+        programId: recommendation!.recommendedProgram.id,
+        subscriptionChoice: "premium"
+      }));
 
-      if (data.paymentUrl) {
-        window.location.href = data.paymentUrl;
-      } else if (data.clientSecret && data.subscriptionId) {
-        window.location.href = `/payment?client_secret=${data.clientSecret}&subscription_id=${data.subscriptionId}`;
-      } else {
-        throw new Error("Invalid subscription response");
-      }
+      const data = await apiRequest("POST", "/api/create-subscription");
+      console.log("Subscription creation response:", data);
+      
       return data;
     },
     onSuccess: (data: any) => {
-      console.log("Subscription creation response:", data);
-      if (data.url) {
-        // Store assessment data for completion after payment
-        localStorage.setItem('pendingAssessment', JSON.stringify({
-          assessmentData,
-          programId: recommendation!.recommendedProgram.id,
-          subscriptionChoice: "premium"
-        }));
-        window.location.href = data.url;
-      } else if (data.paymentUrl) {
-        // Store assessment data for completion after payment
-        localStorage.setItem('pendingAssessment', JSON.stringify({
-          assessmentData,
-          programId: recommendation!.recommendedProgram.id,
-          subscriptionChoice: "premium"
-        }));
+      console.log("Subscription creation successful:", data);
+      
+      if (data.paymentUrl) {
+        console.log("Redirecting to payment URL:", data.paymentUrl);
         window.location.href = data.paymentUrl;
+      } else if (data.clientSecret && data.subscriptionId) {
+        console.log("Redirecting to payment page with client secret");
+        window.location.href = `/payment?client_secret=${data.clientSecret}&subscription_id=${data.subscriptionId}`;
       } else {
+        console.error("Invalid subscription response:", data);
         toast({
           title: "Error",
-          description: "Failed to create subscription. Please try again.",
+          description: "Invalid subscription response. Please try again.",
           variant: "destructive"
         });
       }
     },
     onError: (error: any) => {
       console.error("Subscription creation error:", error);
+      localStorage.removeItem('pendingAssessment'); // Clean up on error
       toast({
         title: "Error",
         description: error.message || "Failed to create subscription. Please try again.",

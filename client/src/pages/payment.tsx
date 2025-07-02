@@ -33,29 +33,45 @@ function CheckoutForm({ clientSecret, subscriptionId }: { clientSecret: string, 
       return;
     }
 
-    // Confirm payment
-    const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
-      payment_method: {
-        card: cardElement,
-      },
-    });
+    // Determine if this is a payment intent or setup intent
+    const isSetupIntent = clientSecret.startsWith('seti_');
+    
+    let result;
+    if (isSetupIntent) {
+      // Confirm setup intent
+      result = await stripe.confirmCardSetup(clientSecret, {
+        payment_method: {
+          card: cardElement,
+        },
+      });
+    } else {
+      // Confirm payment intent
+      result = await stripe.confirmCardPayment(clientSecret, {
+        payment_method: {
+          card: cardElement,
+        },
+      });
+    }
+    
+    const { error, paymentIntent, setupIntent } = result;
 
     if (error) {
-      console.error("Payment failed:", error);
+      console.error("Payment/Setup failed:", error);
       toast({
         title: "Payment Failed",
         description: error.message || "Your payment could not be processed.",
         variant: "destructive"
       });
-    } else if (paymentIntent?.status === 'succeeded') {
-      // Payment succeeded - update subscription status and complete assessment
+    } else if (paymentIntent?.status === 'succeeded' || setupIntent?.status === 'succeeded') {
+      // Payment or setup succeeded - update subscription status and complete assessment
       try {
-        console.log("Payment succeeded, updating subscription status...");
+        const intentId = paymentIntent?.id || setupIntent?.id;
+        console.log("Payment/Setup succeeded, updating subscription status...", intentId);
         
         // Update subscription status
         await apiRequest("POST", "/api/subscription-confirmed", {
           subscriptionId,
-          paymentIntentId: paymentIntent.id
+          paymentIntentId: intentId
         });
 
         const pendingAssessment = localStorage.getItem('pendingAssessment');
@@ -176,8 +192,8 @@ export default function Payment() {
       return;
     }
 
-    // Validate client secret format
-    if (!secret.startsWith('pi_') || secret.length < 27) {
+    // Validate client secret format (accept both payment intents and setup intents)
+    if ((!secret.startsWith('pi_') && !secret.startsWith('seti_')) || secret.length < 27) {
       console.error("Invalid client secret format:", secret);
       setError("Invalid payment session. Please try subscribing again.");
       return;

@@ -1507,10 +1507,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const response = {
         subscriptionId: subscription.id,
         clientSecret: clientSecret,
-        paymentUrl: `/payment?client_secret=${clientSecret}&subscription_id=${subscription.id}`
+        paymentUrl: `/payment?client_secret=${clientSecret}&subscription_id=${subscription.id}`,
+        success: true
       };
 
       console.log("Subscription creation successful:", response.subscriptionId);
+      console.log("Payment URL generated:", response.paymentUrl);
       res.json(response);
     } catch (error: any) {
       console.error("Subscription creation error:", error);
@@ -2041,10 +2043,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ message: "Stripe not configured" });
       }
 
-      // Verify payment intent is successful
-      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-      if (paymentIntent.status !== 'succeeded') {
-        return res.status(400).json({ message: "Payment not confirmed" });
+      // Verify payment intent or setup intent is successful
+      let intentSucceeded = false;
+      
+      if (paymentIntentId.startsWith('pi_')) {
+        // Payment intent
+        const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+        intentSucceeded = paymentIntent.status === 'succeeded';
+      } else if (paymentIntentId.startsWith('seti_')) {
+        // Setup intent
+        const setupIntent = await stripe.setupIntents.retrieve(paymentIntentId);
+        intentSucceeded = setupIntent.status === 'succeeded';
+      }
+      
+      if (!intentSucceeded) {
+        return res.status(400).json({ message: "Payment/Setup not confirmed" });
       }
 
       // Update user subscription status
