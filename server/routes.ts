@@ -107,7 +107,7 @@ const upload = multer({
       'application/vnd.ms-excel',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     ];
-    
+
     if (allowedTypes.includes(file.mimetype) || 
         file.originalname?.endsWith('.csv') || 
         file.originalname?.endsWith('.xlsx')) {
@@ -142,7 +142,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           setTimeout(() => reject(new Error('Database connection timeout')), 5000)
         )
       ]);
-      
+
       await dbTest;
       healthStatus.checks.database = 'connected';
       console.log('✅ Health check passed');
@@ -151,7 +151,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('❌ Health check failed:', error);
       healthStatus.status = 'unhealthy';
       healthStatus.checks.database = 'failed';
-      
+
       // Provide more specific error information
       let errorMessage = 'Database connection failed';
       if (error instanceof Error) {
@@ -165,7 +165,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           errorMessage = error.message;
         }
       }
-      
+
       res.status(503).json({ 
         ...healthStatus,
         error: errorMessage
@@ -874,7 +874,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           completedWorkouts: startOption === "continue" ? existingProgress.completedWorkouts : 0
         });
       } else {
-        await storage.createUserProgress({
+        await storage.createUserProgress```text
+({
           userId,
           programId,
           currentWeek: currentWeek,
@@ -1866,11 +1867,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       let subscription;
-      
+
       if (immediate) {
         // Cancel immediately and downgrade to free plan
         subscription = await stripe.subscriptions.cancel(user.stripeSubscriptionId);
-        
+
         // Update user profile to free status immediately
         await storage.updateUserProfile(userId, {
           subscriptionStatus: "free_trial",
@@ -1996,7 +1997,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const user = await storage.getUserByStripeSubscriptionId(failedSubscriptionId as string);
           if (user) {
             console.log(`Payment failed for user ${user.id}. Attempt: ${failedInvoice.attempt_count}`);
-            
+
             // Update user status to indicate payment issues
             await storage.updateUserProfile(user.id, {
               subscriptionStatus: "past_due",
@@ -2274,7 +2275,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const invoice = invoices.data[0];
-      
+
       if (invoice.status === 'paid') {
         return res.status(400).json({ message: "Invoice is already paid" });
       }
@@ -2335,8 +2336,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Error creating payment intent: " + error.message });
     }
   });
-
-
 
   // Phase transition management
   app.post("/api/check-phase-transition", isAuthenticated, async (req: any, res) => {
@@ -3225,7 +3224,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       let user = await storage.getUser(userId);
-      
+
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -3241,12 +3240,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Generate new referral code
       const referralCode = await generateReferralCode();
-      
+
       // Update user with the new referral code
       user = await storage.updateUser(userId, { referralCode });
-      
+
       const referralUrl = createReferralUrl(referralCode);
-      
+
       res.json({ 
         referralCode,
         referralUrl 
@@ -3286,7 +3285,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Update subscription in our database
       let subscription = await storage.getUserSubscription(userId);
-      
+
       if (!subscription) {
         // Create new subscription record
         subscription = await storage.createSubscription({
@@ -3314,7 +3313,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Landing page for referral links
   app.get("/join", (req, res) => {
     const referralCode = req.query.ref as string;
-    
+
     // Store referral code in session for signup process
     if (referralCode) {
       req.session = req.session || {};
@@ -3338,6 +3337,177 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     res.json({ message: "Referral code cleared from session" });
   });
+
+  // Authentication middleware
+  function requireAuth(req: Request, res: Response, next: NextFunction) {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    next();
+  }
+
+  const STRIPE_PRICE_ID = process.env.STRIPE_PRICE_ID;
+
+  async function getUserStripeCustomer(userId: number) {
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, userId)
+    });
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    return {
+      userId: user.id,
+      stripeCustomerId: user.stripeCustomerId
+    };
+  }
+
+  async function createStripeCustomer(userId: number) {
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, userId)
+    });
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    if (!stripe) {
+      throw new Error("Stripe not configured");
+    }
+
+    // Check if the user already has a Stripe customer ID
+    if (user.stripeCustomerId) {
+      console.warn(`User ${userId} already has a Stripe customer ID: ${user.stripeCustomerId}`);
+      return {
+        userId: user.id,
+        stripeCustomerId: user.stripeCustomerId
+      };
+    }
+
+    const customer = await stripe.customers.create({
+      metadata: {
+        userId: userId
+      }
+    });
+
+    await db.update(users)
+      .set({ stripeCustomerId: customer.id })
+      .where(eq(users.id, userId));
+
+    return {
+      userId: user.id,
+      stripeCustomerId: customer.id
+    };
+  }
+
+  // Create subscription
+  app.post("/api/create-subscription", requireAuth, async (req, res) => {
+    try {
+      console.log("Creating subscription for user:", req.user?.id);
+
+      if (!req.user?.id) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
+      const subscription = await createStripeSubscription(req.user.id);
+      console.log("Created subscription response:", subscription);
+
+      // Ensure we have a valid response
+      if (!subscription) {
+        throw new Error("No subscription data returned");
+      }
+
+      // Validate response has required fields
+      if (!subscription.paymentUrl && !subscription.clientSecret) {
+        throw new Error("Invalid subscription response - missing payment URL or client secret");
+      }
+
+      res.json(subscription);
+    } catch (error) {
+      console.error("Subscription creation error:", error);
+      res.status(500).json({ 
+        error: "Failed to create subscription",
+        message: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
+  async function createStripeSubscription(userId: number) {
+    console.log("Creating Stripe subscription for user:", userId);
+
+    if (!stripe) {
+      console.error("Stripe not configured - missing STRIPE_SECRET_KEY");
+      throw new Error("Stripe not configured");
+    }
+
+    if (!STRIPE_PRICE_ID) {
+      console.error("STRIPE_PRICE_ID not configured");
+      throw new Error("Stripe price ID not configured");
+    }
+
+    console.log("Using Stripe Price ID:", STRIPE_PRICE_ID);
+
+    try {
+      // Get or create customer
+      let customer = await getUserStripeCustomer(userId);
+      if (!customer.stripeCustomerId) {
+        console.log("Creating new Stripe customer for user:", userId);
+        customer = await createStripeCustomer(userId);
+      }
+
+      console.log("Using customer:", customer.stripeCustomerId);
+
+      // Create subscription
+      const subscription = await stripe.subscriptions.create({
+        customer: customer.stripeCustomerId,
+        items: [{ price: STRIPE_PRICE_ID }],
+        payment_behavior: 'default_incomplete',
+        payment_settings: { save_default_payment_method: 'on_subscription' },
+        expand: ['latest_invoice.payment_intent'],
+      });
+
+      console.log("Created subscription:", subscription.id, "Status:", subscription.status);
+
+      // Store subscription in database
+      await db.insert(subscriptions).values({
+        userId,
+        stripeSubscriptionId: subscription.id,
+        stripeCustomerId: customer.stripeCustomerId,
+        status: subscription.status as any,
+        currentPeriodStart: new Date(subscription.current_period_start * 1000),
+        currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+        cancelAtPeriodEnd: subscription.cancel_at_period_end,
+      }).onConflictDoUpdate({
+        target: subscriptions.userId,
+        set: {
+          stripeSubscriptionId: subscription.id,
+          status: subscription.status as any,
+          currentPeriodStart: new Date(subscription.current_period_start * 1000),
+          currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+          cancelAtPeriodEnd: subscription.cancel_at_period_end,
+        }
+      });
+
+      const paymentIntent = subscription.latest_invoice?.payment_intent as any;
+      console.log("Payment intent client secret exists:", !!paymentIntent?.client_secret);
+
+      if (paymentIntent?.client_secret) {
+        const response = {
+          subscriptionId: subscription.id,
+          clientSecret: paymentIntent.client_secret,
+          paymentUrl: `/payment?client_secret=${paymentIntent.client_secret}&subscription_id=${subscription.id}`
+        };
+        console.log("Returning subscription response:", response);
+        return response;
+      }
+
+      throw new Error("Failed to create payment intent - no client secret");
+    } catch (error) {
+      console.error("Error in createStripeSubscription:", error);
+      throw error;
+    }
+  }
 
   const httpServer = createServer(app);
   return httpServer;

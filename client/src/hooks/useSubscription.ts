@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 export interface SubscriptionStatus {
   isSubscribed: boolean;
@@ -13,6 +14,7 @@ export interface SubscriptionStatus {
 
 export function useSubscription() {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const { data: subscriptionStatus, isLoading } = useQuery<SubscriptionStatus>({
     queryKey: ['/api/subscription-status'],

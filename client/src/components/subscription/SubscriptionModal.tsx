@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Crown, Zap, Check } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
-// import { useLocation } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 
 interface SubscriptionModalProps {
   open: boolean;
@@ -14,23 +14,34 @@ interface SubscriptionModalProps {
 
 export function SubscriptionModal({ open, onOpenChange, feature }: SubscriptionModalProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
 
   const handleSubscribe = async () => {
     setIsLoading(true);
     try {
+      console.log("Creating subscription...");
       const data = await apiRequest("POST", "/api/create-subscription");
+      console.log("Subscription response:", data);
       
       if (data.paymentUrl) {
+        console.log("Redirecting to payment URL:", data.paymentUrl);
         window.location.href = data.paymentUrl;
       } else if (data.clientSecret && data.subscriptionId) {
         // Redirect to payment page with required parameters
-        window.location.href = `/payment?client_secret=${data.clientSecret}&subscription_id=${data.subscriptionId}`;
+        const paymentUrl = `/payment?client_secret=${data.clientSecret}&subscription_id=${data.subscriptionId}`;
+        console.log("Redirecting to payment page:", paymentUrl);
+        window.location.href = paymentUrl;
       } else {
-        throw new Error("Invalid subscription response");
+        console.error("Invalid subscription response:", data);
+        throw new Error("Invalid subscription response - missing payment URL");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Subscription error:", error);
-    } finally {
+      toast({
+        title: "Subscription Error",
+        description: error.message || "Failed to create subscription. Please try again.",
+        variant: "destructive",
+      });
       setIsLoading(false);
     }
   };
