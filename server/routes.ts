@@ -874,10 +874,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           completedWorkouts: startOption === "continue" ? existingProgress.completedWorkouts : 0
         });
       } else {
-        await storage.createUserProgress```text
-({
+        await storage.createUserProgress({
           userId,
           programId,
+```text
           currentWeek: currentWeek,
           currentDay: currentDay,
           startDate: startDate.toISOString(),
@@ -2684,7 +2684,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating program:", error);
       res.status(500).json({ message: "Failed to create program" });
-    }
+        }
   });
 
   app.put('/api/admin/programs/:id', requireAdmin, async (req: any, res) => {
