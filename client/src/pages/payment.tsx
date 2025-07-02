@@ -130,20 +130,62 @@ export default function Payment() {
   const [, setLocation] = useLocation();
   const [clientSecret, setClientSecret] = useState<string>("");
   const [subscriptionId, setSubscriptionId] = useState<string>("");
+  const [error, setError] = useState<string>("");
+  const { toast } = useToast();
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const secret = urlParams.get('client_secret');
     const subId = urlParams.get('subscription_id');
 
+    console.log("Payment page loaded with params:", { secret: !!secret, subId: !!subId });
+
     if (!secret || !subId) {
+      console.error("Missing payment parameters - redirecting to assessment");
+      toast({
+        title: "Payment Error",
+        description: "Missing payment information. Please try subscribing again.",
+        variant: "destructive"
+      });
       setLocation('/assessment');
+      return;
+    }
+
+    // Validate client secret format
+    if (!secret.startsWith('pi_') || secret.length < 10) {
+      console.error("Invalid client secret format");
+      setError("Invalid payment parameters. Please try subscribing again.");
       return;
     }
 
     setClientSecret(secret);
     setSubscriptionId(subId);
-  }, [setLocation]);
+  }, [setLocation, toast]);
+
+  if (error) {
+    return (
+      <MobileLayout>
+        <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-50 p-4">
+          <div className="max-w-md mx-auto pt-20">
+            <Card className="border-red-200">
+              <CardHeader className="text-center">
+                <CardTitle className="text-xl text-red-600">Payment Error</CardTitle>
+                <CardDescription>{error}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button 
+                  onClick={() => setLocation('/assessment')}
+                  className="w-full"
+                >
+                  Return to Assessment
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </MobileLayout>
+    );
+  }
 
   if (!clientSecret) {
     return (

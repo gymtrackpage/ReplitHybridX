@@ -42,6 +42,7 @@ const requiredEnvVars = {
 
 const optionalEnvVars = {
   STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
+  STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
   STRAVA_CLIENT_ID: process.env.STRAVA_CLIENT_ID,
   STRAVA_CLIENT_SECRET: process.env.STRAVA_CLIENT_SECRET,
 };
@@ -49,7 +50,19 @@ const optionalEnvVars = {
 // Check required environment variables
 for (const [key, value] of Object.entries(requiredEnvVars)) {
   if (!value) {
-    console.error(`Missing required environment variable: ${key}`);
+    console.error(`❌ Missing required environment variable: ${key}`);
+  } else {
+    console.log(`✅ Required environment variable set: ${key}`);
+  }
+}
+
+// Check optional environment variables
+console.log("🔧 Optional environment variables:");
+for (const [key, value] of Object.entries(optionalEnvVars)) {
+  if (value) {
+    console.log(`✅ ${key}: configured`);
+  } else {
+    console.log(`⚠️  ${key}: not configured`);
   }
 }
 
@@ -1284,52 +1297,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/create-subscription', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      console.log("Creating subscription for user:", userId);
 
+      // Check Stripe configuration
       if (!stripe) {
-        return res.status(500).json({ message: "Payment processing not configured" });
+        console.error("Stripe not configured - missing STRIPE_SECRET_KEY");
+        return res.status(500).json({ 
+          message: "Payment processing not configured. Please contact support.",
+          error: "STRIPE_NOT_CONFIGURED"
+        });
       }
 
       const user = await storage.getUser(userId);
-
       if (!user) {
+        console.error("User not found:", userId);
         return res.status(404).json({ message: "User not found" });
       }
 
+      // Check for existing active subscription
       if (user.stripeSubscriptionId) {
         try {
-          const subscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
-          const invoice = subscription.latest_invoice;
-          const clientSecret = typeof invoice === 'object' && invoice?.payment_intent 
-            ? (typeof invoice.payment_intent === 'object' ? invoice.payment_intent.client_secret : null)
-            : null;
-          return res.json({
-            subscriptionId: subscription.id,
-            clientSecret,
-          });
+          const existingSubscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
+          if (existingSubscription.status === 'active') {
+            console.log("User already has active subscription:", existingSubscription.id);
+            return res.json({
+              subscriptionId: existingSubscription.id,
+              status: 'active',
+              message: "You already have an active subscription"
+            });
+          }
         } catch (stripeError) {
-          console.error("Existing subscription not found:", stripeError);
+          console.log("Existing subscription not found, creating new one");
           // Continue to create new subscription
         }
       }
 
+      // Ensure user has email
       if (!user.email) {
-        return res.status(400).json({ message: 'No user email on file' });
+        console.error("User has no email:", userId);
+        return res.status(400).json({ 
+          message: 'Email address required for subscription. Please update your profile.',
+          error: "NO_EMAIL"
+        });
       }
 
-      const customer = await stripe.customers.create({
-        email: user.email,
-        name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
-      });
+      let customerId = user.stripeCustomerId;
 
-      // Create £5/month subscription
+      // Create or retrieve Stripe customer
+      if (!customerId) {
+        console.log("Creating new Stripe customer for user:", userId);
+        const customer = await stripe.customers.create({
+          email: user.email,
+          name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+          metadata: { userId }
+        });
+        customerId = customer.id;
+        await storage.updateUserStripeInfo(userId, customerId, "");
+      }
+
+      console.log("Using Stripe customer:", customerId);
+
+      // Create subscription with proper error handling
       const subscription = await stripe.subscriptions.create({
-        customer: customer.id,
+        customer: customerId,
         items: [{
           price_data: {
             currency: 'gbp',
             product_data: {
               name: 'HybridX Premium',
-              description: 'Access to all HYROX training programs and features'
+              description: 'Access to all HYROX training programs and premium features'
             },
             unit_amount: 500, // £5.00/month (500 pence)
             recurring: {
@@ -1338,23 +1374,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }],
         payment_behavior: 'default_incomplete',
+        payment_settings: {
+          save_default_payment_method: 'on_subscription'
+        },
         expand: ['latest_invoice.payment_intent'],
       });
 
-      await storage.updateUserStripeInfo(userId, customer.id, subscription.id);
+      console.log("Created subscription:", subscription.id, "Status:", subscription.status);
 
+      // Update user with subscription ID
+      await storage.updateUserStripeInfo(userId, customerId, subscription.id);
+
+      // Extract payment intent client secret
       const invoice = subscription.latest_invoice;
-      const clientSecret = typeof invoice === 'object' && invoice?.payment_intent 
-        ? (typeof invoice.payment_intent === 'object' ? invoice.payment_intent.client_secret : null)
+      const paymentIntent = typeof invoice === 'object' && invoice?.payment_intent 
+        ? (typeof invoice.payment_intent === 'object' ? invoice.payment_intent : null)
         : null;
 
-      res.json({
+      if (!paymentIntent?.client_secret) {
+        console.error("No payment intent client secret found");
+        return res.status(500).json({ 
+          message: "Failed to create payment intent. Please try again.",
+          error: "NO_CLIENT_SECRET"
+        });
+      }
+
+      const response = {
         subscriptionId: subscription.id,
-        clientSecret,
-      });
+        clientSecret: paymentIntent.client_secret,
+        paymentUrl: `/payment?client_secret=${paymentIntent.client_secret}&subscription_id=${subscription.id}`
+      };
+
+      console.log("Subscription creation successful:", response.subscriptionId);
+      res.json(response);
     } catch (error: any) {
-      console.error("Stripe error:", error);
-      res.status(400).json({ error: { message: error.message } });
+      console.error("Subscription creation error:", error);
+      
+      // Provide specific error messages based on error type
+      let message = "Failed to create subscription. Please try again.";
+      let errorCode = "SUBSCRIPTION_ERROR";
+
+      if (error.type === 'StripeCardError') {
+        message = "Card error: " + error.message;
+        errorCode = "CARD_ERROR";
+      } else if (error.type === 'StripeInvalidRequestError') {
+        message = "Invalid request: " + error.message;
+        errorCode = "INVALID_REQUEST";
+      } else if (error.code === 'resource_missing') {
+        message = "Stripe resource not found. Please try again.";
+        errorCode = "RESOURCE_MISSING";
+      }
+
+      res.status(500).json({ 
+        message,
+        error: errorCode,
+        details: error.message
+      });
     }
   });
 
@@ -1959,7 +2034,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const sig = req.headers['stripe-signature'];
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
-    if (!stripe || !webhookSecret) {
+    console.log("Webhook received, signature present:", !!sig);
+
+    if (!stripe) {
+      console.error("Stripe not configured for webhook processing");
+      return res.status(400).send('Stripe not configured');
+    }
+
+    if (!webhookSecret) {
+      console.error("Webhook secret not configured");
       return res.status(400).send('Webhook secret not configured');
     }
 
@@ -1967,6 +2050,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     try {
       event = stripe.webhooks.constructEvent(req.body, sig!, webhookSecret);
+      console.log("Webhook event constructed successfully:", event.type);
     } catch (err: any) {
       console.error('Webhook signature verification failed:', err.message);
       return res.status(400).send(`Webhook Error: ${err.message}`);
@@ -3400,37 +3484,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     };
   }
 
-  // Create subscription
-  app.post("/api/create-subscription", requireAuth, async (req, res) => {
-    try {
-      console.log("Creating subscription for user:", req.user?.id);
-
-      if (!req.user?.id) {
-        return res.status(401).json({ error: "User not authenticated" });
-      }
-
-      const subscription = await createStripeSubscription(req.user.id);
-      console.log("Created subscription response:", subscription);
-
-      // Ensure we have a valid response
-      if (!subscription) {
-        throw new Error("No subscription data returned");
-      }
-
-      // Validate response has required fields
-      if (!subscription.paymentUrl && !subscription.clientSecret) {
-        throw new Error("Invalid subscription response - missing payment URL or client secret");
-      }
-
-      res.json(subscription);
-    } catch (error) {
-      console.error("Subscription creation error:", error);
-      res.status(500).json({ 
-        error: "Failed to create subscription",
-        message: error instanceof Error ? error.message : "Unknown error"
-      });
-    }
-  });
+  
 
   async function createStripeSubscription(userId: number) {
     console.log("Creating Stripe subscription for user:", userId);

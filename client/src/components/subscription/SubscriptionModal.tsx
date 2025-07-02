@@ -23,25 +23,61 @@ export function SubscriptionModal({ open, onOpenChange, feature }: SubscriptionM
       const data = await apiRequest("POST", "/api/create-subscription");
       console.log("Subscription response:", data);
       
+      // Handle different response scenarios
+      if (data.status === 'active') {
+        // User already has active subscription
+        toast({
+          title: "Already Subscribed",
+          description: data.message || "You already have an active subscription.",
+        });
+        onOpenChange(false);
+        return;
+      }
+      
       if (data.paymentUrl) {
         console.log("Redirecting to payment URL:", data.paymentUrl);
         window.location.href = data.paymentUrl;
-      } else if (data.clientSecret && data.subscriptionId) {
+        return;
+      } 
+      
+      if (data.clientSecret && data.subscriptionId) {
         // Redirect to payment page with required parameters
         const paymentUrl = `/payment?client_secret=${data.clientSecret}&subscription_id=${data.subscriptionId}`;
         console.log("Redirecting to payment page:", paymentUrl);
         window.location.href = paymentUrl;
-      } else {
-        console.error("Invalid subscription response:", data);
-        throw new Error("Invalid subscription response - missing payment URL");
+        return;
       }
+      
+      // If we get here, the response is invalid
+      console.error("Invalid subscription response:", data);
+      throw new Error("Invalid subscription response - missing payment information");
+      
     } catch (error: any) {
       console.error("Subscription error:", error);
+      
+      let errorMessage = "Failed to create subscription. Please try again.";
+      let errorTitle = "Subscription Error";
+      
+      // Handle specific error types
+      if (error.message?.includes("STRIPE_NOT_CONFIGURED")) {
+        errorMessage = "Payment processing is temporarily unavailable. Please contact support.";
+        errorTitle = "Service Unavailable";
+      } else if (error.message?.includes("NO_EMAIL")) {
+        errorMessage = "Please add an email address to your profile before subscribing.";
+        errorTitle = "Email Required";
+      } else if (error.message?.includes("NO_CLIENT_SECRET")) {
+        errorMessage = "Payment setup failed. Please try again or contact support.";
+        errorTitle = "Payment Setup Error";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
-        title: "Subscription Error",
-        description: error.message || "Failed to create subscription. Please try again.",
+        title: errorTitle,
+        description: errorMessage,
         variant: "destructive",
       });
+    } finally {
       setIsLoading(false);
     }
   };
