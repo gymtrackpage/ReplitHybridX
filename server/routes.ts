@@ -1422,7 +1422,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         payment_settings: {
           save_default_payment_method: 'on_subscription'
         },
-        expand: ['latest_invoice.payment_intent'],
+        expand: ['latest_invoice.payment_intent', 'pending_setup_intent'],
       });
 
       console.log("Created subscription:", subscription.id, "Status:", subscription.status);
@@ -1431,20 +1431,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.updateUserStripeInfo(userId, customerId, subscription.id);
 
       // Extract payment intent client secret safely
-      const invoice = subscription.latest_invoice;
       let clientSecret = null;
+      
+      console.log("Subscription created:", {
+        id: subscription.id,
+        status: subscription.status,
+        latest_invoice: typeof subscription.latest_invoice
+      });
 
-      if (invoice && typeof invoice === 'object' && invoice.payment_intent) {
-        if (typeof invoice.payment_intent === 'object' && invoice.payment_intent.client_secret) {
-          clientSecret = invoice.payment_intent.client_secret;
+      if (subscription.latest_invoice) {
+        const invoice = subscription.latest_invoice;
+        console.log("Invoice details:", {
+          id: typeof invoice === 'object' ? invoice.id : invoice,
+          payment_intent: typeof invoice === 'object' ? typeof invoice.payment_intent : 'N/A'
+        });
+
+        if (typeof invoice === 'object' && invoice.payment_intent) {
+          const paymentIntent = invoice.payment_intent;
+          console.log("Payment intent details:", {
+            id: typeof paymentIntent === 'object' ? paymentIntent.id : paymentIntent,
+            client_secret: typeof paymentIntent === 'object' ? !!paymentIntent.client_secret : 'N/A'
+          });
+
+          if (typeof paymentIntent === 'object' && paymentIntent.client_secret) {
+            clientSecret = paymentIntent.client_secret;
+          } else if (typeof paymentIntent === 'string') {
+            // If payment_intent is just an ID, retrieve it
+            try {
+              const fullPaymentIntent = await stripe.paymentIntents.retrieve(paymentIntent);
+              clientSecret = fullPaymentIntent.client_secret;
+              console.log("Retrieved payment intent client secret from ID");
+            } catch (retrieveError) {
+              console.error("Failed to retrieve payment intent:", retrieveError);
+            }
+          }
         }
       }
 
       if (!clientSecret) {
-        console.error("No payment intent client secret found");
+        console.error("No payment intent client secret found after all attempts");
+        console.log("Subscription object keys:", Object.keys(subscription));
+        
+        // Try to create a setup intent as fallback for incomplete subscriptions
+        if (subscription.status === 'incomplete') {
+          try {
+            console.log("Creating setup intent as fallback...");
+            const setupIntent = await stripe.setupIntents.create({
+              customer: customerId,
+              payment_method_types: ['card'],
+              usage: 'off_session'
+            });
+            
+            if (setupIntent.client_secret) {
+              console.log("Using setup intent client secret as fallback");
+              clientSecret = setupIntent.client_secret;
+            }
+          } catch (setupError) {
+            console.error("Setup intent creation failed:", setupError);
+          }
+        }
+      }
+
+      if (!clientSecret) {
         return res.status(500).json({ 
           message: "Failed to create payment intent. Please try again.",
-          error: "NO_CLIENT_SECRET"
+          error: "NO_CLIENT_SECRET",
+          debug: {
+            subscriptionStatus: subscription.status,
+            hasLatestInvoice: !!subscription.latest_invoice,
+            subscriptionId: subscription.id
+          }
         });
       }
 
