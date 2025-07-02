@@ -273,10 +273,10 @@ export type Assessment = typeof assessments.$inferSelect;
 export type InsertAssessment = z.infer<typeof insertAssessmentSchema>;
 export type WeightEntry = typeof weightEntries.$inferSelect;
 export type InsertWeightEntry = z.infer<typeof insertWeightEntrySchema>;
-export type Referral = typeof referrals.$inferSelect;
-export type InsertReferral = z.infer<typeof insertReferralSchema>;
 export type Subscription = typeof subscriptions.$inferSelect;
 export type InsertSubscription = z.infer<typeof insertSubscriptionSchema>;
+export type Referral = typeof referrals.$inferSelect;
+export type InsertReferral = z.infer<typeof insertReferralSchema>;
 
 // Additional interface for API responses
 export interface ApiResponse<T = any> {

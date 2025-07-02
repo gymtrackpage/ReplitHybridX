@@ -1308,15 +1308,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Validate required environment variables
-      if (!process.env.STRIPE_SECRET_KEY) {
-        console.error("STRIPE_SECRET_KEY environment variable not set");
-        return res.status(500).json({ 
-          message: "Payment processing configuration error.",
-          error: "STRIPE_NOT_CONFIGURED"
-        });
-      }
-
       const user = await storage.getUser(userId);
       if (!user) {
         console.error("User not found:", userId);
@@ -1337,7 +1328,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         } catch (stripeError) {
           console.log("Existing subscription not found, creating new one");
-          // Continue to create new subscription
         }
       }
 
@@ -1366,7 +1356,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log("Using Stripe customer:", customerId);
 
-      // Create subscription with proper error handling
+      // Create subscription
       const subscription = await stripe.subscriptions.create({
         customer: customerId,
         items: [{
@@ -1394,13 +1384,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update user with subscription ID
       await storage.updateUserStripeInfo(userId, customerId, subscription.id);
 
-      // Extract payment intent client secret
+      // Extract payment intent client secret safely
       const invoice = subscription.latest_invoice;
-      const paymentIntent = typeof invoice === 'object' && invoice?.payment_intent 
-        ? (typeof invoice.payment_intent === 'object' ? invoice.payment_intent : null)
-        : null;
+      let clientSecret = null;
 
-      if (!paymentIntent?.client_secret) {
+      if (invoice && typeof invoice === 'object' && invoice.payment_intent) {
+        if (typeof invoice.payment_intent === 'object' && invoice.payment_intent.client_secret) {
+          clientSecret = invoice.payment_intent.client_secret;
+        }
+      }
+
+      if (!clientSecret) {
         console.error("No payment intent client secret found");
         return res.status(500).json({ 
           message: "Failed to create payment intent. Please try again.",
@@ -1410,8 +1404,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const response = {
         subscriptionId: subscription.id,
-        clientSecret: paymentIntent.client_secret,
-        paymentUrl: `/payment?client_secret=${paymentIntent.client_secret}&subscription_id=${subscription.id}`
+        clientSecret: clientSecret,
+        paymentUrl: `/payment?client_secret=${clientSecret}&subscription_id=${subscription.id}`
       };
 
       console.log("Subscription creation successful:", response.subscriptionId);
@@ -1419,7 +1413,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Subscription creation error:", error);
       
-      // Provide specific error messages based on error type
       let message = "Failed to create subscription. Please try again.";
       let errorCode = "SUBSCRIPTION_ERROR";
 
@@ -2066,21 +2059,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     // Handle the event
-    switch (event.type) {
-      case 'invoice.payment_succeeded':
-        const successfulInvoice = event.data.object;
-        const successSubscriptionId = successfulInvoice.subscription;
-        if (successSubscriptionId) {
-          const user = await storage.getUserByStripeSubscriptionId(successSubscriptionId as string);
-          if (user) {
-            await storage.updateUserProfile(user.id, {
-              subscriptionStatus: "active",
-              updatedAt: new Date()
-            });
-            console.log(`Payment succeeded for user ${user.id}`);
+    try {
+      switch (event.type) {
+        case 'invoice.payment_succeeded':
+          const successfulInvoice = event.data.object;
+          const successSubscriptionId = successfulInvoice.subscription;
+          if (successSubscriptionId && typeof successSubscriptionId === 'string') {
+            const user = await storage.getUserByStripeSubscriptionId(successSubscriptionId);
+            if (user) {
+              await storage.updateUserProfile(user.id, {
+                subscriptionStatus: "active",
+                updatedAt: new Date()
+              });
+              console.log(`Payment succeeded for user ${user.id}, subscription ${successSubscriptionId}`);
+            } else {
+              console.warn(`Payment succeeded but user not found for subscription ${successSubscriptionId}`);
+            }
           }
-        }
-        break;
+          break;
 
       case 'invoice.upcoming':
         const upcomingInvoice = event.data.object;
@@ -2202,7 +2198,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         break;
 
       default:
-        console.log(`Unhandled event type ${event.type}`);
+          console.log(`Unhandled event type ${event.type}`);
+      }
+    } catch (webhookError) {
+      console.error(`Error processing webhook event ${event.type}:`, webhookError);
+      // Still return success to Stripe to avoid retries for processing errors
+      return res.json({received: true, error: 'processing_error'});
     }
 
     res.json({received: true});
@@ -3538,81 +3539,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   
 
-  async function createStripeSubscription(userId: number) {
-    console.log("Creating Stripe subscription for user:", userId);
-
-    if (!stripe) {
-      console.error("Stripe not configured - missing STRIPE_SECRET_KEY");
-      throw new Error("Stripe not configured");
-    }
-
-    if (!STRIPE_PRICE_ID) {
-      console.error("STRIPE_PRICE_ID not configured");
-      throw new Error("Stripe price ID not configured");
-    }
-
-    console.log("Using Stripe Price ID:", STRIPE_PRICE_ID);
-
-    try {
-      // Get or create customer
-      let customer = await getUserStripeCustomer(userId);
-      if (!customer.stripeCustomerId) {
-        console.log("Creating new Stripe customer for user:", userId);
-        customer = await createStripeCustomer(userId);
-      }
-
-      console.log("Using customer:", customer.stripeCustomerId);
-
-      // Create subscription
-      const subscription = await stripe.subscriptions.create({
-        customer: customer.stripeCustomerId,
-        items: [{ price: STRIPE_PRICE_ID }],
-        payment_behavior: 'default_incomplete',
-        payment_settings: { save_default_payment_method: 'on_subscription' },
-        expand: ['latest_invoice.payment_intent'],
-      });
-
-      console.log("Created subscription:", subscription.id, "Status:", subscription.status);
-
-      // Store subscription in database
-      await db.insert(subscriptions).values({
-        userId,
-        stripeSubscriptionId: subscription.id,
-        stripeCustomerId: customer.stripeCustomerId,
-        status: subscription.status as any,
-        currentPeriodStart: new Date(subscription.current_period_start * 1000),
-        currentPeriodEnd: new Date(subscription.current_period_end * 1000),
-        cancelAtPeriodEnd: subscription.cancel_at_period_end,
-      }).onConflictDoUpdate({
-        target: subscriptions.userId,
-        set: {
-          stripeSubscriptionId: subscription.id,
-          status: subscription.status as any,
-          currentPeriodStart: new Date(subscription.current_period_start * 1000),
-          currentPeriodEnd: new Date(subscription.current_period_end * 1000),
-          cancelAtPeriodEnd: subscription.cancel_at_period_end,
-        }
-      });
-
-      const paymentIntent = subscription.latest_invoice?.payment_intent as any;
-      console.log("Payment intent client secret exists:", !!paymentIntent?.client_secret);
-
-      if (paymentIntent?.client_secret) {
-        const response = {
-          subscriptionId: subscription.id,
-          clientSecret: paymentIntent.client_secret,
-          paymentUrl: `/payment?client_secret=${paymentIntent.client_secret}&subscription_id=${subscription.id}`
-        };
-        console.log("Returning subscription response:", response);
-        return response;
-      }
-
-      throw new Error("Failed to create payment intent - no client secret");
-    } catch (error) {
-      console.error("Error in createStripeSubscription:", error);
-      throw error;
-    }
-  }
+  
 
   const httpServer = createServer(app);
   return httpServer;
