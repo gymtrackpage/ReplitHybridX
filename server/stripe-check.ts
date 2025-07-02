@@ -1,11 +1,5 @@
 
-#!/usr/bin/env node
-
 import Stripe from 'stripe';
-import * as dotenv from 'dotenv';
-
-// Load environment variables
-dotenv.config();
 
 const PRICE_ID = 'price_1RgOOZGKLIEfAkDGfqPezReg';
 
@@ -16,7 +10,7 @@ async function validateStripeIntegration() {
     secretKey: false,
     webhookSecret: false,
     priceId: false,
-    errors: []
+    errors: [] as string[]
   };
 
   // Check secret key
@@ -49,7 +43,7 @@ async function validateStripeIntegration() {
         const price = await stripe.prices.retrieve(PRICE_ID);
         console.log('✅ Price ID valid:', {
           id: price.id,
-          amount: `${price.unit_amount / 100} ${price.currency.toUpperCase()}`,
+          amount: `${(price.unit_amount || 0) / 100} ${price.currency.toUpperCase()}`,
           recurring: price.recurring?.interval || 'one-time',
           active: price.active
         });
@@ -59,12 +53,12 @@ async function validateStripeIntegration() {
         if (!price.active) {
           results.errors.push(`⚠️  Price ${PRICE_ID} is inactive in Stripe`);
         }
-      } catch (priceError) {
+      } catch (priceError: any) {
         results.errors.push(`❌ Price ID ${PRICE_ID} not found in Stripe`);
         console.error('Price validation error:', priceError.message);
       }
 
-    } catch (stripeError) {
+    } catch (stripeError: any) {
       results.errors.push('❌ Stripe API connection failed');
       console.error('Stripe connection error:', stripeError.message);
     }

@@ -148,9 +148,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Validate price ID
-      const PRICE_ID = 'price_1RgOOZGKLIEfAkDGfqPezReg';
       try {
-        const price = await stripe.prices.retrieve(PRICE_ID);
+        const price = await stripe.prices.retrieve('price_1RgOOZGKLIEfAkDGfqPezReg');
         validationResults.priceIdValid = true;
         validationResults.priceDetails = {
           id: price.id,
@@ -160,7 +159,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           active: price.active
         };
       } catch (priceError) {
-        validationResults.errors.push(`Price ID ${PRICE_ID} not found in Stripe`);
+        validationResults.errors.push(`Price ID price_1RgOOZGKLIEfAkDGfqPezReg not found in Stripe`);
       }
 
       res.json(validationResults);
@@ -1921,14 +1920,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Create new subscription with validated price ID
-      const PRICE_ID = 'price_1RgOOZGKLIEfAkDGfqPezReg';
-      
       // Verify price exists in Stripe
       try {
-        await stripe.prices.retrieve(PRICE_ID);
+        await stripe.prices.retrieve('price_1RgOOZGKLIEfAkDGfqPezReg');
       } catch (priceError) {
-        console.error("Price ID not found in Stripe:", PRICE_ID);
+        console.error("Price ID not found in Stripe:", 'price_1RgOOZGKLIEfAkDGfqPezReg');
         return res.status(500).json({ 
           message: "Subscription pricing configuration error. Please contact support.",
           error: "INVALID_PRICE_ID"
@@ -1939,7 +1935,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const subscription = await stripe.subscriptions.create({
         customer: customerId,
         items: [{
-          price: PRICE_ID
+          price: 'price_1RgOOZGKLIEfAkDGfqPezReg'
         }],
         payment_behavior: 'default_incomplete',
         payment_settings: {
