@@ -1352,6 +1352,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         customerId = customer.id;
         await storage.updateUserStripeInfo(userId, customerId, "");
+      } else {
+        // Verify the customer still exists in Stripe
+        try {
+          await stripe.customers.retrieve(customerId);
+          console.log("Verified existing Stripe customer:", customerId);
+        } catch (customerError) {
+          console.log("Existing customer not found in Stripe, creating new one:", customerId);
+          // Customer doesn't exist in Stripe, create a new one
+          const customer = await stripe.customers.create({
+            email: user.email,
+            name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+            metadata: { userId }
+          });
+          customerId = customer.id;
+          await storage.updateUserStripeInfo(userId, customerId, "");
+        }
       }
 
       console.log("Using Stripe customer:", customerId);
@@ -1797,10 +1813,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             cancelAtPeriodEnd: subscription.cancel_at_period_end,
             trialEnd: subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null,
           };
-        } catch (stripeError) {
-          console.error("Error fetching subscription from Stripe:", stripeError);
-          // If subscription not found in Stripe, mark as inactive
-          await storage.updateUserStripeInfo(userId, user.stripeCustomerId || "", "");
+        } catch (stripeError: any) {
+          console.error("Error fetching subscription from Stripe:", stripeError.message);
+          // If subscription or customer not found in Stripe, clear the references
+          if (stripeError.code === 'resource_missing') {
+            console.log("Clearing invalid Stripe references for user:", userId);
+            await storage.updateUserStripeInfo(userId, "", "");
+          }
         }
       }
 
