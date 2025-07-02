@@ -19,6 +19,11 @@ export function SubscriptionModal({ open, onOpenChange, feature }: SubscriptionM
   const handleSubscribe = async () => {
     setIsLoading(true);
     try {
+      // Check if Stripe is properly configured
+      if (!import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY) {
+        throw new Error("STRIPE_NOT_CONFIGURED");
+      }
+
       console.log("Creating subscription...");
       const data = await apiRequest("POST", "/api/create-subscription");
       console.log("Subscription response:", data);
@@ -31,6 +36,7 @@ export function SubscriptionModal({ open, onOpenChange, feature }: SubscriptionM
           description: data.message || "You already have an active subscription.",
         });
         onOpenChange(false);
+        window.location.reload(); // Refresh to update subscription status
         return;
       }
       
@@ -41,8 +47,13 @@ export function SubscriptionModal({ open, onOpenChange, feature }: SubscriptionM
       } 
       
       if (data.clientSecret && data.subscriptionId) {
+        // Validate client secret format
+        if (!data.clientSecret.startsWith('pi_')) {
+          throw new Error("Invalid payment session format");
+        }
+        
         // Redirect to payment page with required parameters
-        const paymentUrl = `/payment?client_secret=${data.clientSecret}&subscription_id=${data.subscriptionId}`;
+        const paymentUrl = `/payment?client_secret=${encodeURIComponent(data.clientSecret)}&subscription_id=${encodeURIComponent(data.subscriptionId)}`;
         console.log("Redirecting to payment page:", paymentUrl);
         window.location.href = paymentUrl;
         return;
@@ -68,6 +79,9 @@ export function SubscriptionModal({ open, onOpenChange, feature }: SubscriptionM
       } else if (error.message?.includes("NO_CLIENT_SECRET")) {
         errorMessage = "Payment setup failed. Please try again or contact support.";
         errorTitle = "Payment Setup Error";
+      } else if (error.message?.includes("Invalid payment session")) {
+        errorMessage = "Payment session is invalid. Please try again.";
+        errorTitle = "Payment Error";
       } else if (error.message) {
         errorMessage = error.message;
       }

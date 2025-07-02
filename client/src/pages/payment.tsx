@@ -50,6 +50,8 @@ function CheckoutForm({ clientSecret, subscriptionId }: { clientSecret: string, 
     } else if (paymentIntent?.status === 'succeeded') {
       // Payment succeeded - update subscription status and complete assessment
       try {
+        console.log("Payment succeeded, updating subscription status...");
+        
         // Update subscription status
         await apiRequest("POST", "/api/subscription-confirmed", {
           subscriptionId,
@@ -58,28 +60,44 @@ function CheckoutForm({ clientSecret, subscriptionId }: { clientSecret: string, 
 
         const pendingAssessment = localStorage.getItem('pendingAssessment');
         if (pendingAssessment) {
-          const assessmentData = JSON.parse(pendingAssessment);
-          await apiRequest("POST", "/api/complete-assessment", {
-            ...assessmentData,
-            subscriptionChoice: "premium",
-            paymentIntentId: paymentIntent.id
-          });
-          localStorage.removeItem('pendingAssessment');
+          console.log("Completing pending assessment...");
+          try {
+            const assessmentData = JSON.parse(pendingAssessment);
+            await apiRequest("POST", "/api/complete-assessment", {
+              ...assessmentData,
+              subscriptionChoice: "premium",
+              paymentIntentId: paymentIntent.id
+            });
+            localStorage.removeItem('pendingAssessment');
+            console.log("Assessment completed successfully");
+          } catch (assessmentError) {
+            console.error("Assessment completion failed:", assessmentError);
+            // Don't fail the whole flow if assessment completion fails
+          }
         }
 
         toast({
           title: "Payment Successful!",
-          description: "Welcome to HybridX Premium! Your assessment has been completed.",
+          description: "Welcome to HybridX Premium! Your subscription is now active.",
         });
 
-        setLocation("/dashboard");
+        // Small delay before redirect to allow toast to show
+        setTimeout(() => {
+          setLocation("/dashboard");
+        }, 1000);
+        
       } catch (error) {
-        console.error("Assessment completion error:", error);
+        console.error("Post-payment processing error:", error);
         toast({
-          title: "Assessment Error",
-          description: "Payment succeeded but assessment completion failed. Please contact support.",
+          title: "Payment Successful",
+          description: "Your payment was successful, but there was an issue completing setup. Please contact support if you experience issues.",
           variant: "destructive"
         });
+        
+        // Still redirect to dashboard since payment succeeded
+        setTimeout(() => {
+          setLocation("/dashboard");
+        }, 3000);
       }
     }
 
@@ -134,6 +152,13 @@ export default function Payment() {
   const { toast } = useToast();
 
   useEffect(() => {
+    // Check if Stripe is configured
+    if (!import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY) {
+      console.error("Stripe publishable key not configured");
+      setError("Payment processing is not properly configured. Please contact support.");
+      return;
+    }
+
     const urlParams = new URLSearchParams(window.location.search);
     const secret = urlParams.get('client_secret');
     const subId = urlParams.get('subscription_id');
@@ -147,14 +172,21 @@ export default function Payment() {
         description: "Missing payment information. Please try subscribing again.",
         variant: "destructive"
       });
-      setLocation('/assessment');
+      setTimeout(() => setLocation('/assessment'), 2000);
       return;
     }
 
     // Validate client secret format
-    if (!secret.startsWith('pi_') || secret.length < 10) {
-      console.error("Invalid client secret format");
-      setError("Invalid payment parameters. Please try subscribing again.");
+    if (!secret.startsWith('pi_') || secret.length < 27) {
+      console.error("Invalid client secret format:", secret);
+      setError("Invalid payment session. Please try subscribing again.");
+      return;
+    }
+
+    // Validate subscription ID format
+    if (!subId.startsWith('sub_') || subId.length < 10) {
+      console.error("Invalid subscription ID format:", subId);
+      setError("Invalid subscription session. Please try subscribing again.");
       return;
     }
 

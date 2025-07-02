@@ -1308,6 +1308,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Validate required environment variables
+      if (!process.env.STRIPE_SECRET_KEY) {
+        console.error("STRIPE_SECRET_KEY environment variable not set");
+        return res.status(500).json({ 
+          message: "Payment processing configuration error.",
+          error: "STRIPE_NOT_CONFIGURED"
+        });
+      }
+
       const user = await storage.getUser(userId);
       if (!user) {
         console.error("User not found:", userId);
