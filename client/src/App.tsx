@@ -36,6 +36,15 @@ function Router() {
     retry: false,
   });
 
+  // Debug logging to understand redirect issue
+  if (isAuthenticated && userStatus) {
+    console.log("User status check:", {
+      assessmentCompleted: (userStatus as any).assessmentCompleted,
+      subscriptionStatus: (userStatus as any).subscriptionStatus,
+      userStatus
+    });
+  }
+
   if (isLoading || (isAuthenticated && statusLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -54,9 +63,12 @@ function Router() {
   }
 
   // Check if user needs to complete assessment
-  if (userStatus && !(userStatus as any).assessmentCompleted) {
+  // Allow access to payment page even if assessment not completed
+  const needsAssessment = userStatus && !(userStatus as any).assessmentCompleted;
+  if (needsAssessment) {
     return (
       <Switch>
+        <Route path="/payment" component={Payment} />
         <Route path="/assessment" component={Assessment} />
         <Route component={Assessment} />
       </Switch>
@@ -73,7 +85,7 @@ function Router() {
       <Route path="/random-workout" component={RandomWorkout} />
       <Route path="/free-workouts" component={FreeWorkouts} />
       <Route path="/subscription-success" component={SubscriptionSuccess} />
-      <Route path="/payment" component={() => import("./pages/payment").then(m => m.default)} />
+      <Route path="/payment" component={Payment} />
       <Route path="/progress" component={Progress} />
       <Route path="/profile" component={Profile} />
       <Route path="/settings" component={Settings} />

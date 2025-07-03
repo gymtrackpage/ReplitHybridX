@@ -6,7 +6,7 @@ import { MobileLayout } from "@/components/layout/mobile-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Crown, Lock, CreditCard } from "lucide-react";
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY!);
@@ -86,14 +86,25 @@ function CheckoutForm({ clientSecret, subscriptionId }: { clientSecret: string, 
             await apiRequest("POST", "/api/complete-assessment", {
               ...assessmentData,
               subscriptionChoice: "premium",
-              paymentIntentId: paymentIntent.id
+              paymentIntentId: paymentIntent?.id || setupIntent?.id
             });
             localStorage.removeItem('pendingAssessment');
             console.log("Assessment completed successfully");
+            
+            // Force cache refresh to prevent redirect loop
+            await queryClient.invalidateQueries({ queryKey: ["/api/user-onboarding-status"] });
+            await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+            await queryClient.invalidateQueries({ queryKey: ["/api/subscription-status"] });
+            
+            console.log("Cache invalidated after assessment completion");
           } catch (assessmentError) {
             console.error("Assessment completion failed:", assessmentError);
             // Don't fail the whole flow if assessment completion fails
           }
+        } else {
+          // If no pending assessment, still invalidate cache to ensure proper redirect
+          await queryClient.invalidateQueries({ queryKey: ["/api/user-onboarding-status"] });
+          await queryClient.invalidateQueries({ queryKey: ["/api/subscription-status"] });
         }
 
         toast({
@@ -101,10 +112,11 @@ function CheckoutForm({ clientSecret, subscriptionId }: { clientSecret: string, 
           description: "Welcome to HybridX Premium! Your subscription is now active.",
         });
 
-        // Small delay before redirect to allow toast to show
+        // Wait for cache refresh to complete before redirect
         setTimeout(() => {
+          console.log("Redirecting to dashboard after cache refresh");
           setLocation("/dashboard");
-        }, 1000);
+        }, 1500);
         
       } catch (error) {
         console.error("Post-payment processing error:", error);
