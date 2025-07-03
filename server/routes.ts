@@ -2089,6 +2089,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const { subscriptionId, paymentIntentId } = req.body;
+      
+      console.log("Subscription confirmation:", { userId, subscriptionId, paymentIntentId });
 
       if (!stripe) {
         return res.status(500).json({ message: "Stripe not configured" });
@@ -2111,12 +2113,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Payment/Setup not confirmed" });
       }
 
-      // Update user subscription status
+      // Get subscription details from Stripe
+      const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+      
+      // Update user subscription status and Stripe info
       await storage.updateUserProfile(userId, {
         subscriptionStatus: "active",
         updatedAt: new Date()
       });
+      
+      // Update Stripe subscription info in user record
+      await storage.updateUserStripeInfo(userId, subscription.customer as string, subscriptionId);
 
+      console.log("Subscription confirmed successfully for user:", userId);
+      
       res.json({
         success: true,
         message: "Subscription confirmed successfully"
