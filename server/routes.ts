@@ -1548,6 +1548,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log("Subscription creation successful:", response.subscriptionId);
       console.log("Payment URL generated:", response.paymentUrl);
+      console.log("Full response being sent to client:", JSON.stringify(response, null, 2));
       res.json(response);
     } catch (error: any) {
       console.error("Subscription creation error:", error);
@@ -1960,10 +1961,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/create-subscription", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      console.log("Create subscription request for user:", userId);
+      
       const user = await storage.getUser(userId);
+      console.log("User found:", user ? `${user.email} (ID: ${user.id})` : "No user found");
 
       if (!user) {
-        return res.status(404).json({ message: "User not found" });
+        console.error("User not found in database for ID:", userId);
+        return res.status(404).json({ 
+          message: "User not found. Please log in again.",
+          error: "USER_NOT_FOUND"
+        });
+      }
+
+      if (!user.email) {
+        console.error("User has no email address:", userId);
+        return res.status(400).json({ 
+          message: "Email address required for subscription. Please update your profile.",
+          error: "NO_EMAIL"
+        });
       }
 
       if (!stripe) {

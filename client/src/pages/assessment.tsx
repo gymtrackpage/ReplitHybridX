@@ -151,45 +151,120 @@ export default function Assessment() {
   const createSubscriptionMutation = useMutation({
     mutationFn: async () => {
       console.log("Creating subscription...");
+      console.log("Assessment data:", assessmentData);
+      console.log("Recommendation:", recommendation);
+      
+      if (!recommendation || !recommendation.recommendedProgram) {
+        throw new Error("No program recommendation available. Please complete the assessment first.");
+      }
       
       // Store assessment data before payment
-      localStorage.setItem('pendingAssessment', JSON.stringify({
+      const pendingData = {
         assessmentData,
-        programId: recommendation!.recommendedProgram.id,
+        programId: recommendation.recommendedProgram.id,
         subscriptionChoice: "premium"
-      }));
-
-      const data = await apiRequest("POST", "/api/create-subscription");
-      console.log("Subscription creation response:", data);
+      };
       
-      return data;
+      console.log("Storing pending assessment:", pendingData);
+      localStorage.setItem('pendingAssessment', JSON.stringify(pendingData));
+
+      try {
+        const data = await apiRequest("POST", "/api/create-subscription");
+        console.log("Subscription creation response:", data);
+        console.log("Response type:", typeof data);
+        console.log("Response keys:", Object.keys(data || {}));
+        
+        return data;
+      } catch (error) {
+        console.error("API request failed:", error);
+        // Don't remove pending assessment here, let onError handle it
+        throw error;
+      }
     },
     onSuccess: (data: any) => {
       console.log("Subscription creation successful:", data);
       
-      if (data.paymentUrl) {
-        console.log("Redirecting to payment URL:", data.paymentUrl);
-        window.location.href = data.paymentUrl;
-      } else if (data.clientSecret && data.subscriptionId) {
-        console.log("Redirecting to payment page with client secret");
-        window.location.href = `/payment?client_secret=${data.clientSecret}&subscription_id=${data.subscriptionId}`;
-      } else {
-        console.error("Invalid subscription response:", data);
+      // Validate response structure
+      if (!data) {
+        console.error("Empty subscription response");
         toast({
           title: "Error",
           description: "Invalid subscription response. Please try again.",
           variant: "destructive"
         });
+        return;
       }
+
+      // Handle different response scenarios
+      if (data.status === 'active') {
+        // User already has active subscription
+        toast({
+          title: "Already Subscribed",
+          description: data.message || "You already have an active subscription.",
+        });
+        // Complete assessment with premium access
+        completeAssessmentMutation.mutate({
+          assessmentData,
+          programId: recommendation!.recommendedProgram.id,
+          subscriptionChoice: "premium"
+        });
+        return;
+      }
+
+      // Try paymentUrl first (preferred)
+      if (data.paymentUrl) {
+        console.log("Redirecting to payment URL:", data.paymentUrl);
+        window.location.href = data.paymentUrl;
+        return;
+      } 
+      
+      // Fallback to manual URL construction
+      if (data.clientSecret && data.subscriptionId) {
+        console.log("Redirecting to payment page with client secret");
+        const paymentUrl = `/payment?client_secret=${encodeURIComponent(data.clientSecret)}&subscription_id=${encodeURIComponent(data.subscriptionId)}`;
+        window.location.href = paymentUrl;
+        return;
+      }
+      
+      // If we get here, the response is missing required data
+      console.error("Invalid subscription response - missing required fields:", data);
+      toast({
+        title: "Subscription Error",
+        description: "Failed to initialize payment. Please try again.",
+        variant: "destructive"
+      });
     },
     onError: (error: any) => {
       console.error("Subscription creation error:", error);
-      localStorage.removeItem('pendingAssessment'); // Clean up on error
+      console.error("Error details:", {
+        message: error.message,
+        status: error.status,
+        cause: error.cause,
+        stack: error.stack
+      });
+      
+      // Clean up pending assessment on error
+      localStorage.removeItem('pendingAssessment');
+      
+      // Don't redirect back to assessment start - stay on current step
+      let errorMessage = "Failed to create subscription. Please try again.";
+      
+      if (error.message && error.message.includes("Unauthorized")) {
+        errorMessage = "Session expired. Please refresh the page and try again.";
+      } else if (error.message && error.message.includes("User not found")) {
+        errorMessage = "Account issue detected. Please refresh the page and try again.";
+      } else if (error.message && error.message.includes("Stripe")) {
+        errorMessage = "Payment system error. Please try again or contact support.";
+      }
+      
       toast({
-        title: "Error",
-        description: error.message || "Failed to create subscription. Please try again.",
+        title: "Subscription Error",
+        description: errorMessage,
         variant: "destructive"
       });
+      
+      // Stay on current step instead of redirecting
+      console.log("Staying on current step due to subscription error");
     },
   });
 
@@ -215,6 +290,23 @@ export default function Assessment() {
   };
 
   const handleSubscribe = () => {
+    console.log("Subscribe button clicked");
+    console.log("Current state:", {
+      currentStep,
+      recommendation: !!recommendation,
+      assessmentData,
+      hasRecommendedProgram: !!recommendation?.recommendedProgram
+    });
+    
+    if (!recommendation?.recommendedProgram) {
+      toast({
+        title: "Error",
+        description: "Please complete the assessment first to get a program recommendation.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     createSubscriptionMutation.mutate();
   };
 
