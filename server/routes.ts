@@ -1542,13 +1542,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const response = {
         subscriptionId: subscription.id,
         clientSecret: clientSecret,
-        paymentUrl: `/payment?client_secret=${clientSecret}&subscription_id=${subscription.id}`,
-        success: true
+        paymentUrl: `/payment?client_secret=${encodeURIComponent(clientSecret)}&subscription_id=${encodeURIComponent(subscription.id)}`,
+        success: true,
+        message: "Subscription created successfully"
       };
 
       console.log("Subscription creation successful:", response.subscriptionId);
       console.log("Payment URL generated:", response.paymentUrl);
-      console.log("Full response being sent to client:", JSON.stringify(response, null, 2));
       res.json(response);
     } catch (error: any) {
       console.error("Subscription creation error:", error);

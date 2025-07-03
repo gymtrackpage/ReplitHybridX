@@ -171,8 +171,10 @@ export default function Assessment() {
       try {
         const data = await apiRequest("POST", "/api/create-subscription");
         console.log("Subscription creation response:", data);
-        console.log("Response type:", typeof data);
-        console.log("Response keys:", Object.keys(data || {}));
+        
+        if (!data) {
+          throw new Error("Empty response from subscription service");
+        }
         
         return data;
       } catch (error) {
@@ -211,6 +213,35 @@ export default function Assessment() {
         return;
       }
 
+      // Validate required fields for payment
+      if (!data.clientSecret || !data.subscriptionId) {
+        console.error("Missing required payment fields:", { 
+          hasClientSecret: !!data.clientSecret, 
+          hasSubscriptionId: !!data.subscriptionId,
+          data 
+        });
+        toast({
+          title: "Payment Setup Error",
+          description: "Failed to initialize payment session. Please try again.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Validate client secret format
+      const validSecretFormats = ['pi_', 'seti_', 'cs_test_', 'cs_live_'];
+      const isValidSecret = validSecretFormats.some(format => data.clientSecret.startsWith(format));
+      
+      if (!isValidSecret) {
+        console.error("Invalid client secret format:", data.clientSecret.substring(0, 10) + "...");
+        toast({
+          title: "Payment Setup Error",
+          description: "Invalid payment session format. Please try again.",
+          variant: "destructive"
+        });
+        return;
+      }
+
       // Try paymentUrl first (preferred)
       if (data.paymentUrl) {
         console.log("Redirecting to payment URL:", data.paymentUrl);
@@ -218,21 +249,11 @@ export default function Assessment() {
         return;
       } 
       
-      // Fallback to manual URL construction
-      if (data.clientSecret && data.subscriptionId) {
-        console.log("Redirecting to payment page with client secret");
-        const paymentUrl = `/payment?client_secret=${encodeURIComponent(data.clientSecret)}&subscription_id=${encodeURIComponent(data.subscriptionId)}`;
-        window.location.href = paymentUrl;
-        return;
-      }
-      
-      // If we get here, the response is missing required data
-      console.error("Invalid subscription response - missing required fields:", data);
-      toast({
-        title: "Subscription Error",
-        description: "Failed to initialize payment. Please try again.",
-        variant: "destructive"
-      });
+      // Construct payment URL manually
+      console.log("Constructing payment URL with client secret");
+      const paymentUrl = `/payment?client_secret=${encodeURIComponent(data.clientSecret)}&subscription_id=${encodeURIComponent(data.subscriptionId)}`;
+      console.log("Redirecting to:", paymentUrl);
+      window.location.href = paymentUrl;
     },
     onError: (error: any) => {
       console.error("Subscription creation error:", error);

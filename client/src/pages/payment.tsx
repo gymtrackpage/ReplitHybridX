@@ -72,12 +72,14 @@ function CheckoutForm({ clientSecret, subscriptionId }: { clientSecret: string, 
         const intentId = paymentIntent?.id || setupIntent?.id;
         console.log("Payment/Setup succeeded, updating subscription status...", intentId);
         
-        // Update subscription status
+        // Update subscription status first
         await apiRequest("POST", "/api/subscription-confirmed", {
           subscriptionId,
           paymentIntentId: intentId
         });
+        console.log("Subscription status updated successfully");
 
+        // Complete pending assessment if exists
         const pendingAssessment = localStorage.getItem('pendingAssessment');
         if (pendingAssessment) {
           console.log("Completing pending assessment...");
@@ -86,50 +88,59 @@ function CheckoutForm({ clientSecret, subscriptionId }: { clientSecret: string, 
             await apiRequest("POST", "/api/complete-assessment", {
               ...assessmentData,
               subscriptionChoice: "premium",
-              paymentIntentId: paymentIntent?.id || setupIntent?.id
+              paymentIntentId: intentId
             });
             localStorage.removeItem('pendingAssessment');
             console.log("Assessment completed successfully");
-            
-            // Force cache refresh to prevent redirect loop
-            await queryClient.invalidateQueries({ queryKey: ["/api/user-onboarding-status"] });
-            await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-            await queryClient.invalidateQueries({ queryKey: ["/api/subscription-status"] });
-            
-            console.log("Cache invalidated after assessment completion");
           } catch (assessmentError) {
             console.error("Assessment completion failed:", assessmentError);
-            // Don't fail the whole flow if assessment completion fails
+            // Continue with flow even if assessment completion fails
           }
-        } else {
-          // If no pending assessment, still invalidate cache to ensure proper redirect
-          await queryClient.invalidateQueries({ queryKey: ["/api/user-onboarding-status"] });
-          await queryClient.invalidateQueries({ queryKey: ["/api/subscription-status"] });
         }
+
+        // Force comprehensive cache refresh
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["/api/user-onboarding-status"] }),
+          queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] }),
+          queryClient.invalidateQueries({ queryKey: ["/api/subscription-status"] }),
+          queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] }),
+          queryClient.invalidateQueries({ queryKey: ["/api/user-progress"] })
+        ]);
+        
+        console.log("All caches invalidated after payment completion");
 
         toast({
           title: "Payment Successful!",
           description: "Welcome to HybridX Premium! Your subscription is now active.",
         });
 
-        // Wait for cache refresh to complete before redirect
+        // Wait for cache refresh and redirect
         setTimeout(() => {
-          console.log("Redirecting to dashboard after cache refresh");
+          console.log("Redirecting to dashboard after successful payment");
           setLocation("/dashboard");
-        }, 1500);
+        }, 2000);
         
       } catch (error) {
         console.error("Post-payment processing error:", error);
+        
+        // Show different messages based on error type
+        let errorMessage = "Your payment was successful, but there was an issue completing setup.";
+        if (error.message?.includes("assessment")) {
+          errorMessage = "Payment successful! There was an issue completing your assessment, but you can complete it from your dashboard.";
+        } else if (error.message?.includes("subscription")) {
+          errorMessage = "Payment successful! Please refresh the page to see your subscription status.";
+        }
+        
         toast({
           title: "Payment Successful",
-          description: "Your payment was successful, but there was an issue completing setup. Please contact support if you experience issues.",
+          description: errorMessage + " Contact support if you experience continued issues.",
           variant: "destructive"
         });
         
         // Still redirect to dashboard since payment succeeded
         setTimeout(() => {
           setLocation("/dashboard");
-        }, 3000);
+        }, 4000);
       }
     }
 
@@ -208,10 +219,14 @@ export default function Payment() {
       return;
     }
 
-    // Validate client secret format (accept both payment intents and setup intents)
-    if ((!secret.startsWith('pi_') && !secret.startsWith('seti_')) || secret.length < 27) {
-      console.error("Invalid client secret format:", secret);
+    // Validate client secret format (accept multiple Stripe formats)
+    const validSecretFormats = ['pi_', 'seti_', 'cs_test_', 'cs_live_'];
+    const isValidSecret = validSecretFormats.some(format => secret.startsWith(format)) && secret.length >= 10;
+    
+    if (!isValidSecret) {
+      console.error("Invalid client secret format:", secret.substring(0, 10) + "...");
       setError("Invalid payment session. Please try subscribing again.");
+      setTimeout(() => setLocation('/assessment'), 3000);
       return;
     }
 
@@ -219,6 +234,7 @@ export default function Payment() {
     if (!subId.startsWith('sub_') || subId.length < 10) {
       console.error("Invalid subscription ID format:", subId);
       setError("Invalid subscription session. Please try subscribing again.");
+      setTimeout(() => setLocation('/assessment'), 3000);
       return;
     }
 

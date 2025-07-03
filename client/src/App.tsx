@@ -63,12 +63,13 @@ function Router() {
   }
 
   // Check if user needs to complete assessment
-  // Allow access to payment page even if assessment not completed
+  // Allow access to payment page and subscription success even if assessment not completed
   const needsAssessment = userStatus && !(userStatus as any).assessmentCompleted;
   if (needsAssessment) {
     return (
       <Switch>
         <Route path="/payment" component={Payment} />
+        <Route path="/subscription-success" component={SubscriptionSuccess} />
         <Route path="/assessment" component={Assessment} />
         <Route component={Assessment} />
       </Switch>
