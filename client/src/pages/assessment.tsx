@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { MobileLayout } from "@/components/layout/mobile-layout";
 import { Button } from "@/components/ui/button";
@@ -148,142 +148,58 @@ export default function Assessment() {
     },
   });
 
+  // Check subscription status to avoid duplicate subscriptions
+  const { data: subscriptionStatus } = useQuery({
+    queryKey: ['/api/subscription-status'],
+    staleTime: 5 * 60 * 1000,
+  });
+
   const createSubscriptionMutation = useMutation({
     mutationFn: async () => {
-      console.log("Creating subscription...");
-      console.log("Assessment data:", assessmentData);
-      console.log("Recommendation:", recommendation);
-      
-      if (!recommendation || !recommendation.recommendedProgram) {
-        throw new Error("No program recommendation available. Please complete the assessment first.");
+      // Check if user is already subscribed
+      if (subscriptionStatus?.isSubscribed) {
+        throw new Error("You already have an active subscription");
       }
-      
-      // Store assessment data before payment
-      const pendingData = {
-        assessmentData,
-        programId: recommendation.recommendedProgram.id,
-        subscriptionChoice: "premium"
-      };
-      
-      console.log("Storing pending assessment:", pendingData);
-      localStorage.setItem('pendingAssessment', JSON.stringify(pendingData));
 
-      try {
-        const data = await apiRequest("POST", "/api/create-subscription");
-        console.log("Subscription creation response:", data);
-        
-        if (!data) {
-          throw new Error("Empty response from subscription service");
-        }
-        
-        return data;
-      } catch (error) {
-        console.error("API request failed:", error);
-        // Don't remove pending assessment here, let onError handle it
-        throw error;
-      }
+      console.log("Creating subscription...");
+      const response = await apiRequest("POST", "/api/create-subscription");
+      console.log("Subscription response:", response);
+      return response;
     },
     onSuccess: (data: any) => {
-      console.log("Subscription creation successful:", data);
-      
-      // Validate response structure
-      if (!data) {
-        console.error("Empty subscription response");
+      console.log("Subscription creation initiated:", data);
+      if (data.paymentUrl) {
+        console.log("Redirecting to payment:", data.paymentUrl);
+        window.location.href = data.paymentUrl;
+      } else {
+        console.error("No payment URL in response:", data);
         toast({
           title: "Error",
-          description: "Invalid subscription response. Please try again.",
+          description: "Failed to initiate payment process",
           variant: "destructive"
         });
-        return;
       }
-
-      // Handle different response scenarios
-      if (data.status === 'active') {
-        // User already has active subscription
-        toast({
-          title: "Already Subscribed",
-          description: data.message || "You already have an active subscription.",
-        });
-        // Complete assessment with premium access
-        completeAssessmentMutation.mutate({
-          assessmentData,
-          programId: recommendation!.recommendedProgram.id,
-          subscriptionChoice: "premium"
-        });
-        return;
-      }
-
-      // Validate required fields for payment
-      if (!data.clientSecret || !data.subscriptionId) {
-        console.error("Missing required payment fields:", { 
-          hasClientSecret: !!data.clientSecret, 
-          hasSubscriptionId: !!data.subscriptionId,
-          data 
-        });
-        toast({
-          title: "Payment Setup Error",
-          description: "Failed to initialize payment session. Please try again.",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Validate client secret format
-      const validSecretFormats = ['pi_', 'seti_', 'cs_test_', 'cs_live_'];
-      const isValidSecret = validSecretFormats.some(format => data.clientSecret.startsWith(format));
-      
-      if (!isValidSecret) {
-        console.error("Invalid client secret format:", data.clientSecret.substring(0, 10) + "...");
-        toast({
-          title: "Payment Setup Error",
-          description: "Invalid payment session format. Please try again.",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Try paymentUrl first (preferred)
-      if (data.paymentUrl) {
-        console.log("Redirecting to payment URL:", data.paymentUrl);
-        window.location.href = data.paymentUrl;
-        return;
-      } 
-      
-      // Construct payment URL manually
-      console.log("Constructing payment URL with client secret");
-      const paymentUrl = `/payment?client_secret=${encodeURIComponent(data.clientSecret)}&subscription_id=${encodeURIComponent(data.subscriptionId)}`;
-      console.log("Redirecting to:", paymentUrl);
-      window.location.href = paymentUrl;
     },
     onError: (error: any) => {
-      console.error("Subscription creation error:", error);
-      console.error("Error details:", {
-        message: error.message,
-        status: error.status,
-        cause: error.cause,
-        stack: error.stack
-      });
-      
-      // Clean up pending assessment on error
-      localStorage.removeItem('pendingAssessment');
-      
-      // Don't redirect back to assessment start - stay on current step
+      console.error("Subscription creation failed:", error);
+
       let errorMessage = "Failed to create subscription. Please try again.";
-      
-      if (error.message && error.message.includes("Unauthorized")) {
-        errorMessage = "Session expired. Please refresh the page and try again.";
-      } else if (error.message && error.message.includes("User not found")) {
-        errorMessage = "Account issue detected. Please refresh the page and try again.";
-      } else if (error.message && error.message.includes("Stripe")) {
+      if (error.message?.includes("already have an active subscription")) {
+        errorMessage = "You already have an active subscription.";
+      } else if (error.message?.includes("not configured")) {
+        errorMessage = "Payment system not configured. Please contact support.";
+      } else if (error.message?.includes("EMAIL")) {
+        errorMessage = "Email address required. Please update your profile.";
+      } else if (error.message?.includes("STRIPE")) {
         errorMessage = "Payment system error. Please try again or contact support.";
       }
-      
+
       toast({
         title: "Subscription Error",
         description: errorMessage,
         variant: "destructive"
       });
-      
+
       // Stay on current step instead of redirecting
       console.log("Staying on current step due to subscription error");
     },
@@ -318,7 +234,7 @@ export default function Assessment() {
       assessmentData,
       hasRecommendedProgram: !!recommendation?.recommendedProgram
     });
-    
+
     if (!recommendation?.recommendedProgram) {
       toast({
         title: "Error",
@@ -327,7 +243,7 @@ export default function Assessment() {
       });
       return;
     }
-    
+
     createSubscriptionMutation.mutate();
   };
 
