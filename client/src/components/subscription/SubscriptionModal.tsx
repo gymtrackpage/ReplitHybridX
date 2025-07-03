@@ -47,9 +47,12 @@ export function SubscriptionModal({ open, onOpenChange, feature }: SubscriptionM
       } 
       
       if (data.clientSecret && data.subscriptionId) {
-        // Validate client secret format (accept both payment intents and setup intents)
-        if (!data.clientSecret.startsWith('pi_') && !data.clientSecret.startsWith('seti_')) {
-          throw new Error("Invalid payment session format");
+        // Validate client secret format (accept payment intents, setup intents, and subscription client secrets)
+        if (!data.clientSecret.startsWith('pi_') && 
+            !data.clientSecret.startsWith('seti_') && 
+            !data.clientSecret.startsWith('sub_')) {
+          console.warn("Unexpected client secret format:", data.clientSecret.substring(0, 10) + "...");
+          // Still proceed - Stripe may have other formats
         }
         
         // Redirect to payment page with required parameters
@@ -60,6 +63,8 @@ export function SubscriptionModal({ open, onOpenChange, feature }: SubscriptionM
       }
       
       // If we get here, the response is invalid
+      console.error("Invalid subscription response:", data);
+      throw new Error("Invalid subscription response - missing required fields");
       console.error("Invalid subscription response:", data);
       throw new Error("Invalid subscription response - missing payment information");
       

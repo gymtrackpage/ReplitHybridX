@@ -1464,32 +1464,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.error("Failed to retrieve payment intent:", retrieveError);
           }
         } else {
-          console.error("Invoice has no payment intent");
+          console.log("Invoice has no payment intent, creating one manually");
         }
       } else {
-        console.error("Subscription has no latest invoice");
+        console.log("Subscription has no latest invoice, creating payment intent manually");
       }
 
-      // If no client secret found, create a new payment intent manually
+      // If no client secret found, create a new payment intent manually for the subscription
       if (!clientSecret) {
         console.log("Creating manual payment intent for subscription");
         try {
-          const paymentIntent = await stripe.paymentIntents.create({
-            customer: customerId,
-            amount: 500, // £5.00 in pence
-            currency: 'gbp',
-            metadata: {
-              subscription_id: subscription.id,
-              user_id: userId
-            },
-            setup_future_usage: 'off_session',
-            payment_method_types: ['card']
-          });
+          // First, try to finalize the invoice if it exists
+          if (subscription.latest_invoice && typeof subscription.latest_invoice === 'object') {
+            const invoice = subscription.latest_invoice;
+            if (invoice.status === 'draft') {
+              console.log("Finalizing draft invoice");
+              const finalizedInvoice = await stripe.invoices.finalizeInvoice(invoice.id);
+              
+              if (finalizedInvoice.payment_intent && typeof finalizedInvoice.payment_intent === 'string') {
+                const paymentIntent = await stripe.paymentIntents.retrieve(finalizedInvoice.payment_intent);
+                clientSecret = paymentIntent.client_secret;
+                console.log("Successfully retrieved client secret from finalized invoice");
+              }
+            }
+          }
           
-          clientSecret = paymentIntent.client_secret;
-          console.log("Successfully created manual payment intent");
+          // If still no client secret, create a standalone payment intent
+          if (!clientSecret) {
+            const paymentIntent = await stripe.paymentIntents.create({
+              customer: customerId,
+              amount: 500, // £5.00 in pence
+              currency: 'gbp',
+              metadata: {
+                subscription_id: subscription.id,
+                user_id: userId
+              },
+              automatic_payment_methods: {
+                enabled: true
+              }
+            });
+            
+            clientSecret = paymentIntent.client_secret;
+            console.log("Successfully created standalone payment intent");
+          }
         } catch (paymentIntentError) {
-          console.error("Failed to create manual payment intent:", paymentIntentError);
+          console.error("Failed to create payment intent:", paymentIntentError);
           
           // Final fallback: create setup intent for payment method collection
           try {
@@ -1513,12 +1532,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (!clientSecret) {
+        console.error("Failed to create client secret for subscription:", subscription.id);
+        console.error("Subscription details:", {
+          id: subscription.id,
+          status: subscription.status,
+          customer: subscription.customer,
+          latest_invoice: subscription.latest_invoice ? 'exists' : 'missing'
+        });
+        
         return res.status(500).json({ 
           message: "Failed to create payment session. Please try again or contact support.",
           error: "NO_CLIENT_SECRET",
           debug: {
             subscriptionStatus: subscription.status,
-            subscriptionId: subscription.id
+            subscriptionId: subscription.id,
+            hasInvoice: !!subscription.latest_invoice
           }
         });
       }
