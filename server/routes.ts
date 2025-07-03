@@ -1423,8 +1423,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           save_default_payment_method: 'on_subscription',
           payment_method_types: ['card']
         },
-        expand: ['latest_invoice.payment_intent'],
-        collection_method: 'charge_automatically'
+        expand: ['latest_invoice.payment_intent']
       });
 
       console.log("Created subscription:", {
@@ -1439,95 +1438,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Extract payment intent client secret with improved error handling
       let clientSecret = null;
       
+      console.log("Subscription created:", {
+        id: subscription.id,
+        status: subscription.status,
+        hasLatestInvoice: !!subscription.latest_invoice
+      });
+
       if (subscription.latest_invoice && typeof subscription.latest_invoice === 'object') {
         const invoice = subscription.latest_invoice;
-        console.log("Invoice status:", invoice.status);
+        console.log("Invoice details:", {
+          id: invoice.id,
+          status: invoice.status,
+          hasPaymentIntent: !!invoice.payment_intent,
+          paymentIntentType: typeof invoice.payment_intent
+        });
         
-        if (invoice.payment_intent && typeof invoice.payment_intent === 'object') {
-          const paymentIntent = invoice.payment_intent;
-          console.log("Payment intent status:", paymentIntent.status);
-          
-          if (paymentIntent.client_secret) {
-            clientSecret = paymentIntent.client_secret;
-            console.log("Successfully extracted client secret from payment intent");
-          } else {
-            console.error("Payment intent exists but has no client secret");
-          }
-        } else if (typeof invoice.payment_intent === 'string') {
-          // If payment_intent is just an ID, retrieve it
-          try {
-            console.log("Retrieving payment intent details from ID:", invoice.payment_intent);
-            const fullPaymentIntent = await stripe.paymentIntents.retrieve(invoice.payment_intent);
-            clientSecret = fullPaymentIntent.client_secret;
-            console.log("Successfully retrieved client secret from payment intent ID");
-          } catch (retrieveError) {
-            console.error("Failed to retrieve payment intent:", retrieveError);
-          }
-        } else {
-          console.log("Invoice has no payment intent, creating one manually");
-        }
-      } else {
-        console.log("Subscription has no latest invoice, creating payment intent manually");
-      }
-
-      // If no client secret found, create a new payment intent manually for the subscription
-      if (!clientSecret) {
-        console.log("Creating manual payment intent for subscription");
-        try {
-          // First, try to finalize the invoice if it exists
-          if (subscription.latest_invoice && typeof subscription.latest_invoice === 'object') {
-            const invoice = subscription.latest_invoice;
-            if (invoice.status === 'draft') {
-              console.log("Finalizing draft invoice");
-              const finalizedInvoice = await stripe.invoices.finalizeInvoice(invoice.id);
-              
-              if (finalizedInvoice.payment_intent && typeof finalizedInvoice.payment_intent === 'string') {
-                const paymentIntent = await stripe.paymentIntents.retrieve(finalizedInvoice.payment_intent);
-                clientSecret = paymentIntent.client_secret;
-                console.log("Successfully retrieved client secret from finalized invoice");
-              }
+        if (invoice.payment_intent) {
+          if (typeof invoice.payment_intent === 'object' && invoice.payment_intent.client_secret) {
+            clientSecret = invoice.payment_intent.client_secret;
+            console.log("Successfully extracted client secret from expanded payment intent");
+          } else if (typeof invoice.payment_intent === 'string') {
+            // Payment intent is just an ID, retrieve the full object
+            try {
+              console.log("Retrieving payment intent:", invoice.payment_intent);
+              const fullPaymentIntent = await stripe.paymentIntents.retrieve(invoice.payment_intent);
+              clientSecret = fullPaymentIntent.client_secret;
+              console.log("Successfully retrieved client secret from payment intent ID");
+            } catch (retrieveError) {
+              console.error("Failed to retrieve payment intent:", retrieveError);
             }
           }
-          
-          // If still no client secret, create a standalone payment intent
-          if (!clientSecret) {
-            const paymentIntent = await stripe.paymentIntents.create({
-              customer: customerId,
-              amount: 500, // £5.00 in pence
-              currency: 'gbp',
-              metadata: {
-                subscription_id: subscription.id,
-                user_id: userId
-              },
-              automatic_payment_methods: {
-                enabled: true
-              }
-            });
+        }
+      }
+
+      // If no client secret found, ensure the subscription has an invoice with payment intent
+      if (!clientSecret) {
+        console.log("No client secret found, creating invoice and payment intent");
+        try {
+          // Get the subscription again to check for invoice
+          const refreshedSubscription = await stripe.subscriptions.retrieve(subscription.id, {
+            expand: ['latest_invoice.payment_intent']
+          });
+
+          if (refreshedSubscription.latest_invoice && typeof refreshedSubscription.latest_invoice === 'object') {
+            const invoice = refreshedSubscription.latest_invoice;
             
-            clientSecret = paymentIntent.client_secret;
-            console.log("Successfully created standalone payment intent");
+            if (invoice.payment_intent && typeof invoice.payment_intent === 'object') {
+              clientSecret = invoice.payment_intent.client_secret;
+              console.log("Found client secret after subscription refresh");
+            } else {
+              // Manually create payment intent for the invoice amount
+              const paymentIntent = await stripe.paymentIntents.create({
+                customer: customerId,
+                amount: 500, // £5.00 in pence
+                currency: 'gbp',
+                metadata: {
+                  subscription_id: subscription.id,
+                  user_id: userId,
+                  invoice_id: invoice.id
+                },
+                automatic_payment_methods: {
+                  enabled: true
+                }
+              });
+              
+              clientSecret = paymentIntent.client_secret;
+              console.log("Created manual payment intent for subscription");
+            }
           }
-        } catch (paymentIntentError) {
-          console.error("Failed to create payment intent:", paymentIntentError);
-          
-          // Final fallback: create setup intent for payment method collection
-          try {
-            console.log("Creating setup intent as final fallback");
-            const setupIntent = await stripe.setupIntents.create({
-              customer: customerId,
-              payment_method_types: ['card'],
-              usage: 'off_session',
-              metadata: {
-                subscription_id: subscription.id,
-                user_id: userId
-              }
-            });
-            
-            clientSecret = setupIntent.client_secret;
-            console.log("Successfully created setup intent as fallback");
-          } catch (setupError) {
-            console.error("All payment intent creation methods failed:", setupError);
-          }
+        } catch (refreshError) {
+          console.error("Failed to refresh subscription or create payment intent:", refreshError);
         }
       }
 
@@ -1540,8 +1520,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           latest_invoice: subscription.latest_invoice ? 'exists' : 'missing'
         });
         
+        // Cancel the subscription since we can't process payment
+        try {
+          await stripe.subscriptions.cancel(subscription.id);
+          console.log("Cancelled incomplete subscription:", subscription.id);
+        } catch (cancelError) {
+          console.error("Failed to cancel incomplete subscription:", cancelError);
+        }
+        
         return res.status(500).json({ 
-          message: "Failed to create payment session. Please try again or contact support.",
+          message: "Failed to initialize payment. Please try again.",
           error: "NO_CLIENT_SECRET",
           debug: {
             subscriptionStatus: subscription.status,

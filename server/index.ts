@@ -95,8 +95,9 @@ async function startServer() {
 
     server.listen(port, "0.0.0.0", () => {
       console.log(`✅ HybridX server running on http://0.0.0.0:${port}`);
-      console.log(`🌐 Access your app at: https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`);
-      console.log(`📍 Local access: http://localhost:${port}`);
+      console.log(`🌐 Access your app at: https://${process.env.REPL_SLUG || 'your-repl'}.${process.env.REPL_OWNER || 'username'}.repl.co`);
+      console.log(`📍 Local access: http://0.0.0.0:${port}`);
+      console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
     });
 
     // Graceful shutdown
