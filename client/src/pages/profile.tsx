@@ -13,7 +13,8 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { SubscriptionModal } from "@/components/subscription/SubscriptionModal";
-import { User, Calendar, Target, Trophy, Settings, Save, ExternalLink, Share2, Copy, Gift } from "lucide-react";
+import { useSubscription } from "@/hooks/useSubscription";
+import { User, Calendar, Target, Trophy, Settings, Save, ExternalLink, Share2, Copy, Gift, CreditCard, AlertCircle, RefreshCw, CheckCircle } from "lucide-react";
 
 const profileSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -26,6 +27,331 @@ const profileSchema = z.object({
 });
 
 type ProfileData = z.infer<typeof profileSchema>;
+
+function SubscriptionManagement() {
+  const { toast } = useToast();
+  const { 
+    subscriptionStatus, 
+    isLoading: subscriptionLoading,
+    cancelSubscription,
+    resumeSubscription,
+    updatePaymentMethod,
+    retryPayment,
+    downgradeToFree,
+    isCancelingSubscription,
+    isResumingSubscription,
+    isUpdatingPaymentMethod,
+    isRetryingPayment,
+    isDowngrading
+  } = useSubscription();
+
+  const { data: paymentMethods } = useQuery({
+    queryKey: ["/api/payment-methods"],
+    enabled: subscriptionStatus?.isSubscribed,
+  });
+
+  const handleCancelSubscription = async () => {
+    try {
+      await cancelSubscription();
+      toast({
+        title: "Subscription Cancelled",
+        description: "Your subscription will be cancelled at the end of this billing period.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to cancel subscription",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCancelImmediately = async () => {
+    try {
+      const response = await apiRequest("POST", "/api/cancel-subscription", { immediate: true });
+      queryClient.invalidateQueries({ queryKey: ["/api/subscription-status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      toast({
+        title: "Subscription Cancelled",
+        description: "Your subscription has been cancelled and you now have free access.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to cancel subscription immediately",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleResumeSubscription = async () => {
+    try {
+      await resumeSubscription();
+      toast({
+        title: "Subscription Resumed",
+        description: "Your subscription has been resumed successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to resume subscription",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleUpdatePaymentMethod = async () => {
+    try {
+      const { clientSecret } = await updatePaymentMethod();
+      // In a real implementation, you'd redirect to Stripe payment page
+      toast({
+        title: "Payment Method Update",
+        description: "Please complete the payment method update process.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to initiate payment method update",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleRetryPayment = async () => {
+    try {
+      await retryPayment();
+      toast({
+        title: "Payment Retry Successful",
+        description: "Your payment has been processed successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Payment Failed",
+        description: "Unable to process payment. Please update your payment method.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDowngradeToFree = async () => {
+    try {
+      await downgradeToFree();
+      toast({
+        title: "Downgraded to Free",
+        description: "You now have free access to basic features.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to downgrade subscription",
+        variant: "destructive",
+      });
+    }
+  };
+
+  if (subscriptionLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CreditCard className="h-5 w-5" />
+            Subscription
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center p-4">
+            <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const isSubscribed = subscriptionStatus?.isSubscribed;
+  const status = subscriptionStatus?.subscriptionStatus;
+  const cancelAtPeriodEnd = subscriptionStatus?.cancelAtPeriodEnd;
+  const currentPeriodEnd = subscriptionStatus?.currentPeriodEnd;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <CreditCard className="h-5 w-5" />
+          Subscription Management
+        </CardTitle>
+        <CardDescription>
+          Manage your subscription and billing settings
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Subscription Status */}
+        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+          <div>
+            <div className="font-medium">Current Plan</div>
+            <div className="text-sm text-muted-foreground">
+              {isSubscribed ? "HybridX Premium - £5/month" : "Free Plan"}
+            </div>
+          </div>
+          <Badge className={
+            status === "active" ? "bg-green-100 text-green-800" :
+            status === "past_due" ? "bg-red-100 text-red-800" :
+            status === "canceled" ? "bg-gray-100 text-gray-800" :
+            "bg-blue-100 text-blue-800"
+          }>
+            {status === "active" ? "Active" :
+             status === "past_due" ? "Payment Due" :
+             status === "canceled" ? "Cancelled" :
+             "Free"}
+          </Badge>
+        </div>
+
+        {/* Subscription Details */}
+        {isSubscribed && (
+          <div className="space-y-2 text-sm">
+            {currentPeriodEnd && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">
+                  {cancelAtPeriodEnd ? "Expires on:" : "Next billing:"}
+                </span>
+                <span>{new Date(currentPeriodEnd).toLocaleDateString()}</span>
+              </div>
+            )}
+            
+            {cancelAtPeriodEnd && (
+              <div className="flex items-center gap-2 text-orange-600 text-sm">
+                <AlertCircle className="h-4 w-4" />
+                <span>Your subscription will end on {new Date(currentPeriodEnd!).toLocaleDateString()}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="space-y-2">
+          {!isSubscribed ? (
+            <Button 
+              className="w-full bg-yellow-500 hover:bg-yellow-600 text-black"
+              onClick={() => window.location.href = "/api/create-subscription"}
+            >
+              <CreditCard className="h-4 w-4 mr-2" />
+              Upgrade to Premium - £5/month
+            </Button>
+          ) : (
+            <>
+              {/* Payment Issues */}
+              {status === "past_due" && (
+                <div className="space-y-2">
+                  <Button 
+                    className="w-full bg-red-600 hover:bg-red-700"
+                    onClick={handleRetryPayment}
+                    disabled={isRetryingPayment}
+                  >
+                    {isRetryingPayment ? (
+                      <div className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full mr-2" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                    )}
+                    Retry Payment
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={handleUpdatePaymentMethod}
+                    disabled={isUpdatingPaymentMethod}
+                  >
+                    Update Payment Method
+                  </Button>
+                </div>
+              )}
+
+              {/* Active Subscription Actions */}
+              {status === "active" && !cancelAtPeriodEnd && (
+                <div className="space-y-2">
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={handleUpdatePaymentMethod}
+                    disabled={isUpdatingPaymentMethod}
+                  >
+                    <CreditCard className="h-4 w-4 mr-2" />
+                    Update Payment Method
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={handleCancelSubscription}
+                    disabled={isCancelingSubscription}
+                  >
+                    Cancel at Period End
+                  </Button>
+                  <Button 
+                    variant="destructive" 
+                    className="w-full"
+                    onClick={handleDowngradeToFree}
+                    disabled={isDowngrading}
+                  >
+                    Cancel & Downgrade to Free Now
+                  </Button>
+                </div>
+              )}
+
+              {/* Cancelled but Active Subscription */}
+              {cancelAtPeriodEnd && (
+                <div className="space-y-2">
+                  <Button 
+                    className="w-full bg-green-600 hover:bg-green-700"
+                    onClick={handleResumeSubscription}
+                    disabled={isResumingSubscription}
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Resume Subscription
+                  </Button>
+                  <Button 
+                    variant="destructive" 
+                    className="w-full"
+                    onClick={handleCancelImmediately}
+                  >
+                    Cancel Immediately
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Payment Methods */}
+        {isSubscribed && paymentMethods?.paymentMethods?.length > 0 && (
+          <div className="border-t pt-4">
+            <h4 className="font-medium mb-2">Payment Methods</h4>
+            <div className="space-y-2">
+              {paymentMethods.paymentMethods.map((pm: any) => (
+                <div key={pm.id} className="flex items-center justify-between p-2 border rounded">
+                  <div className="flex items-center gap-2">
+                    <CreditCard className="h-4 w-4" />
+                    <span className="text-sm">
+                      **** **** **** {pm.last4} ({pm.brand?.toUpperCase()})
+                    </span>
+                    {pm.isDefault && (
+                      <Badge variant="secondary" className="text-xs">Default</Badge>
+                    )}
+                  </div>
+                  <span className="text-sm text-muted-foreground">
+                    {pm.expMonth}/{pm.expYear}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Help Text */}
+        <div className="text-xs text-muted-foreground pt-2 border-t">
+          <p>Need help with your subscription? Contact support or visit our help center.</p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function Profile() {
   const { toast } = useToast();
@@ -442,38 +768,8 @@ export default function Profile() {
               </CardContent>
             </Card>
 
-            {user?.subscriptionStatus && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Subscription</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between">
-                      <Badge className={user?.subscriptionStatus === "active" 
-                        ? "bg-green-100 text-green-800" 
-                        : "bg-gray-100 text-gray-800"
-                      }>
-                        {user?.subscriptionStatus || "free"}
-                      </Badge>
-                      {user?.subscriptionStatus !== "active" && (
-                        <Button 
-                          onClick={() => setShowSubscriptionModal(true)}
-                          size="sm"
-                          className="bg-yellow-500 hover:bg-yellow-600 text-black"
-                        >
-                          Upgrade
-                        </Button>
-                      )}
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      {user?.subscriptionStatus === "active" 
-                        ? "You have full access to all features"
-                        : "Upgrade to access premium features"
-                      }
-                    </p>
-                </CardContent>
-              </Card>
-            )}
+            <SubscriptionManagement />
+            </div>
 
             {/* Referral System */}
             <Card>
