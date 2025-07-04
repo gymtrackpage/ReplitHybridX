@@ -134,31 +134,44 @@ export default function Assessment() {
         // Clear all cached data to ensure fresh state
         queryClient.clear();
         
-        // Invalidate specific queries with error handling
-        const invalidationPromises = [
-          queryClient.invalidateQueries({ queryKey: ["/api/user-onboarding-status"] }),
-          queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] }),
-          queryClient.invalidateQueries({ queryKey: ["/api/subscription-status"] }),
-          queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] }),
-          queryClient.invalidateQueries({ queryKey: ["/api/user-progress"] })
+        // Invalidate specific queries with comprehensive error handling
+        const invalidationQueries = [
+          "/api/user-onboarding-status",
+          "/api/auth/user", 
+          "/api/subscription-status",
+          "/api/dashboard",
+          "/api/user-progress",
+          "/api/profile"
         ];
 
-        await Promise.allSettled(invalidationPromises);
+        for (const query of invalidationQueries) {
+          try {
+            await queryClient.invalidateQueries({ queryKey: [query] });
+            await queryClient.removeQueries({ queryKey: [query] });
+          } catch (error) {
+            console.warn(`Failed to invalidate query ${query}:`, error);
+          }
+        }
 
-        // Force fresh fetch of critical data with timeout
-        const fetchPromises = [
-          queryClient.fetchQuery({ 
-            queryKey: ["/api/user-onboarding-status"],
-            staleTime: 0 
-          }),
-          queryClient.fetchQuery({ 
-            queryKey: ["/api/auth/user"],
-            staleTime: 0 
-          })
-        ];
-
-        const fetchResults = await Promise.allSettled(fetchPromises);
-        console.log("Post-assessment data fetch results:", fetchResults);
+        // Force fresh fetch of critical data
+        try {
+          await Promise.race([
+            Promise.all([
+              queryClient.fetchQuery({ 
+                queryKey: ["/api/user-onboarding-status"],
+                staleTime: 0 
+              }),
+              queryClient.fetchQuery({ 
+                queryKey: ["/api/auth/user"],
+                staleTime: 0 
+              })
+            ]),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Fetch timeout')), 5000))
+          ]);
+          console.log("Critical user data refetched successfully");
+        } catch (fetchError) {
+          console.warn("Failed to refetch critical data, but continuing:", fetchError);
+        }
         
       } catch (error) {
         console.error("Error updating caches after assessment:", error);
@@ -170,12 +183,11 @@ export default function Assessment() {
         description: "Welcome to HybridX! You can upgrade to Premium anytime for full access.",
       });
       
-      // Longer delay to ensure all state updates propagate
+      // Ensure redirect happens with proper state cleanup
       setTimeout(() => {
         console.log("Redirecting to dashboard after assessment completion");
-        // Use window.location.href for a full page refresh to ensure clean state
         window.location.href = "/dashboard";
-      }, 2000);
+      }, 1500);
     },
     onError: (error: any) => {
       console.error("Assessment completion error:", error);

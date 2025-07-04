@@ -82,7 +82,7 @@ function CheckoutForm({ clientSecret, subscriptionId }: { clientSecret: string, 
         // Handle assessment completion after successful payment
         const pendingAssessment = localStorage.getItem('pendingAssessment');
         if (pendingAssessment) {
-          console.log("Completing pending assessment...");
+          console.log("Completing pending assessment after payment...");
           try {
             const assessmentData = JSON.parse(pendingAssessment);
             await apiRequest("POST", "/api/complete-assessment", {
@@ -91,31 +91,33 @@ function CheckoutForm({ clientSecret, subscriptionId }: { clientSecret: string, 
               paymentIntentId: intentId
             });
             localStorage.removeItem('pendingAssessment');
-            console.log("Assessment completed successfully with subscription");
+            console.log("Assessment completed successfully with premium subscription");
           } catch (assessmentError) {
-            console.error("Assessment completion failed:", assessmentError);
-            // Still mark assessment as complete even if detailed assessment fails
+            console.error("Assessment completion failed, trying fallback:", assessmentError);
+            // Fallback: mark assessment as complete without detailed data
             try {
               await apiRequest("POST", "/api/mark-assessment-complete", {
                 subscriptionChoice: "premium",
                 paymentIntentId: intentId
               });
+              localStorage.removeItem('pendingAssessment'); // Clean up even on fallback
+              console.log("Assessment marked complete via fallback method");
             } catch (fallbackError) {
               console.error("Fallback assessment marking also failed:", fallbackError);
             }
           }
         } else {
-          // No pending assessment - mark assessment as complete for existing users
-          console.log("No pending assessment found, marking assessment as complete for subscription...");
+          // No pending assessment - this might be an existing user upgrading
+          console.log("No pending assessment found, marking assessment as complete for existing user subscription...");
           try {
             await apiRequest("POST", "/api/mark-assessment-complete", {
               subscriptionChoice: "premium",
               paymentIntentId: intentId
             });
-            console.log("Assessment marked complete for subscription");
+            console.log("Assessment marked complete for existing user subscription");
           } catch (error) {
-            console.error("Failed to mark assessment complete:", error);
-            // Don't block the payment success flow
+            console.error("Failed to mark assessment complete for existing user:", error);
+            // Don't block the payment success flow for existing users
           }
         }
 
@@ -126,20 +128,44 @@ function CheckoutForm({ clientSecret, subscriptionId }: { clientSecret: string, 
           // Clear all cached data first
           queryClient.clear();
           
-          // Then specifically invalidate key queries
-          await Promise.all([
-            queryClient.invalidateQueries({ queryKey: ["/api/user-onboarding-status"] }),
-            queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] }),
-            queryClient.invalidateQueries({ queryKey: ["/api/subscription-status"] }),
-            queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] }),
-            queryClient.invalidateQueries({ queryKey: ["/api/user-progress"] })
-          ]);
+          // Define all critical queries to invalidate
+          const criticalQueries = [
+            "/api/user-onboarding-status",
+            "/api/auth/user",
+            "/api/subscription-status", 
+            "/api/dashboard",
+            "/api/user-progress",
+            "/api/profile"
+          ];
 
-          // Force fresh fetch of critical data
+          // Invalidate and remove each query individually with error handling
+          for (const query of criticalQueries) {
+            try {
+              await queryClient.invalidateQueries({ queryKey: [query] });
+              await queryClient.removeQueries({ queryKey: [query] });
+            } catch (queryError) {
+              console.warn(`Failed to invalidate query ${query}:`, queryError);
+            }
+          }
+
+          // Force fresh fetch of critical data with timeout
           console.log("Refetching critical user data...");
-          await Promise.all([
-            queryClient.fetchQuery({ queryKey: ["/api/user-onboarding-status"] }),
-            queryClient.fetchQuery({ queryKey: ["/api/auth/user"] })
+          await Promise.race([
+            Promise.all([
+              queryClient.fetchQuery({ 
+                queryKey: ["/api/user-onboarding-status"],
+                staleTime: 0 
+              }),
+              queryClient.fetchQuery({ 
+                queryKey: ["/api/auth/user"],
+                staleTime: 0 
+              }),
+              queryClient.fetchQuery({ 
+                queryKey: ["/api/subscription-status"],
+                staleTime: 0 
+              })
+            ]),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Refetch timeout')), 5000))
           ]);
 
           console.log("Cache invalidation and refetch completed successfully");

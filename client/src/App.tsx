@@ -66,23 +66,32 @@ function Router() {
   // Extract user status data with proper defaults
   const assessmentCompleted = (userStatus as any)?.assessmentCompleted || false;
   const subscriptionStatus = (userStatus as any)?.subscriptionStatus || 'none';
+  const currentProgramId = (userStatus as any)?.currentProgramId;
   
   // Allow access to payment and subscription success pages regardless of assessment status
   const isOnPaymentFlow = window.location.pathname.includes('/payment') || 
                          window.location.pathname.includes('/subscription-success');
   
-  // Only allow app access if user has completed assessment
-  // New users MUST complete assessment first before accessing any features
+  // Check if user has active subscription or admin access
+  const hasActiveSubscription = ['active', 'trialing'].includes(subscriptionStatus);
+  const isFreeTrial = subscriptionStatus === 'free_trial';
+  
+  // New users must complete assessment before accessing any features
+  // Exception: Allow payment flow pages even without completed assessment
   const shouldShowAssessment = !assessmentCompleted && !isOnPaymentFlow;
   
   console.log("App routing decision:", {
     assessmentCompleted,
     subscriptionStatus,
+    hasActiveSubscription,
+    isFreeTrial,
+    currentProgramId,
     isOnPaymentFlow,
     shouldShowAssessment,
     currentPath: window.location.pathname
   });
   
+  // Force assessment completion for new users
   if (shouldShowAssessment) {
     return (
       <Switch>

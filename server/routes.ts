@@ -1160,13 +1160,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Create assessment record with comprehensive data
-      const assessment = await storage.createAssessment({
-        userId,
-        data: JSON.stringify(assessmentData),
-        ...assessmentData
-      });
-
-      console.log("Assessment record created:", assessment.id);
+      let assessment;
+      try {
+        assessment = await storage.createAssessment({
+          userId,
+          data: JSON.stringify(assessmentData),
+          ...assessmentData
+        });
+        console.log("Assessment record created:", assessment.id);
+      } catch (assessmentError) {
+        console.error("Failed to create assessment record:", assessmentError);
+        // Continue without assessment record if it fails
+      }
 
       // Determine subscription status based on choice and payment
       let subscriptionStatus = "free_trial";
@@ -1185,36 +1190,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       console.log("User profile updated:", {
+        userId,
         assessmentCompleted: updatedUser?.assessmentCompleted,
-        subscriptionStatus: updatedUser?.subscriptionStatus
+        subscriptionStatus: updatedUser?.subscriptionStatus,
+        currentProgramId: updatedUser?.currentProgramId
       });
 
-      // Create initial progress tracking if it doesn't exist
+      // Create or update initial progress tracking
       const existingProgress = await storage.getUserProgress(userId);
       if (!existingProgress) {
-        const newProgress = await storage.createUserProgress({
-          userId,
-          programId,
-          currentWeek: 1,
-          currentDay: 1,
-          startDate: new Date().toISOString(),
-          completedWorkouts: 0,
-          totalWorkouts: 84 // Default for 12-week program
-        });
-        console.log("Created initial progress tracking:", newProgress.id);
+        try {
+          // Get program details for accurate total workouts calculation
+          const program = await storage.getProgram(programId);
+          const totalWorkouts = program ? (program.duration || 12) * (program.frequency || 6) : 84;
+
+          const newProgress = await storage.createUserProgress({
+            userId,
+            programId,
+            currentWeek: 1,
+            currentDay: 1,
+            startDate: new Date().toISOString(),
+            completedWorkouts: 0,
+            totalWorkouts
+          });
+          console.log("Created initial progress tracking:", newProgress.id);
+        } catch (progressError) {
+          console.error("Failed to create progress tracking:", progressError);
+          // Continue without progress tracking if it fails
+        }
       } else {
         console.log("Progress tracking already exists for user");
+        // Update existing progress with new program if different
+        if (existingProgress.programId !== programId) {
+          try {
+            await storage.updateUserProgress(userId, {
+              programId,
+              currentWeek: 1,
+              currentDay: 1,
+              startDate: new Date().toISOString(),
+              completedWorkouts: 0
+            });
+            console.log("Updated existing progress tracking with new program");
+          } catch (updateError) {
+            console.error("Failed to update existing progress:", updateError);
+          }
+        }
       }
+
+      // Verify the user update was successful
+      const verificationUser = await storage.getUser(userId);
+      const finalStatus = {
+        assessmentCompleted: verificationUser?.assessmentCompleted || false,
+        subscriptionStatus: verificationUser?.subscriptionStatus || subscriptionStatus,
+        currentProgramId: verificationUser?.currentProgramId || programId
+      };
+
+      console.log("Final user status verification:", finalStatus);
 
       // Response with comprehensive status
       res.json({ 
         success: true, 
-        assessment,
-        userStatus: {
-          assessmentCompleted: true,
-          subscriptionStatus: subscriptionStatus,
-          currentProgramId: programId
-        },
+        assessment: assessment || { id: null, message: "Assessment data stored in user profile" },
+        userStatus: finalStatus,
         message: subscriptionChoice === "premium" ? 
           "Assessment completed with premium subscription" : 
           "Assessment completed with free trial access"
