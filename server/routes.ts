@@ -1143,31 +1143,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Complete assessment after payment success
+  // Complete assessment after payment success or free trial selection
   app.post('/api/complete-assessment', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { assessmentData, programId, subscriptionChoice } = req.body;
+      const { assessmentData, programId, subscriptionChoice, paymentIntentId } = req.body;
 
-      // Create assessment record
+      console.log("Completing assessment for user:", userId, "with choice:", subscriptionChoice);
+
+      // Validate required data
+      if (!assessmentData || !programId || !subscriptionChoice) {
+        return res.status(400).json({ 
+          message: "Missing required assessment data",
+          required: ["assessmentData", "programId", "subscriptionChoice"]
+        });
+      }
+
+      // Create assessment record with comprehensive data
       const assessment = await storage.createAssessment({
         userId,
         data: JSON.stringify(assessmentData),
         ...assessmentData
       });
 
-      // Update user profile
-      await storage.updateUserProfile(userId, {
+      console.log("Assessment record created:", assessment.id);
+
+      // Determine subscription status based on choice and payment
+      let subscriptionStatus = "free_trial";
+      if (subscriptionChoice === "premium" && paymentIntentId) {
+        subscriptionStatus = "active";
+      } else if (subscriptionChoice === "premium") {
+        subscriptionStatus = "pending"; // Premium requested but no payment confirmation
+      }
+
+      // Update user profile with assessment completion
+      const updatedUser = await storage.updateUserProfile(userId, {
         assessmentCompleted: true,
-        subscriptionStatus: subscriptionChoice === "premium" ? "active" : "free_trial",
+        subscriptionStatus: subscriptionStatus,
         currentProgramId: programId,
         updatedAt: new Date()
       });
 
-      // Create initial progress tracking
+      console.log("User profile updated:", {
+        assessmentCompleted: updatedUser?.assessmentCompleted,
+        subscriptionStatus: updatedUser?.subscriptionStatus
+      });
+
+      // Create initial progress tracking if it doesn't exist
       const existingProgress = await storage.getUserProgress(userId);
       if (!existingProgress) {
-        await storage.createUserProgress({
+        const newProgress = await storage.createUserProgress({
           userId,
           programId,
           currentWeek: 1,
@@ -1176,12 +1201,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
           completedWorkouts: 0,
           totalWorkouts: 84 // Default for 12-week program
         });
+        console.log("Created initial progress tracking:", newProgress.id);
+      } else {
+        console.log("Progress tracking already exists for user");
       }
 
-      res.json({ success: true, assessment });
+      // Response with comprehensive status
+      res.json({ 
+        success: true, 
+        assessment,
+        userStatus: {
+          assessmentCompleted: true,
+          subscriptionStatus: subscriptionStatus,
+          currentProgramId: programId
+        },
+        message: subscriptionChoice === "premium" ? 
+          "Assessment completed with premium subscription" : 
+          "Assessment completed with free trial access"
+      });
     } catch (error) {
       console.error("Error completing assessment:", error);
-      res.status(500).json({ message: "Failed to complete assessment" });
+      res.status(500).json({ 
+        message: "Failed to complete assessment",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
     }
   });
 
@@ -1189,23 +1232,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/mark-assessment-complete', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { subscriptionChoice } = req.body;
+      const { subscriptionChoice, paymentIntentId } = req.body;
+
+      console.log("Marking assessment complete for user:", userId, "with choice:", subscriptionChoice);
+
+      // Determine subscription status
+      let subscriptionStatus = "free_trial";
+      if (subscriptionChoice === "premium" && paymentIntentId) {
+        subscriptionStatus = "active";
+      } else if (subscriptionChoice === "premium") {
+        subscriptionStatus = "pending";
+      }
 
       // Update user profile to mark assessment as complete
-      await storage.updateUserProfile(userId, {
+      const updatedUser = await storage.updateUserProfile(userId, {
         assessmentCompleted: true,
-        subscriptionStatus: subscriptionChoice === "premium" ? "active" : "free_trial",
+        subscriptionStatus: subscriptionStatus,
         updatedAt: new Date()
       });
 
+      console.log("User profile updated - assessment marked complete");
+
       // Assign a default program if user doesn't have one
       const user = await storage.getUser(userId);
-      if (!user?.currentProgramId) {
+      let assignedProgramId = user?.currentProgramId;
+
+      if (!assignedProgramId) {
+        console.log("Assigning default program to user");
         const programs = await storage.getPrograms();
-        const defaultProgram = programs.find(p => p.difficulty === 'Intermediate') || programs[0];
+        const defaultProgram = programs.find(p => p.difficulty === 'Intermediate') || 
+                             programs.find(p => p.difficulty === 'Beginner') || 
+                             programs[0];
         
         if (defaultProgram) {
           await storage.updateUserProgram(userId, defaultProgram.id);
+          assignedProgramId = defaultProgram.id;
           
           // Create initial progress tracking
           const existingProgress = await storage.getUserProgress(userId);
@@ -1219,14 +1280,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
               completedWorkouts: 0,
               totalWorkouts: 84
             });
+            console.log("Created progress tracking for default program:", defaultProgram.name);
           }
+        } else {
+          console.warn("No programs available to assign to user");
         }
       }
 
-      res.json({ success: true, message: "Assessment marked complete" });
+      res.json({ 
+        success: true, 
+        message: "Assessment marked complete",
+        userStatus: {
+          assessmentCompleted: true,
+          subscriptionStatus: subscriptionStatus,
+          currentProgramId: assignedProgramId
+        }
+      });
     } catch (error) {
       console.error("Error marking assessment complete:", error);
-      res.status(500).json({ message: "Failed to mark assessment complete" });
+      res.status(500).json({ 
+        message: "Failed to mark assessment complete",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
     }
   });
 

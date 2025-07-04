@@ -79,7 +79,7 @@ function CheckoutForm({ clientSecret, subscriptionId }: { clientSecret: string, 
         });
         console.log("Subscription status updated successfully");
 
-        // Complete pending assessment if exists, or ensure assessment is marked complete
+        // Handle assessment completion after successful payment
         const pendingAssessment = localStorage.getItem('pendingAssessment');
         if (pendingAssessment) {
           console.log("Completing pending assessment...");
@@ -91,21 +91,31 @@ function CheckoutForm({ clientSecret, subscriptionId }: { clientSecret: string, 
               paymentIntentId: intentId
             });
             localStorage.removeItem('pendingAssessment');
-            console.log("Assessment completed successfully");
+            console.log("Assessment completed successfully with subscription");
           } catch (assessmentError) {
             console.error("Assessment completion failed:", assessmentError);
+            // Still mark assessment as complete even if detailed assessment fails
+            try {
+              await apiRequest("POST", "/api/mark-assessment-complete", {
+                subscriptionChoice: "premium",
+                paymentIntentId: intentId
+              });
+            } catch (fallbackError) {
+              console.error("Fallback assessment marking also failed:", fallbackError);
+            }
           }
         } else {
-          // Ensure assessment is marked complete even without pending data
-          console.log("No pending assessment found, marking assessment as complete...");
+          // No pending assessment - mark assessment as complete for existing users
+          console.log("No pending assessment found, marking assessment as complete for subscription...");
           try {
             await apiRequest("POST", "/api/mark-assessment-complete", {
               subscriptionChoice: "premium",
               paymentIntentId: intentId
             });
-            console.log("Assessment marked complete successfully");
+            console.log("Assessment marked complete for subscription");
           } catch (error) {
             console.error("Failed to mark assessment complete:", error);
+            // Don't block the payment success flow
           }
         }
 

@@ -131,26 +131,38 @@ export default function Assessment() {
       console.log("Assessment completed successfully:", data);
       
       try {
-        // Clear all query cache to ensure fresh data
+        // Clear all cached data to ensure fresh state
         queryClient.clear();
         
-        // Force fresh data fetch for critical queries
-        await Promise.all([
+        // Invalidate specific queries with error handling
+        const invalidationPromises = [
           queryClient.invalidateQueries({ queryKey: ["/api/user-onboarding-status"] }),
           queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] }),
           queryClient.invalidateQueries({ queryKey: ["/api/subscription-status"] }),
-          queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] })
-        ]);
+          queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] }),
+          queryClient.invalidateQueries({ queryKey: ["/api/user-progress"] })
+        ];
 
-        // Verify the assessment completion was properly saved
-        const updatedStatus = await queryClient.fetchQuery({ 
-          queryKey: ["/api/user-onboarding-status"] 
-        });
-        
-        console.log("Post-assessment user status:", updatedStatus);
+        await Promise.allSettled(invalidationPromises);
+
+        // Force fresh fetch of critical data with timeout
+        const fetchPromises = [
+          queryClient.fetchQuery({ 
+            queryKey: ["/api/user-onboarding-status"],
+            staleTime: 0 
+          }),
+          queryClient.fetchQuery({ 
+            queryKey: ["/api/auth/user"],
+            staleTime: 0 
+          })
+        ];
+
+        const fetchResults = await Promise.allSettled(fetchPromises);
+        console.log("Post-assessment data fetch results:", fetchResults);
         
       } catch (error) {
         console.error("Error updating caches after assessment:", error);
+        // Continue with redirect even if cache operations fail
       }
       
       toast({
@@ -158,10 +170,12 @@ export default function Assessment() {
         description: "Welcome to HybridX! You can upgrade to Premium anytime for full access.",
       });
       
-      // Redirect to dashboard after state updates
+      // Longer delay to ensure all state updates propagate
       setTimeout(() => {
-        setLocation("/dashboard");
-      }, 1500);
+        console.log("Redirecting to dashboard after assessment completion");
+        // Use window.location.href for a full page refresh to ensure clean state
+        window.location.href = "/dashboard";
+      }, 2000);
     },
     onError: (error: any) => {
       console.error("Assessment completion error:", error);
