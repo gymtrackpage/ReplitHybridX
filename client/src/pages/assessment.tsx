@@ -127,16 +127,26 @@ export default function Assessment() {
       const response = await apiRequest("POST", "/api/complete-assessment", data);
       return response;
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       console.log("Assessment completed successfully:", data);
-      queryClient.invalidateQueries({ queryKey: ["/api/user-onboarding-status"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      
+      // Ensure queries are invalidated and refetched
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["/api/user-onboarding-status"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] }),
+        queryClient.refetchQueries({ queryKey: ["/api/user-onboarding-status"] }),
+        queryClient.refetchQueries({ queryKey: ["/api/auth/user"] })
+      ]);
+      
       toast({
         title: "Assessment Complete!",
         description: "Welcome to HybridX! You can upgrade to Premium anytime for full access.",
       });
-      // Redirect to dashboard instead of home
-      setLocation("/dashboard");
+      
+      // Small delay to ensure state updates
+      setTimeout(() => {
+        setLocation("/dashboard");
+      }, 500);
     },
     onError: (error: any) => {
       console.error("Assessment completion error:", error);

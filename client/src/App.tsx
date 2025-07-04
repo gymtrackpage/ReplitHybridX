@@ -74,8 +74,12 @@ function Router() {
   const hasActiveSubscription = userStatus && 
     ['active', 'trialing', 'past_due'].includes((userStatus as any).subscriptionStatus);
   
+  // Check if assessment is actually completed (including after payment)
+  const assessmentCompleted = (userStatus as any)?.assessmentCompleted || false;
+  
   // Only force assessment if user hasn't completed it AND doesn't have active subscription AND not on payment flow
-  if (needsAssessment && !hasActiveSubscription && !isOnPaymentFlow) {
+  // Also allow users who completed assessment (even without subscription) to access the app
+  if (needsAssessment && !hasActiveSubscription && !isOnPaymentFlow && !assessmentCompleted) {
     return (
       <Switch>
         <Route path="/payment" component={Payment} />

@@ -110,6 +110,8 @@ function CheckoutForm({ clientSecret, subscriptionId }: { clientSecret: string, 
         }
 
         // Force comprehensive cache refresh and wait for completion
+        console.log("Starting cache invalidation after payment success...");
+        
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: ["/api/user-onboarding-status"] }),
           queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] }),
@@ -118,9 +120,12 @@ function CheckoutForm({ clientSecret, subscriptionId }: { clientSecret: string, 
           queryClient.invalidateQueries({ queryKey: ["/api/user-progress"] })
         ]);
 
-        // Refetch user onboarding status to ensure it's updated
-        await queryClient.refetchQueries({ queryKey: ["/api/user-onboarding-status"] });
-        await queryClient.refetchQueries({ queryKey: ["/api/auth/user"] });
+        // Wait for refetch to complete before redirecting
+        console.log("Refetching critical user data...");
+        await Promise.all([
+          queryClient.refetchQueries({ queryKey: ["/api/user-onboarding-status"] }),
+          queryClient.refetchQueries({ queryKey: ["/api/auth/user"] })
+        ]);
 
         console.log("All caches invalidated and refetched after payment completion");
 
@@ -129,11 +134,12 @@ function CheckoutForm({ clientSecret, subscriptionId }: { clientSecret: string, 
           description: "Welcome to HybridX Premium! Redirecting to your dashboard...",
         });
 
-        // Longer delay to ensure all state updates are complete
+        // Longer delay to ensure all state updates are propagated
         setTimeout(() => {
           console.log("Redirecting to dashboard after successful payment");
-          setLocation("/dashboard");
-        }, 2000);
+          // Force a page reload to ensure fresh state
+          window.location.href = "/dashboard";
+        }, 2500);
       } catch (error: any) {
         console.error("Error updating subscription status:", error);
         toast({
