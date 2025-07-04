@@ -72,8 +72,8 @@ function Router() {
   const isOnPaymentFlow = window.location.pathname.includes('/payment') || 
                          window.location.pathname.includes('/subscription-success');
   
-  // Check if user has active subscription or admin access
-  const hasActiveSubscription = ['active', 'trialing'].includes(subscriptionStatus);
+  // Check if user has active subscription (including various active states)
+  const hasActiveSubscription = ['active', 'trialing', 'past_due'].includes(subscriptionStatus);
   const isFreeTrial = subscriptionStatus === 'free_trial';
   
   // New users must complete assessment before accessing any features
@@ -88,8 +88,29 @@ function Router() {
     currentProgramId,
     isOnPaymentFlow,
     shouldShowAssessment,
-    currentPath: window.location.pathname
+    currentPath: window.location.pathname,
+    userStatusRaw: userStatus
   });
+
+  // Additional detailed logging for debugging assessment routing
+  if (shouldShowAssessment) {
+    console.log("🔄 Redirecting to assessment because:", {
+      assessmentNotCompleted: !assessmentCompleted,
+      notOnPaymentFlow: !isOnPaymentFlow,
+      noActiveSubscription: !hasActiveSubscription,
+      allConditions: {
+        assessmentCompleted,
+        isOnPaymentFlow,
+        hasActiveSubscription
+      }
+    });
+  } else {
+    console.log("✅ Allowing access to main app:", {
+      reason: hasActiveSubscription ? "Has active subscription" : 
+              assessmentCompleted ? "Assessment completed" : 
+              isOnPaymentFlow ? "On payment flow" : "Unknown"
+    });
+  }
   
   // Force assessment completion for new users
   if (shouldShowAssessment) {
