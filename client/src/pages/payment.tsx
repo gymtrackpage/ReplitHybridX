@@ -134,12 +134,12 @@ function CheckoutForm({ clientSecret, subscriptionId }: { clientSecret: string, 
           description: "Welcome to HybridX Premium! Redirecting to your dashboard...",
         });
 
-        // Longer delay to ensure all state updates are propagated
+        // Shorter delay with forced reload to ensure fresh state
         setTimeout(() => {
           console.log("Redirecting to dashboard after successful payment");
-          // Force a page reload to ensure fresh state
+          // Force a full page reload to ensure all caches are cleared and fresh data is loaded
           window.location.href = "/dashboard";
-        }, 2500);
+        }, 1500);
       } catch (error: any) {
         console.error("Error updating subscription status:", error);
         toast({

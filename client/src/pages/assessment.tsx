@@ -130,12 +130,15 @@ export default function Assessment() {
     onSuccess: async (data) => {
       console.log("Assessment completed successfully:", data);
       
-      // Ensure queries are invalidated and refetched
+      // Clear any cached user status data
+      queryClient.removeQueries({ queryKey: ["/api/user-onboarding-status"] });
+      queryClient.removeQueries({ queryKey: ["/api/auth/user"] });
+      
+      // Force fresh data fetch
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["/api/user-onboarding-status"] }),
         queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] }),
-        queryClient.refetchQueries({ queryKey: ["/api/user-onboarding-status"] }),
-        queryClient.refetchQueries({ queryKey: ["/api/auth/user"] })
+        queryClient.invalidateQueries({ queryKey: ["/api/subscription-status"] })
       ]);
       
       toast({
@@ -143,10 +146,10 @@ export default function Assessment() {
         description: "Welcome to HybridX! You can upgrade to Premium anytime for full access.",
       });
       
-      // Small delay to ensure state updates
+      // Longer delay to ensure all state updates propagate
       setTimeout(() => {
         setLocation("/dashboard");
-      }, 500);
+      }, 1000);
     },
     onError: (error: any) => {
       console.error("Assessment completion error:", error);
