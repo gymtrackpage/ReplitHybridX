@@ -77,8 +77,8 @@ function Router() {
   const isFreeTrial = subscriptionStatus === 'free_trial';
   
   // New users must complete assessment before accessing any features
-  // Exception: Allow payment flow pages even without completed assessment
-  const shouldShowAssessment = !assessmentCompleted && !isOnPaymentFlow;
+  // Exception: Allow payment flow pages and users with active subscriptions to skip assessment
+  const shouldShowAssessment = !assessmentCompleted && !isOnPaymentFlow && !hasActiveSubscription;
   
   console.log("App routing decision:", {
     assessmentCompleted,
