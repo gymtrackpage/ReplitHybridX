@@ -520,7 +520,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Assessment operations
-  async createAssessment(assessmentData: any) {
+  async createAssessment(assessmentData: any): Promise<Assessment> {
     try {
       console.log("Creating assessment with data:", {
         userId: assessmentData.userId,
@@ -539,14 +539,40 @@ export class DatabaseStorage implements IStorage {
         assessmentData.data = JSON.stringify(assessmentData.data);
       }
 
-      const result = await db.insert(assessments).values(assessmentData).returning();
-      console.log("Assessment created successfully:", result[0]?.id);
+      // Validate all required fields are present
+      const validatedData = {
+        userId: assessmentData.userId,
+        data: assessmentData.data || JSON.stringify({}),
+        hyroxEventsCompleted: assessmentData.hyroxEventsCompleted ?? 0,
+        generalFitnessYears: assessmentData.generalFitnessYears ?? 1,
+        primaryTrainingBackground: assessmentData.primaryTrainingBackground || 'general',
+        weeklyTrainingDays: assessmentData.weeklyTrainingDays ?? 3,
+        avgSessionLength: assessmentData.avgSessionLength ?? 60,
+        competitionFormat: assessmentData.competitionFormat || 'singles',
+        age: assessmentData.age ?? 30,
+        injuryHistory: assessmentData.injuryHistory ?? false,
+        injuryRecent: assessmentData.injuryRecent ?? false,
+        goals: assessmentData.goals || 'general-fitness',
+        equipmentAccess: assessmentData.equipmentAccess || 'full_gym',
+        bestFinishTime: assessmentData.bestFinishTime || null,
+        kilometerRunTime: assessmentData.kilometerRunTime || null,
+        squatMaxReps: assessmentData.squatMaxReps || null,
+        createdAt: assessmentData.createdAt || new Date()
+      };
+
+      const result = await db.insert(assessments).values(validatedData).returning();
+      
+      if (!result[0]) {
+        throw new Error("Assessment creation failed - no result returned");
+      }
+
+      console.log("Assessment created successfully:", result[0].id);
       return result[0];
     } catch (error) {
       console.error("Database error creating assessment:", error);
       throw error;
     }
-  },
+  }
 
   async getUserAssessment(userId: string): Promise<Assessment | undefined> {
     const [assessment] = await db

@@ -1159,38 +1159,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Create assessment record with comprehensive data - this is critical and should not fail silently
-      let assessment;
-      try {
-        // Ensure all required assessment fields are present
-        const completeAssessmentData = {
-          userId,
-          data: JSON.stringify(assessmentData),
-          hyroxEventsCompleted: assessmentData.hyroxEventsCompleted || 0,
-          bestFinishTime: assessmentData.bestFinishTime || null,
-          generalFitnessYears: assessmentData.generalFitnessYears || 0,
-          primaryTrainingBackground: assessmentData.primaryTrainingBackground || 'general',
-          weeklyTrainingDays: assessmentData.weeklyTrainingDays || 3,
-          avgSessionLength: assessmentData.avgSessionLength || 60,
-          competitionFormat: assessmentData.competitionFormat || 'singles',
-          age: assessmentData.age || 30,
-          injuryHistory: assessmentData.injuryHistory || false,
-          injuryRecent: assessmentData.injuryRecent || false,
-          kilometerRunTime: assessmentData.kilometerRunTime || null,
-          squatMaxReps: assessmentData.squatMaxReps || null,
-          goals: Array.isArray(assessmentData.goals) ? assessmentData.goals.join(',') : (assessmentData.goals || 'general-fitness'),
-          equipmentAccess: assessmentData.equipmentAccess || 'full_gym',
-          createdAt: new Date()
-        };
-        
-        assessment = await storage.createAssessment(completeAssessmentData);
-        console.log("Assessment record created successfully:", assessment.id);
-      } catch (assessmentError) {
-        console.error("Critical error: Failed to create assessment record:", assessmentError);
-        return res.status(500).json({ 
-          message: "Failed to save assessment data. Please try again.",
-          error: "ASSESSMENT_SAVE_FAILED"
-        });
+      // Check if assessment already exists to prevent duplicates
+      const existingAssessment = await storage.getUserAssessment(userId);
+      if (existingAssessment) {
+        console.log("Assessment already exists for user:", userId, "- updating user profile only");
+      } else {
+        // Create assessment record with comprehensive data - this is critical and should not fail silently
+        try {
+          // Ensure all required assessment fields are present
+          const completeAssessmentData = {
+            userId,
+            data: JSON.stringify(assessmentData),
+            hyroxEventsCompleted: assessmentData.hyroxEventsCompleted || 0,
+            bestFinishTime: assessmentData.bestFinishTime || null,
+            generalFitnessYears: assessmentData.generalFitnessYears || 0,
+            primaryTrainingBackground: assessmentData.primaryTrainingBackground || 'general',
+            weeklyTrainingDays: assessmentData.weeklyTrainingDays || 3,
+            avgSessionLength: assessmentData.avgSessionLength || 60,
+            competitionFormat: assessmentData.competitionFormat || 'singles',
+            age: assessmentData.age || 30,
+            injuryHistory: assessmentData.injuryHistory || false,
+            injuryRecent: assessmentData.injuryRecent || false,
+            kilometerRunTime: assessmentData.kilometerRunTime || null,
+            squatMaxReps: assessmentData.squatMaxReps || null,
+            goals: Array.isArray(assessmentData.goals) ? assessmentData.goals.join(',') : (assessmentData.goals || 'general-fitness'),
+            equipmentAccess: assessmentData.equipmentAccess || 'full_gym',
+            createdAt: new Date()
+          };
+          
+          const assessment = await storage.createAssessment(completeAssessmentData);
+          console.log("Assessment record created successfully:", assessment.id);
+        } catch (assessmentError) {
+          console.error("Critical error: Failed to create assessment record:", assessmentError);
+          return res.status(500).json({ 
+            message: "Failed to save assessment data. Please try again.",
+            error: "ASSESSMENT_SAVE_FAILED"
+          });
+        }
       }
 
       // Determine subscription status based on choice and payment
@@ -1201,20 +1206,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         subscriptionStatus = "pending"; // Premium requested but no payment confirmation
       }
 
-      // Update user profile with assessment completion
-      const updatedUser = await storage.updateUserProfile(userId, {
-        assessmentCompleted: true,
-        subscriptionStatus: subscriptionStatus,
-        currentProgramId: programId,
-        updatedAt: new Date()
-      });
+      // CRITICAL: Update user profile with assessment completion flag - this must succeed
+      try {
+        const updatedUser = await storage.updateUserProfile(userId, {
+          assessmentCompleted: true,
+          subscriptionStatus: subscriptionStatus,
+          currentProgramId: programId,
+          updatedAt: new Date()
+        });
 
-      console.log("User profile updated:", {
-        userId,
-        assessmentCompleted: updatedUser?.assessmentCompleted,
-        subscriptionStatus: updatedUser?.subscriptionStatus,
-        currentProgramId: updatedUser?.currentProgramId
-      });
+        console.log("User profile updated successfully:", {
+          userId,
+          assessmentCompleted: updatedUser?.assessmentCompleted,
+          subscriptionStatus: updatedUser?.subscriptionStatus,
+          currentProgramId: updatedUser?.currentProgramId
+        });
+
+        // Verify the update actually worked
+        if (!updatedUser?.assessmentCompleted) {
+          throw new Error("Assessment completion flag was not properly set");
+        }
+      } catch (profileError) {
+        console.error("CRITICAL: Failed to update user profile with assessment completion:", profileError);
+        return res.status(500).json({ 
+          message: "Failed to mark assessment as complete. Please try again.",
+          error: "PROFILE_UPDATE_FAILED"
+        });
+      }
 
       // Create or update initial progress tracking
       const existingProgress = await storage.getUserProgress(userId);
@@ -1257,7 +1275,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Verify the user update was successful
+      // Final verification of user status
       const verificationUser = await storage.getUser(userId);
       const finalStatus = {
         assessmentCompleted: verificationUser?.assessmentCompleted || false,
@@ -1267,10 +1285,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log("Final user status verification:", finalStatus);
 
+      // Ensure assessment was actually completed
+      if (!finalStatus.assessmentCompleted) {
+        console.error("VERIFICATION FAILED: Assessment completion flag not set properly");
+        return res.status(500).json({ 
+          message: "Assessment completion verification failed. Please contact support.",
+          error: "VERIFICATION_FAILED"
+        });
+      }
+
       // Response with comprehensive status
       res.json({ 
         success: true, 
-        assessment: assessment || { id: null, message: "Assessment data stored in user profile" },
         userStatus: finalStatus,
         message: subscriptionChoice === "premium" ? 
           "Assessment completed with premium subscription" : 
@@ -4009,9 +4035,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         subscriptionStatus: user?.subscriptionStatus || 'none',
         currentProgramId: user?.currentProgramId || null,
         needsAssessmentRecord: user?.assessmentCompleted && !assessment,
+        isConsistent: (user?.assessmentCompleted && !!assessment) || (!user?.assessmentCompleted && !assessment),
         createdAt: user?.createdAt,
         updatedAt: user?.updatedAt
       };
+
+      // Log inconsistency warnings
+      if (!verificationResult.isConsistent) {
+        console.warn(`Assessment data inconsistency for user ${userId}:`, verificationResult);
+      }
 
       // If user is marked as assessment complete but no assessment record exists, create one
       if (verificationResult.needsAssessmentRecord) {
@@ -4040,6 +4072,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           verificationResult.assessmentRecordExists = true;
           verificationResult.assessmentId = retroactiveAssessment.id;
           verificationResult.needsAssessmentRecord = false;
+          verificationResult.isConsistent = true;
+          console.log(`Successfully created retroactive assessment ${retroactiveAssessment.id} for user ${userId}`);
         } catch (retroError) {
           console.error("Failed to create retroactive assessment:", retroError);
         }

@@ -111,6 +111,26 @@ function Router() {
               isOnPaymentFlow ? "On payment flow" : "Unknown"
     });
   }
+
+  // Additional detailed logging for debugging assessment routing
+  if (shouldShowAssessment) {
+    console.log("🔄 Redirecting to assessment because:", {
+      assessmentNotCompleted: !assessmentCompleted,
+      notOnPaymentFlow: !isOnPaymentFlow,
+      noActiveSubscription: !hasActiveSubscription,
+      allConditions: {
+        assessmentCompleted,
+        isOnPaymentFlow,
+        hasActiveSubscription
+      }
+    });
+  } else {
+    console.log("✅ Allowing access to main app:", {
+      reason: hasActiveSubscription ? "Has active subscription" : 
+              assessmentCompleted ? "Assessment completed" : 
+              isOnPaymentFlow ? "On payment flow" : "Unknown"
+    });
+  }
   
   // Force assessment completion for new users
   if (shouldShowAssessment) {
