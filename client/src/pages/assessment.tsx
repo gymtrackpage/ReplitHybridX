@@ -212,9 +212,11 @@ export default function Assessment() {
   const nextStep = () => {
     if (currentStep === 2) {
       getRecommendationMutation.mutate(assessmentData);
-    } else if (currentStep === 3 && !hasAccess && !isAdmin) {
-      // If user doesn't have premium access, skip to subscription step
-      setCurrentStep(4);
+    } else if (currentStep === 3) {
+      // Always show subscription step after recommendation unless user is admin
+      if (!isAdmin) {
+        setCurrentStep(4);
+      }
     } else if (currentStep < assessmentSteps.length - 1) {
       setCurrentStep(prev => prev + 1);
     }
@@ -243,6 +245,16 @@ export default function Assessment() {
       });
       return;
     }
+
+    // Store assessment data in localStorage before payment
+    const pendingAssessmentData = {
+      assessmentData,
+      programId: recommendation.recommendedProgram.id,
+      subscriptionChoice: "premium"
+    };
+    
+    localStorage.setItem('pendingAssessment', JSON.stringify(pendingAssessmentData));
+    console.log("Stored pending assessment data:", pendingAssessmentData);
 
     createSubscriptionMutation.mutate();
   };

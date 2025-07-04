@@ -79,7 +79,7 @@ function CheckoutForm({ clientSecret, subscriptionId }: { clientSecret: string, 
         });
         console.log("Subscription status updated successfully");
 
-        // Complete pending assessment if exists
+        // Complete pending assessment if exists, or ensure assessment is marked complete
         const pendingAssessment = localStorage.getItem('pendingAssessment');
         if (pendingAssessment) {
           console.log("Completing pending assessment...");
@@ -94,7 +94,18 @@ function CheckoutForm({ clientSecret, subscriptionId }: { clientSecret: string, 
             console.log("Assessment completed successfully");
           } catch (assessmentError) {
             console.error("Assessment completion failed:", assessmentError);
-            // Continue with flow even if assessment completion fails
+          }
+        } else {
+          // Ensure assessment is marked complete even without pending data
+          console.log("No pending assessment found, marking assessment as complete...");
+          try {
+            await apiRequest("POST", "/api/mark-assessment-complete", {
+              subscriptionChoice: "premium",
+              paymentIntentId: intentId
+            });
+            console.log("Assessment marked complete successfully");
+          } catch (error) {
+            console.error("Failed to mark assessment complete:", error);
           }
         }
 

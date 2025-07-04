@@ -64,15 +64,18 @@ function Router() {
   }
 
   // Check if user needs to complete assessment
-  // Allow access to payment page and subscription success even if assessment not completed
   const needsAssessment = userStatus && !(userStatus as any).assessmentCompleted;
   
-  // Don't force assessment if user is coming from payment pages or has subscription
+  // Allow access to payment pages and subscription success regardless of assessment status
   const isOnPaymentFlow = window.location.pathname.includes('/payment') || 
                          window.location.pathname.includes('/subscription-success');
-  const hasSubscription = userStatus && (userStatus as any).subscriptionStatus !== 'none';
   
-  if (needsAssessment && !isOnPaymentFlow && !hasSubscription) {
+  // Check if user has active subscription (should bypass assessment requirement)
+  const hasActiveSubscription = userStatus && 
+    ['active', 'trialing', 'past_due'].includes((userStatus as any).subscriptionStatus);
+  
+  // Only force assessment if user hasn't completed it AND doesn't have active subscription AND not on payment flow
+  if (needsAssessment && !hasActiveSubscription && !isOnPaymentFlow) {
     return (
       <Switch>
         <Route path="/payment" component={Payment} />

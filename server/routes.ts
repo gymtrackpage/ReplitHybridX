@@ -1185,6 +1185,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Mark assessment complete (for users who paid but don't have full assessment data)
+  app.post('/api/mark-assessment-complete', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { subscriptionChoice } = req.body;
+
+      // Update user profile to mark assessment as complete
+      await storage.updateUserProfile(userId, {
+        assessmentCompleted: true,
+        subscriptionStatus: subscriptionChoice === "premium" ? "active" : "free_trial",
+        updatedAt: new Date()
+      });
+
+      // Assign a default program if user doesn't have one
+      const user = await storage.getUser(userId);
+      if (!user?.currentProgramId) {
+        const programs = await storage.getPrograms();
+        const defaultProgram = programs.find(p => p.difficulty === 'Intermediate') || programs[0];
+        
+        if (defaultProgram) {
+          await storage.updateUserProgram(userId, defaultProgram.id);
+          
+          // Create initial progress tracking
+          const existingProgress = await storage.getUserProgress(userId);
+          if (!existingProgress) {
+            await storage.createUserProgress({
+              userId,
+              programId: defaultProgram.id,
+              currentWeek: 1,
+              currentDay: 1,
+              startDate: new Date().toISOString(),
+              completedWorkouts: 0,
+              totalWorkouts: 84
+            });
+          }
+        }
+      }
+
+      res.json({ success: true, message: "Assessment marked complete" });
+    } catch (error) {
+      console.error("Error marking assessment complete:", error);
+      res.status(500).json({ message: "Failed to mark assessment complete" });
+    }
+  });
+
   // Assessment routes
   app.post('/api/assessment', isAuthenticated, async (req: any, res) => {
     try {
