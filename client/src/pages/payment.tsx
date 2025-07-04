@@ -109,25 +109,34 @@ function CheckoutForm({ clientSecret, subscriptionId }: { clientSecret: string, 
           }
         }
 
-        // Force comprehensive cache refresh and wait for completion
+        // Comprehensive cache clearing with error handling
         console.log("Starting cache invalidation after payment success...");
         
-        await Promise.all([
-          queryClient.invalidateQueries({ queryKey: ["/api/user-onboarding-status"] }),
-          queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] }),
-          queryClient.invalidateQueries({ queryKey: ["/api/subscription-status"] }),
-          queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] }),
-          queryClient.invalidateQueries({ queryKey: ["/api/user-progress"] })
-        ]);
+        try {
+          // Clear all cached data first
+          queryClient.clear();
+          
+          // Then specifically invalidate key queries
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ["/api/user-onboarding-status"] }),
+            queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] }),
+            queryClient.invalidateQueries({ queryKey: ["/api/subscription-status"] }),
+            queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] }),
+            queryClient.invalidateQueries({ queryKey: ["/api/user-progress"] })
+          ]);
 
-        // Wait for refetch to complete before redirecting
-        console.log("Refetching critical user data...");
-        await Promise.all([
-          queryClient.refetchQueries({ queryKey: ["/api/user-onboarding-status"] }),
-          queryClient.refetchQueries({ queryKey: ["/api/auth/user"] })
-        ]);
+          // Force fresh fetch of critical data
+          console.log("Refetching critical user data...");
+          await Promise.all([
+            queryClient.fetchQuery({ queryKey: ["/api/user-onboarding-status"] }),
+            queryClient.fetchQuery({ queryKey: ["/api/auth/user"] })
+          ]);
 
-        console.log("All caches invalidated and refetched after payment completion");
+          console.log("Cache invalidation and refetch completed successfully");
+        } catch (cacheError) {
+          console.error("Cache invalidation failed, but payment was successful:", cacheError);
+          // Don't block redirect if cache operations fail
+        }
 
         toast({
           title: "Payment Successful!",

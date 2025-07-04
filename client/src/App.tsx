@@ -63,7 +63,7 @@ function Router() {
     );
   }
 
-  // Check if user needs to complete assessment
+  // Extract user status data with better defaults
   const assessmentCompleted = (userStatus as any)?.assessmentCompleted || false;
   const subscriptionStatus = (userStatus as any)?.subscriptionStatus || 'none';
   
@@ -71,14 +71,17 @@ function Router() {
   const isOnPaymentFlow = window.location.pathname.includes('/payment') || 
                          window.location.pathname.includes('/subscription-success');
   
-  // Check if user has active subscription (should bypass assessment requirement)
+  // Check if user has active subscription or accepted free trial
   const hasActiveSubscription = ['active', 'trialing', 'past_due'].includes(subscriptionStatus);
+  const hasFreeAccess = subscriptionStatus === 'free_trial';
+  const hasAnyAccess = hasActiveSubscription || hasFreeAccess;
   
-  // Only force assessment if:
-  // 1. Assessment is NOT completed 
-  // 2. User is NOT on payment flow pages
-  // 3. User does NOT have an active subscription
-  const shouldShowAssessment = !assessmentCompleted && !isOnPaymentFlow && !hasActiveSubscription;
+  // Determine if user should be forced to assessment
+  // Force assessment only if:
+  // 1. Assessment is NOT completed AND
+  // 2. User is NOT on payment flow pages AND  
+  // 3. User does NOT have any access (subscription or free trial)
+  const shouldShowAssessment = !assessmentCompleted && !isOnPaymentFlow && !hasAnyAccess;
   
   if (shouldShowAssessment) {
     return (

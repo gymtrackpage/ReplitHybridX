@@ -130,26 +130,38 @@ export default function Assessment() {
     onSuccess: async (data) => {
       console.log("Assessment completed successfully:", data);
       
-      // Clear any cached user status data
-      queryClient.removeQueries({ queryKey: ["/api/user-onboarding-status"] });
-      queryClient.removeQueries({ queryKey: ["/api/auth/user"] });
-      
-      // Force fresh data fetch
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["/api/user-onboarding-status"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/subscription-status"] })
-      ]);
+      try {
+        // Clear all query cache to ensure fresh data
+        queryClient.clear();
+        
+        // Force fresh data fetch for critical queries
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["/api/user-onboarding-status"] }),
+          queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] }),
+          queryClient.invalidateQueries({ queryKey: ["/api/subscription-status"] }),
+          queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] })
+        ]);
+
+        // Verify the assessment completion was properly saved
+        const updatedStatus = await queryClient.fetchQuery({ 
+          queryKey: ["/api/user-onboarding-status"] 
+        });
+        
+        console.log("Post-assessment user status:", updatedStatus);
+        
+      } catch (error) {
+        console.error("Error updating caches after assessment:", error);
+      }
       
       toast({
         title: "Assessment Complete!",
         description: "Welcome to HybridX! You can upgrade to Premium anytime for full access.",
       });
       
-      // Longer delay to ensure all state updates propagate
+      // Redirect to dashboard after state updates
       setTimeout(() => {
         setLocation("/dashboard");
-      }, 1000);
+      }, 1500);
     },
     onError: (error: any) => {
       console.error("Assessment completion error:", error);

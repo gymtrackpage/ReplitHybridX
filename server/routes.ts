@@ -2143,47 +2143,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Verify payment intent or setup intent is successful
       let intentSucceeded = false;
+      let intentDetails = null;
       
-      if (paymentIntentId.startsWith('pi_')) {
-        // Payment intent
-        const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-        intentSucceeded = paymentIntent.status === 'succeeded';
-      } else if (paymentIntentId.startsWith('seti_')) {
-        // Setup intent
-        const setupIntent = await stripe.setupIntents.retrieve(paymentIntentId);
-        intentSucceeded = setupIntent.status === 'succeeded';
+      try {
+        if (paymentIntentId.startsWith('pi_')) {
+          // Payment intent
+          const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+          intentSucceeded = paymentIntent.status === 'succeeded';
+          intentDetails = { type: 'payment_intent', status: paymentIntent.status };
+        } else if (paymentIntentId.startsWith('seti_')) {
+          // Setup intent
+          const setupIntent = await stripe.setupIntents.retrieve(paymentIntentId);
+          intentSucceeded = setupIntent.status === 'succeeded';
+          intentDetails = { type: 'setup_intent', status: setupIntent.status };
+        }
+      } catch (stripeError) {
+        console.error("Error verifying payment intent:", stripeError);
+        return res.status(400).json({ message: "Unable to verify payment status" });
       }
       
       if (!intentSucceeded) {
+        console.error("Payment intent not successful:", intentDetails);
         return res.status(400).json({ message: "Payment/Setup not confirmed" });
       }
 
       // Get subscription details from Stripe
       const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+      console.log("Stripe subscription retrieved:", {
+        id: subscription.id,
+        status: subscription.status,
+        customer: subscription.customer
+      });
       
       // Update user subscription status, assessment completion, and Stripe info
-      await storage.updateUserProfile(userId, {
+      const updateResult = await storage.updateUserProfile(userId, {
         subscriptionStatus: "active",
         assessmentCompleted: true,  // Ensure assessment is marked as completed
         updatedAt: new Date()
       });
       
+      console.log("User profile updated:", updateResult ? "success" : "failed");
+      
       // Update Stripe subscription info in user record
       await storage.updateUserStripeInfo(userId, subscription.customer as string, subscriptionId);
 
-      // Additional verification - ensure assessment is really marked complete
+      // Verification - ensure updates were applied
       const updatedUser = await storage.getUser(userId);
-      console.log("Post-payment user status:", {
+      console.log("Post-payment verification:", {
         userId,
         assessmentCompleted: updatedUser?.assessmentCompleted,
-        subscriptionStatus: updatedUser?.subscriptionStatus
+        subscriptionStatus: updatedUser?.subscriptionStatus,
+        stripeSubscriptionId: updatedUser?.stripeSubscriptionId
       });
+
+      if (!updatedUser?.assessmentCompleted) {
+        console.error("Assessment completion flag not set properly for user:", userId);
+      }
 
       console.log("Subscription confirmed and assessment marked complete for user:", userId);
       
       res.json({
         success: true,
-        message: "Subscription confirmed successfully"
+        message: "Subscription confirmed successfully",
+        userStatus: {
+          assessmentCompleted: updatedUser?.assessmentCompleted,
+          subscriptionStatus: updatedUser?.subscriptionStatus
+        }
       });
     } catch (error: any) {
       console.error("Subscription confirmation error:", error);
