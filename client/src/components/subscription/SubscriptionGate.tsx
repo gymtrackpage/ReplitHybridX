@@ -21,6 +21,8 @@ export function SubscriptionGate({
   const { hasAccess, isLoading, isAdmin } = usePremiumAccess();
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
 
+  console.log("SubscriptionGate render:", { hasAccess, isLoading, isAdmin, feature });
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -30,8 +32,11 @@ export function SubscriptionGate({
   }
 
   if (hasAccess) {
+    console.log("Access granted for feature:", feature);
     return <>{children}</>;
   }
+
+  console.log("Access denied for feature:", feature);
 
   return (
     <div className="space-y-6">

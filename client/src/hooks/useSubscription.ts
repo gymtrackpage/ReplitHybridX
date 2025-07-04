@@ -158,8 +158,22 @@ export function usePremiumAccess() {
   // Admins bypass subscription requirements
   const isAdmin = (user as any)?.isAdmin || false;
 
+  // Check if user has active subscription from multiple sources
+  const hasActiveSubscription = subscriptionStatus?.isSubscribed || 
+                               subscriptionStatus?.subscriptionStatus === 'active' ||
+                               (user as any)?.subscriptionStatus === 'active';
+
+  console.log("Premium access check:", {
+    isAdmin,
+    subscriptionIsSubscribed: subscriptionStatus?.isSubscribed,
+    subscriptionStatus: subscriptionStatus?.subscriptionStatus,
+    userSubscriptionStatus: (user as any)?.subscriptionStatus,
+    hasActiveSubscription,
+    finalAccess: isAdmin || hasActiveSubscription
+  });
+
   return {
-    hasAccess: isAdmin || subscriptionStatus?.isSubscribed || false,
+    hasAccess: isAdmin || hasActiveSubscription || false,
     isLoading,
     subscriptionStatus: subscriptionStatus?.subscriptionStatus,
     isAdmin,

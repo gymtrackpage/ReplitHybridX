@@ -2170,6 +2170,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
 
+      console.log("Checking subscription status for user:", userId, {
+        subscriptionStatus: user.subscriptionStatus,
+        stripeSubscriptionId: user.stripeSubscriptionId,
+        stripeCustomerId: user.stripeCustomerId
+      });
+
       let subscriptionStatus = {
         isSubscribed: false,
         subscriptionStatus: 'inactive' as const,
@@ -2180,13 +2186,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         trialEnd: null,
       };
 
+      // First check database subscription status
+      if (user.subscriptionStatus === 'active') {
+        subscriptionStatus.isSubscribed = true;
+        subscriptionStatus.subscriptionStatus = 'active';
+        console.log("User has active subscription status in database");
+      }
+
       // Check Stripe subscription status if user has a subscription ID
       if (user.stripeSubscriptionId && stripe) {
         try {
           const subscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
+          console.log("Stripe subscription retrieved:", {
+            id: subscription.id,
+            status: subscription.status,
+            customerId: subscription.customer
+          });
 
           subscriptionStatus = {
-            isSubscribed: subscription.status === 'active',
+            isSubscribed: subscription.status === 'active' || subscription.status === 'trialing',
             subscriptionStatus: subscription.status,
             subscriptionId: subscription.id,
             customerId: subscription.customer as string,
@@ -2194,16 +2212,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
             cancelAtPeriodEnd: subscription.cancel_at_period_end,
             trialEnd: subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null,
           };
+
+          // Update local database if Stripe status differs
+          if (subscription.status !== user.subscriptionStatus) {
+            console.log(`Updating user subscription status from ${user.subscriptionStatus} to ${subscription.status}`);
+            await storage.updateUserProfile(userId, {
+              subscriptionStatus: subscription.status,
+              updatedAt: new Date()
+            });
+          }
         } catch (stripeError: any) {
           console.error("Error fetching subscription from Stripe:", stripeError.message);
-          // If subscription or customer not found in Stripe, clear the references
+          // If subscription or customer not found in Stripe, but user has active status in DB, keep active
           if (stripeError.code === 'resource_missing') {
-            console.log("Clearing invalid Stripe references for user:", userId);
-            await storage.updateUserStripeInfo(userId, "", "");
+            if (user.subscriptionStatus === 'active') {
+              console.log("Stripe subscription not found but user marked as active - keeping active status");
+              subscriptionStatus.isSubscribed = true;
+              subscriptionStatus.subscriptionStatus = 'active';
+            } else {
+              console.log("Clearing invalid Stripe references for user:", userId);
+              await storage.updateUserStripeInfo(userId, "", "");
+            }
           }
         }
+      } else if (user.subscriptionStatus === 'active') {
+        // User marked as active but no Stripe subscription ID - trust database
+        console.log("User marked as active without Stripe subscription ID");
+        subscriptionStatus.isSubscribed = true;
+        subscriptionStatus.subscriptionStatus = 'active';
       }
 
+      console.log("Final subscription status:", subscriptionStatus);
       res.json(subscriptionStatus);
     } catch (error: any) {
       console.error("Subscription status error:", error);
@@ -4037,6 +4076,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       delete (req.session as any).referralCode;
     }
     res.json({ message: "Referral code cleared from session" });
+  });
+
+  // Verify user subscription status
+  app.get("/api/verify-subscription", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+
+      const verificationResult = {
+        userId,
+        userExists: !!user,
+        userSubscriptionStatus: user?.subscriptionStatus,
+        stripeCustomerId: user?.stripeCustomerId,
+        stripeSubscriptionId: user?.stripeSubscriptionId,
+        assessmentCompleted: user?.assessmentCompleted,
+        isAdmin: user?.isAdmin,
+        createdAt: user?.createdAt,
+        updatedAt: user?.updatedAt
+      };
+
+      console.log("User subscription verification:", verificationResult);
+      res.json(verificationResult);
+    } catch (error) {
+      console.error("Error verifying subscription:", error);
+      res.status(500).json({ message: "Failed to verify subscription" });
+    }
   });
 
   // Verify assessment completion and data consistency
