@@ -8,6 +8,8 @@ import {
   weightEntries,
   referrals,
   subscriptions,
+  promoCodes,
+  promoCodeUses,
   type User,
   type UpsertUser,
   type Program,
@@ -26,6 +28,10 @@ import {
   type InsertReferral,
   type Subscription,
   type InsertSubscription,
+  type PromoCode,
+  type InsertPromoCode,
+  type PromoCodeUse,
+  type InsertPromoCodeUse,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, gte, lte, sql, isNotNull } from "drizzle-orm";
@@ -93,6 +99,18 @@ export interface IStorage {
   updateSubscription(id: number, updates: Partial<InsertSubscription>): Promise<Subscription>;
   addFreeMonthToSubscription(subscriptionId: number): Promise<Subscription>;
   updateSubscriptionMonthsPaid(userId: string, monthsPaid: number): Promise<Subscription>;
+
+  // Promo code operations
+  getPromoCodeByCode(code: string): Promise<PromoCode | undefined>;
+  createPromoCode(promoCode: InsertPromoCode): Promise<PromoCode>;
+  updatePromoCode(id: number, updates: Partial<InsertPromoCode>): Promise<PromoCode>;
+  deletePromoCode(id: number): Promise<void>;
+  getAllPromoCodes(): Promise<PromoCode[]>;
+  incrementPromoCodeUse(promoCodeId: number): Promise<PromoCode>;
+  createPromoCodeUse(use: InsertPromoCodeUse): Promise<PromoCodeUse>;
+  getPromoCodeUses(promoCodeId: number): Promise<PromoCodeUse[]>;
+  hasUserUsedPromoCode(userId: string, promoCodeId: number): Promise<boolean>;
+  grantPromoFreeMonths(userId: string, months: number, expiresAt?: Date): Promise<User>;
 
   // Admin operations
   getAllUsers(): Promise<User[]>;
@@ -852,6 +870,109 @@ export class DatabaseStorage implements IStorage {
       .where(eq(subscriptions.userId, userId))
       .returning();
     return subscription;
+  }
+
+  // Promo code operations
+  async getPromoCodeByCode(code: string): Promise<PromoCode | undefined> {
+    const [promoCode] = await db
+      .select()
+      .from(promoCodes)
+      .where(eq(promoCodes.code, code.toUpperCase()));
+    return promoCode;
+  }
+
+  async createPromoCode(promoCode: InsertPromoCode): Promise<PromoCode> {
+    const [newPromoCode] = await db
+      .insert(promoCodes)
+      .values({
+        ...promoCode,
+        code: promoCode.code.toUpperCase(),
+      })
+      .returning();
+    return newPromoCode;
+  }
+
+  async updatePromoCode(id: number, updates: Partial<InsertPromoCode>): Promise<PromoCode> {
+    const updateData = { ...updates, updatedAt: new Date() };
+    if (updateData.code) {
+      updateData.code = updateData.code.toUpperCase();
+    }
+    
+    const [promoCode] = await db
+      .update(promoCodes)
+      .set(updateData)
+      .where(eq(promoCodes.id, id))
+      .returning();
+    return promoCode;
+  }
+
+  async deletePromoCode(id: number): Promise<void> {
+    // Delete usage records first
+    await db.delete(promoCodeUses).where(eq(promoCodeUses.promoCodeId, id));
+    // Then delete the promo code
+    await db.delete(promoCodes).where(eq(promoCodes.id, id));
+  }
+
+  async getAllPromoCodes(): Promise<PromoCode[]> {
+    return await db
+      .select()
+      .from(promoCodes)
+      .orderBy(desc(promoCodes.createdAt));
+  }
+
+  async incrementPromoCodeUse(promoCodeId: number): Promise<PromoCode> {
+    const [promoCode] = await db
+      .update(promoCodes)
+      .set({ 
+        usesCount: sql`${promoCodes.usesCount} + 1`,
+        updatedAt: new Date()
+      })
+      .where(eq(promoCodes.id, promoCodeId))
+      .returning();
+    return promoCode;
+  }
+
+  async createPromoCodeUse(use: InsertPromoCodeUse): Promise<PromoCodeUse> {
+    const [newUse] = await db
+      .insert(promoCodeUses)
+      .values(use)
+      .returning();
+    return newUse;
+  }
+
+  async getPromoCodeUses(promoCodeId: number): Promise<PromoCodeUse[]> {
+    return await db
+      .select()
+      .from(promoCodeUses)
+      .where(eq(promoCodeUses.promoCodeId, promoCodeId))
+      .orderBy(desc(promoCodeUses.usedAt));
+  }
+
+  async hasUserUsedPromoCode(userId: string, promoCodeId: number): Promise<boolean> {
+    const [use] = await db
+      .select()
+      .from(promoCodeUses)
+      .where(
+        and(
+          eq(promoCodeUses.userId, userId),
+          eq(promoCodeUses.promoCodeId, promoCodeId)
+        )
+      );
+    return !!use;
+  }
+
+  async grantPromoFreeMonths(userId: string, months: number, expiresAt?: Date): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({
+        promoFreeMonthsRemaining: months,
+        promoExpires: expiresAt,
+        subscriptionStatus: "active", // Grant premium access
+        updatedAt: new Date()
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    return user;
   }
 }
 

@@ -53,6 +53,8 @@ export const users = pgTable("users", {
   referralCode: varchar("referral_code").unique(),
   referredBy: varchar("referred_by"), // referral code of the person who referred this user
   freeMonthsEarned: integer("free_months_earned").default(0),
+  promoFreeMonthsRemaining: integer("promo_free_months_remaining").default(0),
+  promoExpires: timestamp("promo_expires"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -164,6 +166,31 @@ export const subscriptions = pgTable("subscriptions", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Promo codes table
+export const promoCodes = pgTable("promo_codes", {
+  id: serial("id").primaryKey(),
+  code: varchar("code").unique().notNull(),
+  name: varchar("name").notNull(), // Display name for admin
+  description: text("description"),
+  freeMonths: integer("free_months").notNull(), // Number of free months to grant
+  maxUses: integer("max_uses"), // null = unlimited
+  usesCount: integer("uses_count").default(0),
+  isActive: boolean("is_active").default(true),
+  expiresAt: timestamp("expires_at"), // null = no expiration
+  createdBy: varchar("created_by").notNull(), // Admin user ID who created it
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Promo code usage tracking
+export const promoCodeUses = pgTable("promo_code_uses", {
+  id: serial("id").primaryKey(),
+  promoCodeId: integer("promo_code_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  freeMonthsGranted: integer("free_months_granted").notNull(),
+  usedAt: timestamp("used_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ one, many }) => ({
   currentProgram: one(programs, {
@@ -247,6 +274,25 @@ export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
   }),
 }));
 
+export const promoCodesRelations = relations(promoCodes, ({ one, many }) => ({
+  createdByUser: one(users, {
+    fields: [promoCodes.createdBy],
+    references: [users.id],
+  }),
+  uses: many(promoCodeUses),
+}));
+
+export const promoCodeUsesRelations = relations(promoCodeUses, ({ one }) => ({
+  promoCode: one(promoCodes, {
+    fields: [promoCodeUses.promoCodeId],
+    references: [promoCodes.id],
+  }),
+  user: one(users, {
+    fields: [promoCodeUses.userId],
+    references: [users.id],
+  }),
+}));
+
 // Zod schemas
 export const insertUserSchema = createInsertSchema(users);
 export const insertProgramSchema = createInsertSchema(programs);
@@ -257,6 +303,8 @@ export const insertAssessmentSchema = createInsertSchema(assessments);
 export const insertWeightEntrySchema = createInsertSchema(weightEntries);
 export const insertReferralSchema = createInsertSchema(referrals);
 export const insertSubscriptionSchema = createInsertSchema(subscriptions);
+export const insertPromoCodeSchema = createInsertSchema(promoCodes);
+export const insertPromoCodeUseSchema = createInsertSchema(promoCodeUses);
 
 // Types
 export type UpsertUser = typeof users.$inferInsert;
@@ -277,6 +325,10 @@ export type Subscription = typeof subscriptions.$inferSelect;
 export type InsertSubscription = z.infer<typeof insertSubscriptionSchema>;
 export type Referral = typeof referrals.$inferSelect;
 export type InsertReferral = z.infer<typeof insertReferralSchema>;
+export type PromoCode = typeof promoCodes.$inferSelect;
+export type InsertPromoCode = z.infer<typeof insertPromoCodeSchema>;
+export type PromoCodeUse = typeof promoCodeUses.$inferSelect;
+export type InsertPromoCodeUse = z.infer<typeof insertPromoCodeUseSchema>;
 
 // Additional interface for API responses
 export interface ApiResponse<T = any> {

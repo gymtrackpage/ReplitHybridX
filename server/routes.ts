@@ -4104,6 +4104,211 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============= PROMO CODE SYSTEM ROUTES =============
+
+  // Validate promo code
+  app.post("/api/promo-codes/validate", isAuthenticated, async (req: any, res) => {
+    try {
+      const { code } = req.body;
+      const userId = req.user.claims.sub;
+
+      if (!code) {
+        return res.status(400).json({ message: "Promo code is required" });
+      }
+
+      const promoCode = await storage.getPromoCodeByCode(code);
+      
+      if (!promoCode) {
+        return res.status(404).json({ message: "Invalid promo code" });
+      }
+
+      if (!promoCode.isActive) {
+        return res.status(400).json({ message: "This promo code is no longer active" });
+      }
+
+      if (promoCode.expiresAt && new Date() > new Date(promoCode.expiresAt)) {
+        return res.status(400).json({ message: "This promo code has expired" });
+      }
+
+      if (promoCode.maxUses && promoCode.usesCount >= promoCode.maxUses) {
+        return res.status(400).json({ message: "This promo code has reached its usage limit" });
+      }
+
+      // Check if user has already used this promo code
+      const hasUsed = await storage.hasUserUsedPromoCode(userId, promoCode.id);
+      if (hasUsed) {
+        return res.status(400).json({ message: "You have already used this promo code" });
+      }
+
+      res.json({
+        valid: true,
+        promoCode: {
+          id: promoCode.id,
+          code: promoCode.code,
+          name: promoCode.name,
+          description: promoCode.description,
+          freeMonths: promoCode.freeMonths,
+        }
+      });
+    } catch (error) {
+      console.error("Error validating promo code:", error);
+      res.status(500).json({ message: "Failed to validate promo code" });
+    }
+  });
+
+  // Apply promo code
+  app.post("/api/promo-codes/apply", isAuthenticated, async (req: any, res) => {
+    try {
+      const { code } = req.body;
+      const userId = req.user.claims.sub;
+
+      if (!code) {
+        return res.status(400).json({ message: "Promo code is required" });
+      }
+
+      const promoCode = await storage.getPromoCodeByCode(code);
+      
+      if (!promoCode || !promoCode.isActive) {
+        return res.status(404).json({ message: "Invalid or inactive promo code" });
+      }
+
+      if (promoCode.expiresAt && new Date() > new Date(promoCode.expiresAt)) {
+        return res.status(400).json({ message: "This promo code has expired" });
+      }
+
+      if (promoCode.maxUses && promoCode.usesCount >= promoCode.maxUses) {
+        return res.status(400).json({ message: "This promo code has reached its usage limit" });
+      }
+
+      // Check if user has already used this promo code
+      const hasUsed = await storage.hasUserUsedPromoCode(userId, promoCode.id);
+      if (hasUsed) {
+        return res.status(400).json({ message: "You have already used this promo code" });
+      }
+
+      // Calculate expiration (promo months don't expire unless specified)
+      const expiresAt = promoCode.expiresAt ? new Date(promoCode.expiresAt) : undefined;
+
+      // Grant free months to user
+      await storage.grantPromoFreeMonths(userId, promoCode.freeMonths, expiresAt);
+
+      // Record the usage
+      await storage.createPromoCodeUse({
+        promoCodeId: promoCode.id,
+        userId,
+        freeMonthsGranted: promoCode.freeMonths,
+      });
+
+      // Increment usage count
+      await storage.incrementPromoCodeUse(promoCode.id);
+
+      res.json({
+        success: true,
+        message: `Successfully applied promo code! You now have ${promoCode.freeMonths} free months of premium access.`,
+        freeMonthsGranted: promoCode.freeMonths,
+      });
+    } catch (error) {
+      console.error("Error applying promo code:", error);
+      res.status(500).json({ message: "Failed to apply promo code" });
+    }
+  });
+
+  // Admin: Get all promo codes
+  app.get("/api/admin/promo-codes", isAuthenticated, requireAdmin, async (req: any, res) => {
+    try {
+      const promoCodes = await storage.getAllPromoCodes();
+      
+      // Get usage details for each promo code
+      const promoCodesWithUsage = await Promise.all(
+        promoCodes.map(async (promoCode) => {
+          const uses = await storage.getPromoCodeUses(promoCode.id);
+          return {
+            ...promoCode,
+            uses,
+            usageDetails: uses.map(use => ({
+              userId: use.userId,
+              usedAt: use.usedAt,
+              freeMonthsGranted: use.freeMonthsGranted,
+            }))
+          };
+        })
+      );
+
+      res.json(promoCodesWithUsage);
+    } catch (error) {
+      console.error("Error fetching promo codes:", error);
+      res.status(500).json({ message: "Failed to fetch promo codes" });
+    }
+  });
+
+  // Admin: Create promo code
+  app.post("/api/admin/promo-codes", isAuthenticated, requireAdmin, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { code, name, description, freeMonths, maxUses, expiresAt } = req.body;
+
+      if (!code || !name || !freeMonths) {
+        return res.status(400).json({ message: "Code, name, and free months are required" });
+      }
+
+      // Check if code already exists
+      const existingCode = await storage.getPromoCodeByCode(code);
+      if (existingCode) {
+        return res.status(400).json({ message: "Promo code already exists" });
+      }
+
+      const promoCode = await storage.createPromoCode({
+        code: code.toUpperCase(),
+        name,
+        description,
+        freeMonths: parseInt(freeMonths),
+        maxUses: maxUses ? parseInt(maxUses) : null,
+        expiresAt: expiresAt ? new Date(expiresAt) : null,
+        createdBy: userId,
+      });
+
+      res.json(promoCode);
+    } catch (error) {
+      console.error("Error creating promo code:", error);
+      res.status(500).json({ message: "Failed to create promo code" });
+    }
+  });
+
+  // Admin: Update promo code
+  app.put("/api/admin/promo-codes/:id", isAuthenticated, requireAdmin, async (req: any, res) => {
+    try {
+      const promoCodeId = parseInt(req.params.id);
+      const { code, name, description, freeMonths, maxUses, expiresAt, isActive } = req.body;
+
+      const updateData: any = {};
+      if (code !== undefined) updateData.code = code;
+      if (name !== undefined) updateData.name = name;
+      if (description !== undefined) updateData.description = description;
+      if (freeMonths !== undefined) updateData.freeMonths = parseInt(freeMonths);
+      if (maxUses !== undefined) updateData.maxUses = maxUses ? parseInt(maxUses) : null;
+      if (expiresAt !== undefined) updateData.expiresAt = expiresAt ? new Date(expiresAt) : null;
+      if (isActive !== undefined) updateData.isActive = isActive;
+
+      const promoCode = await storage.updatePromoCode(promoCodeId, updateData);
+      res.json(promoCode);
+    } catch (error) {
+      console.error("Error updating promo code:", error);
+      res.status(500).json({ message: "Failed to update promo code" });
+    }
+  });
+
+  // Admin: Delete promo code
+  app.delete("/api/admin/promo-codes/:id", isAuthenticated, requireAdmin, async (req: any, res) => {
+    try {
+      const promoCodeId = parseInt(req.params.id);
+      await storage.deletePromoCode(promoCodeId);
+      res.json({ message: "Promo code deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting promo code:", error);
+      res.status(500).json({ message: "Failed to delete promo code" });
+    }
+  });
+
   // Verify assessment completion and data consistency
   app.get("/api/verify-assessment", isAuthenticated, async (req: any, res) => {
     try {

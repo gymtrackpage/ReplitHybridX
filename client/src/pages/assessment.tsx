@@ -89,6 +89,14 @@ export default function Assessment() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { hasAccess, isAdmin } = usePremiumAccess();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCreatingSubscription, setIsCreatingSubscription] = useState(false);
+  const [subscriptionChoice, setSubscriptionChoice] = useState<string | null>(null);
+  const [showPromoCode, setShowPromoCode] = useState(false);
+  const [promoCode, setPromoCode] = useState("");
+  const [promoValidation, setPromoValidation] = useState<any>(null);
+  const [isValidatingPromo, setIsValidatingPromo] = useState(false);
+  const [isApplyingPromo, setIsApplyingPromo] = useState(false);
 
   const getRecommendationMutation = useMutation({
     mutationFn: async (data: AssessmentData) => {
@@ -129,11 +137,11 @@ export default function Assessment() {
     },
     onSuccess: async (data) => {
       console.log("Assessment completed successfully:", data);
-      
+
       try {
         // Clear all cached data to ensure fresh state
         queryClient.clear();
-        
+
         // Invalidate specific queries with comprehensive error handling
         const invalidationQueries = [
           "/api/user-onboarding-status",
@@ -172,29 +180,29 @@ export default function Assessment() {
         } catch (fetchError) {
           console.warn("Failed to refetch critical data, but continuing:", fetchError);
         }
-        
+
       } catch (error) {
         console.error("Error updating caches after assessment:", error);
         // Continue with redirect even if cache operations fail
       }
-      
+
       toast({
         title: "Assessment Complete!",
         description: "Welcome to HybridX! You can upgrade to Premium anytime for full access.",
       });
-      
+
       // Verify assessment completion before redirecting
       const verifyAndRedirect = async () => {
         try {
           console.log("Verifying assessment completion status...");
-          
+
           // Wait a moment for database operations to complete
           await new Promise(resolve => setTimeout(resolve, 1000));
-          
+
           // Fetch fresh user status to verify completion
           const verificationResponse = await apiRequest("GET", "/api/user-onboarding-status");
           console.log("Verification response:", verificationResponse);
-          
+
           if (verificationResponse.assessmentCompleted) {
             console.log("✅ Assessment completion verified - redirecting to dashboard");
             window.location.href = "/dashboard";
@@ -222,7 +230,7 @@ export default function Assessment() {
           window.location.href = "/dashboard";
         }
       };
-      
+
       // Start verification process
       verifyAndRedirect();
     },
@@ -316,6 +324,63 @@ export default function Assessment() {
     }
   };
 
+  const validatePromoCode = async () => {
+    if (!promoCode.trim()) return;
+
+    setIsValidatingPromo(true);
+    setPromoValidation(null);
+
+    try {
+      const response = await apiRequest("POST", "/api/promo-codes/validate", {
+        code: promoCode.trim()
+      });
+
+      setPromoValidation({
+        valid: true,
+        promoCode: response.promoCode
+      });
+    } catch (error: any) {
+      setPromoValidation({
+        valid: false,
+        message: error.message || "Invalid promo code"
+      });
+    } finally {
+      setIsValidatingPromo(false);
+    }
+  };
+
+  const applyPromoCode = async () => {
+    if (!promoValidation?.valid) return;
+
+    setIsApplyingPromo(true);
+
+    try {
+      await apiRequest("POST", "/api/promo-codes/apply", {
+        code: promoCode.trim()
+      });
+
+      toast({
+        title: "Promo Code Applied!",
+        description: `You now have ${promoValidation.promoCode.freeMonths} free months of premium access.`
+      });
+
+      // Complete assessment with promo access
+      await completeAssessmentMutation({
+        assessmentData,
+        programId: recommendation!.recommendedProgram.id,
+        subscriptionChoice: "promo"
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to apply promo code",
+        variant: "destructive"
+      });
+    } finally {
+      setIsApplyingPromo(false);
+    }
+  };
+
   const handleSubscribe = () => {
     console.log("Subscribe button clicked");
     console.log("Current state:", {
@@ -340,7 +405,7 @@ export default function Assessment() {
       programId: recommendation.recommendedProgram.id,
       subscriptionChoice: "premium"
     };
-    
+
     localStorage.setItem('pendingAssessment', JSON.stringify(pendingAssessmentData));
     console.log("Stored pending assessment data:", pendingAssessmentData);
 
@@ -693,6 +758,73 @@ export default function Assessment() {
                   >
                     {completeAssessmentMutation.isPending ? "Setting up..." : "Continue with Limited Access"}
                   </Button>
+
+                  {/* Hidden Promo Code Section */}
+                  <div className="mt-6 pt-4 border-t border-gray-200">
+                    <div className="text-center">
+                      <button
+                        type="button"
+                        onClick={() => setShowPromoCode(!showPromoCode)}
+                        className="text-xs text-gray-500 hover:text-gray-700 underline"
+                      >
+                        Have a promo code?
+                      </button>
+                    </div>
+
+                    {showPromoCode && (
+                      <div className="mt-3 space-y-3">
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="Enter promo code"
+                            value={promoCode}
+                            onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                            className="text-center uppercase"
+                            maxLength={20}
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={validatePromoCode}
+                            disabled={!promoCode || isValidatingPromo}
+                          >
+                            {isValidatingPromo ? "..." : "Check"}
+                          </Button>
+                        </div>
+
+                        {promoValidation && (
+                          <div className={`text-sm p-3 rounded-lg ${
+                            promoValidation.valid 
+                              ? "bg-green-50 text-green-700 border border-green-200" 
+                              : "bg-red-50 text-red-700 border border-red-200"
+                          }`}>
+                            {promoValidation.valid ? (
+                              <div>
+                                <p className="font-medium">✓ Valid Promo Code!</p>
+                                <p className="text-xs mt-1">
+                                  {promoValidation.promoCode?.name} - {promoValidation.promoCode?.freeMonths} free months
+                                </p>
+                                {promoValidation.promoCode?.description && (
+                                  <p className="text-xs mt-1">{promoValidation.promoCode.description}</p>
+                                )}
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  className="mt-2 w-full bg-green-600 hover:bg-green-700"
+                                  onClick={applyPromoCode}
+                                  disabled={isApplyingPromo}
+                                >
+                                  {isApplyingPromo ? "Applying..." : `Activate ${promoValidation.promoCode?.freeMonths} Free Months`}
+                                </Button>
+                              </div>
+                            ) : (
+                              <p>{promoValidation.message}</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -779,7 +911,7 @@ export default function Assessment() {
             )}
 
             <Button 
-              onClick={nextStep}
+                            onClick={nextStep}
               disabled={!canProceed() || getRecommendationMutation.isPending}
               className="flex-1"
             >

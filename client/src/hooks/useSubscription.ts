@@ -163,19 +163,27 @@ export function usePremiumAccess() {
                                subscriptionStatus?.subscriptionStatus === 'active' ||
                                (user as any)?.subscriptionStatus === 'active';
 
+  // Check if user has promo free months remaining
+  const hasPromoAccess = (user as any)?.promoFreeMonthsRemaining > 0 && 
+                         (!((user as any)?.promoExpires) || new Date((user as any)?.promoExpires) > new Date());
+
   console.log("Premium access check:", {
     isAdmin,
     subscriptionIsSubscribed: subscriptionStatus?.isSubscribed,
     subscriptionStatus: subscriptionStatus?.subscriptionStatus,
     userSubscriptionStatus: (user as any)?.subscriptionStatus,
     hasActiveSubscription,
-    finalAccess: isAdmin || hasActiveSubscription
+    hasPromoAccess,
+    promoFreeMonths: (user as any)?.promoFreeMonthsRemaining,
+    promoExpires: (user as any)?.promoExpires,
+    finalAccess: isAdmin || hasActiveSubscription || hasPromoAccess
   });
 
   return {
-    hasAccess: isAdmin || hasActiveSubscription || false,
+    hasAccess: isAdmin || hasActiveSubscription || hasPromoAccess || false,
     isLoading,
     subscriptionStatus: subscriptionStatus?.subscriptionStatus,
     isAdmin,
+    hasPromoAccess,
   };
 }

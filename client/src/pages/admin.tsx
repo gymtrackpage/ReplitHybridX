@@ -40,6 +40,16 @@ export default function Admin() {
   const [editingWorkout, setEditingWorkout] = useState<Workout | null>(null);
   const [editWorkoutOpen, setEditWorkoutOpen] = useState(false);
   const [programWorkouts, setProgramWorkouts] = useState<{[key: number]: Workout[]}>({});
+  const [createPromoOpen, setCreatePromoOpen] = useState(false);
+  const [editingPromoCode, setEditingPromoCode] = useState<any>(null);
+  const [promoForm, setPromoForm] = useState({
+    code: "",
+    name: "",
+    description: "",
+    freeMonths: 1,
+    maxUses: "",
+    expiresAt: "",
+  });
   const [uploadForm, setUploadForm] = useState({
     name: "",
     description: "",
@@ -67,6 +77,11 @@ export default function Admin() {
 
   const { data: systemStats = {} } = useQuery({
     queryKey: ["/api/admin/stats"],
+  });
+
+  const { data: promoCodes = [], isLoading: promoCodesLoading } = useQuery({
+    queryKey: ["/api/admin/promo-codes"],
+    enabled: activeTab === "promo-codes",
   });
 
   // Mutations
@@ -207,6 +222,76 @@ export default function Admin() {
     }
   });
 
+  const createPromoCodeMutation = useMutation({
+    mutationFn: async (promoData: any) => {
+      return apiRequest("POST", "/api/admin/promo-codes", promoData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/promo-codes"] });
+      setCreatePromoOpen(false);
+      setPromoForm({
+        code: "",
+        name: "",
+        description: "",
+        freeMonths: 1,
+        maxUses: "",
+        expiresAt: "",
+      });
+      toast({
+        title: "Success",
+        description: "Promo code created successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create promo code",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const updatePromoCodeMutation = useMutation({
+    mutationFn: async ({ id, ...promoData }: any) => {
+      return apiRequest("PUT", `/api/admin/promo-codes/${id}`, promoData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/promo-codes"] });
+      setEditingPromoCode(null);
+      toast({
+        title: "Success",
+        description: "Promo code updated successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update promo code",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const deletePromoCodeMutation = useMutation({
+    mutationFn: async (promoCodeId: number) => {
+      return apiRequest("DELETE", `/api/admin/promo-codes/${promoCodeId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/promo-codes"] });
+      toast({
+        title: "Success",
+        description: "Promo code deleted successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete promo code",
+        variant: "destructive",
+      });
+    }
+  });
+
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -331,6 +416,17 @@ export default function Admin() {
           >
             <Users className="w-4 h-4" />
             Users
+          </button>
+          <button
+            onClick={() => setActiveTab("promo-codes")}
+            className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === "promo-codes" 
+                ? "border-yellow-500 text-yellow-600 bg-yellow-50" 
+                : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+            }`}
+          >
+            <Crown className="w-4 h-4" />
+            Promo Codes
           </button>
         </div>
       </div>
@@ -607,6 +703,103 @@ export default function Admin() {
             </Card>
           </div>
         )}
+
+        {activeTab === "promo-codes" && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold">Promo Code Management</h2>
+              <Button 
+                className="gap-2 bg-yellow-500 hover:bg-yellow-600 text-black"
+                onClick={() => setCreatePromoOpen(true)}
+              >
+                <Plus className="w-4 h-4" />
+                Create Promo Code
+              </Button>
+            </div>
+            
+            <div className="space-y-3">
+              {promoCodesLoading ? (
+                <div className="text-center py-8">Loading promo codes...</div>
+              ) : (
+                (promoCodes as any[]).map((promoCode: any) => (
+                  <Card key={promoCode.id}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <Badge variant="outline" className="font-mono text-lg px-3 py-1">
+                              {promoCode.code}
+                            </Badge>
+                            <span className="font-semibold">{promoCode.name}</span>
+                            {!promoCode.isActive && (
+                              <Badge variant="secondary" className="text-red-600 bg-red-50 border-red-200">
+                                Inactive
+                              </Badge>
+                            )}
+                          </div>
+                          {promoCode.description && (
+                            <p className="text-gray-600 text-sm mb-2">{promoCode.description}</p>
+                          )}
+                          <div className="flex gap-4 text-sm text-gray-500">
+                            <span>💳 {promoCode.freeMonths} free months</span>
+                            <span>📊 {promoCode.usesCount} uses</span>
+                            {promoCode.maxUses && (
+                              <span>📈 {promoCode.maxUses} max uses</span>
+                            )}
+                            {promoCode.expiresAt && (
+                              <span>⏰ Expires {new Date(promoCode.expiresAt).toLocaleDateString()}</span>
+                            )}
+                          </div>
+                          
+                          {promoCode.uses && promoCode.uses.length > 0 && (
+                            <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                              <h4 className="font-medium text-sm mb-2">Recent Usage</h4>
+                              <div className="space-y-1 max-h-32 overflow-y-auto">
+                                {promoCode.uses.slice(0, 5).map((use: any, index: number) => (
+                                  <div key={index} className="text-xs text-gray-600 flex justify-between">
+                                    <span>User: {use.userId.slice(0, 8)}...</span>
+                                    <span>{new Date(use.usedAt).toLocaleDateString()}</span>
+                                  </div>
+                                ))}
+                                {promoCode.uses.length > 5 && (
+                                  <div className="text-xs text-gray-500">
+                                    +{promoCode.uses.length - 5} more uses
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="flex gap-2 ml-4">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => setEditingPromoCode(promoCode)}
+                          >
+                            <Edit3 className="w-3 h-3" />
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => {
+                              if (confirm("Are you sure you want to delete this promo code?")) {
+                                deletePromoCodeMutation.mutate(promoCode.id);
+                              }
+                            }}
+                            disabled={deletePromoCodeMutation.isPending}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Upload Modal */}
@@ -834,6 +1027,206 @@ export default function Admin() {
               </Button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Create Promo Code Modal */}
+      {createPromoOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Create Promo Code</CardTitle>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setCreatePromoOpen(false)}
+                >
+                  ×
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="promoCode">Promo Code</Label>
+                <Input
+                  id="promoCode"
+                  placeholder="e.g., TRIAL30"
+                  value={promoForm.code}
+                  onChange={(e) => setPromoForm({...promoForm, code: e.target.value.toUpperCase()})}
+                  className="uppercase"
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="promoName">Display Name</Label>
+                <Input
+                  id="promoName"
+                  placeholder="e.g., 30-Day Trial"
+                  value={promoForm.name}
+                  onChange={(e) => setPromoForm({...promoForm, name: e.target.value})}
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="promoDescription">Description (Optional)</Label>
+                <Textarea
+                  id="promoDescription"
+                  placeholder="Brief description of this promo code..."
+                  value={promoForm.description}
+                  onChange={(e) => setPromoForm({...promoForm, description: e.target.value})}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="freeMonths">Free Months</Label>
+                  <Input
+                    id="freeMonths"
+                    type="number"
+                    min="1"
+                    value={promoForm.freeMonths}
+                    onChange={(e) => setPromoForm({...promoForm, freeMonths: parseInt(e.target.value) || 1})}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="maxUses">Max Uses (Optional)</Label>
+                  <Input
+                    id="maxUses"
+                    type="number"
+                    min="1"
+                    placeholder="Unlimited"
+                    value={promoForm.maxUses}
+                    onChange={(e) => setPromoForm({...promoForm, maxUses: e.target.value})}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="expiresAt">Expires At (Optional)</Label>
+                <Input
+                  id="expiresAt"
+                  type="datetime-local"
+                  value={promoForm.expiresAt}
+                  onChange={(e) => setPromoForm({...promoForm, expiresAt: e.target.value})}
+                />
+              </div>
+
+              <Button 
+                className="w-full bg-yellow-500 hover:bg-yellow-600 text-black"
+                disabled={createPromoCodeMutation.isPending || !promoForm.code || !promoForm.name}
+                onClick={() => createPromoCodeMutation.mutate({
+                  ...promoForm,
+                  maxUses: promoForm.maxUses ? parseInt(promoForm.maxUses) : null,
+                  expiresAt: promoForm.expiresAt || null
+                })}
+              >
+                {createPromoCodeMutation.isPending ? "Creating..." : "Create Promo Code"}
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Edit Promo Code Modal */}
+      {editingPromoCode && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Edit Promo Code</CardTitle>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setEditingPromoCode(null)}
+                >
+                  ×
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="editPromoCode">Promo Code</Label>
+                <Input
+                  id="editPromoCode"
+                  value={editingPromoCode.code}
+                  onChange={(e) => setEditingPromoCode({...editingPromoCode, code: e.target.value.toUpperCase()})}
+                  className="uppercase"
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="editPromoName">Display Name</Label>
+                <Input
+                  id="editPromoName"
+                  value={editingPromoCode.name}
+                  onChange={(e) => setEditingPromoCode({...editingPromoCode, name: e.target.value})}
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="editPromoDescription">Description</Label>
+                <Textarea
+                  id="editPromoDescription"
+                  value={editingPromoCode.description || ""}
+                  onChange={(e) => setEditingPromoCode({...editingPromoCode, description: e.target.value})}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="editFreeMonths">Free Months</Label>
+                  <Input
+                    id="editFreeMonths"
+                    type="number"
+                    min="1"
+                    value={editingPromoCode.freeMonths}
+                    onChange={(e) => setEditingPromoCode({...editingPromoCode, freeMonths: parseInt(e.target.value) || 1})}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="editMaxUses">Max Uses</Label>
+                  <Input
+                    id="editMaxUses"
+                    type="number"
+                    min="1"
+                    value={editingPromoCode.maxUses || ""}
+                    onChange={(e) => setEditingPromoCode({...editingPromoCode, maxUses: e.target.value ? parseInt(e.target.value) : null})}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="editExpiresAt">Expires At</Label>
+                <Input
+                  id="editExpiresAt"
+                  type="datetime-local"
+                  value={editingPromoCode.expiresAt ? new Date(editingPromoCode.expiresAt).toISOString().slice(0, 16) : ""}
+                  onChange={(e) => setEditingPromoCode({...editingPromoCode, expiresAt: e.target.value || null})}
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="isActive"
+                  checked={editingPromoCode.isActive}
+                  onChange={(e) => setEditingPromoCode({...editingPromoCode, isActive: e.target.checked})}
+                />
+                <Label htmlFor="isActive">Active</Label>
+              </div>
+
+              <Button 
+                className="w-full bg-blue-600 hover:bg-blue-700"
+                disabled={updatePromoCodeMutation.isPending}
+                onClick={() => updatePromoCodeMutation.mutate(editingPromoCode)}
+              >
+                {updatePromoCodeMutation.isPending ? "Updating..." : "Update Promo Code"}
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       )}
 
