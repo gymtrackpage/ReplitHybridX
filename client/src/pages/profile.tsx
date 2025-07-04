@@ -769,7 +769,6 @@ export default function Profile() {
             </Card>
 
             <SubscriptionManagement />
-            </div>
 
             {/* Referral System */}
             <Card>
@@ -847,6 +846,7 @@ export default function Profile() {
           </div>
         </div>
       </div>
+
       <SubscriptionModal 
         open={showSubscriptionModal} 
         onOpenChange={setShowSubscriptionModal}
