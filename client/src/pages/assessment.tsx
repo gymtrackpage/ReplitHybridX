@@ -183,11 +183,48 @@ export default function Assessment() {
         description: "Welcome to HybridX! You can upgrade to Premium anytime for full access.",
       });
       
-      // Ensure redirect happens with proper state cleanup
-      setTimeout(() => {
-        console.log("Redirecting to dashboard after assessment completion");
-        window.location.href = "/dashboard";
-      }, 1500);
+      // Verify assessment completion before redirecting
+      const verifyAndRedirect = async () => {
+        try {
+          console.log("Verifying assessment completion status...");
+          
+          // Wait a moment for database operations to complete
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          // Fetch fresh user status to verify completion
+          const verificationResponse = await apiRequest("GET", "/api/user-onboarding-status");
+          console.log("Verification response:", verificationResponse);
+          
+          if (verificationResponse.assessmentCompleted) {
+            console.log("✅ Assessment completion verified - redirecting to dashboard");
+            window.location.href = "/dashboard";
+          } else {
+            console.error("❌ Assessment completion NOT verified - retrying...");
+            // Retry once more after a longer delay
+            setTimeout(async () => {
+              try {
+                const retryResponse = await apiRequest("GET", "/api/user-onboarding-status");
+                if (retryResponse.assessmentCompleted) {
+                  console.log("✅ Assessment completion verified on retry - redirecting");
+                  window.location.href = "/dashboard";
+                } else {
+                  console.error("❌ Assessment completion still not verified - forcing redirect");
+                  window.location.href = "/dashboard";
+                }
+              } catch (retryError) {
+                console.error("Retry verification failed, forcing redirect:", retryError);
+                window.location.href = "/dashboard";
+              }
+            }, 2000);
+          }
+        } catch (verifyError) {
+          console.error("Verification failed, forcing redirect:", verifyError);
+          window.location.href = "/dashboard";
+        }
+      };
+      
+      // Start verification process
+      verifyAndRedirect();
     },
     onError: (error: any) => {
       console.error("Assessment completion error:", error);

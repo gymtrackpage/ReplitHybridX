@@ -273,15 +273,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUser(userId);
 
       if (!user) {
+        console.error("User not found for onboarding status check:", userId);
         return res.status(404).json({ message: "User not found" });
       }
 
-      res.json({
+      const response = {
         assessmentCompleted: user.assessmentCompleted || false,
         subscriptionStatus: user.subscriptionStatus || "none",
         currentProgramId: user.currentProgramId,
-        hasCompletedOnboarding: (user.assessmentCompleted && user.subscriptionStatus !== "none")
-      });
+        hasCompletedOnboarding: (user.assessmentCompleted && user.subscriptionStatus !== "none"),
+        userId: userId,
+        timestamp: new Date().toISOString()
+      };
+
+      console.log("Onboarding status response for user", userId, ":", response);
+      res.json(response);
     } catch (error) {
       console.error("Error fetching onboarding status:", error);
       res.status(500).json({ message: "Failed to fetch onboarding status" });
@@ -1226,6 +1232,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!updatedUser?.assessmentCompleted) {
           throw new Error("Assessment completion flag was not properly set");
         }
+
+        // Double-check by fetching the user again to ensure database consistency
+        const verificationUser = await storage.getUser(userId);
+        if (!verificationUser?.assessmentCompleted) {
+          console.error("VERIFICATION FAILED: Assessment completion not persisted in database");
+          throw new Error("Database update verification failed");
+        }
+
+        console.log("Assessment completion verified in database:", {
+          userId,
+          assessmentCompleted: verificationUser.assessmentCompleted,
+          subscriptionStatus: verificationUser.subscriptionStatus
+        });
+
       } catch (profileError) {
         console.error("CRITICAL: Failed to update user profile with assessment completion:", profileError);
         return res.status(500).json({ 

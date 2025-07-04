@@ -42,6 +42,7 @@ function Router() {
       assessmentCompleted: (userStatus as any).assessmentCompleted,
       subscriptionStatus: (userStatus as any).subscriptionStatus,
       currentPath: window.location.pathname,
+      timestamp: new Date().toISOString(),
       userStatus
     });
   }
