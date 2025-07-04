@@ -4052,6 +4052,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create missing assessment record for testing
+  app.post("/api/create-missing-assessment", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Check if assessment already exists
+      const existingAssessment = await storage.getUserAssessment(userId);
+      if (existingAssessment) {
+        return res.status(400).json({ 
+          message: "Assessment record already exists",
+          assessmentId: existingAssessment.id
+        });
+      }
+
+      // Create assessment record
+      const assessment = await storage.createAssessment({
+        userId,
+        data: JSON.stringify({ 
+          retroactiveCreation: true, 
+          created: new Date().toISOString(),
+          note: 'Created via API for testing purposes',
+          subscriptionStatus: user.subscriptionStatus || 'active'
+        }),
+        hyroxEventsCompleted: 0,
+        generalFitnessYears: 2,
+        primaryTrainingBackground: 'general',
+        weeklyTrainingDays: 3,
+        avgSessionLength: 60,
+        competitionFormat: 'singles',
+        age: 30,
+        injuryHistory: false,
+        injuryRecent: false,
+        goals: 'general-fitness',
+        equipmentAccess: 'full_gym',
+        createdAt: new Date()
+      });
+
+      // Ensure user profile is marked as assessment completed
+      await storage.updateUserProfile(userId, {
+        assessmentCompleted: true,
+        updatedAt: new Date()
+      });
+
+      res.json({ 
+        success: true,
+        message: "Assessment record created successfully",
+        assessmentId: assessment.id,
+        userId: userId
+      });
+    } catch (error) {
+      console.error("Error creating assessment record:", error);
+      res.status(500).json({ message: "Failed to create assessment record" });
+    }
+  });
+
   // Authentication middleware
   function requireAuth(req: Request, res: Response, next: NextFunction) {
     if (!req.isAuthenticated()) {
