@@ -1159,18 +1159,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Create assessment record with comprehensive data
+      // Create assessment record with comprehensive data - this is critical and should not fail silently
       let assessment;
       try {
-        assessment = await storage.createAssessment({
+        // Ensure all required assessment fields are present
+        const completeAssessmentData = {
           userId,
           data: JSON.stringify(assessmentData),
-          ...assessmentData
-        });
-        console.log("Assessment record created:", assessment.id);
+          hyroxEventsCompleted: assessmentData.hyroxEventsCompleted || 0,
+          bestFinishTime: assessmentData.bestFinishTime || null,
+          generalFitnessYears: assessmentData.generalFitnessYears || 0,
+          primaryTrainingBackground: assessmentData.primaryTrainingBackground || 'general',
+          weeklyTrainingDays: assessmentData.weeklyTrainingDays || 3,
+          avgSessionLength: assessmentData.avgSessionLength || 60,
+          competitionFormat: assessmentData.competitionFormat || 'singles',
+          age: assessmentData.age || 30,
+          injuryHistory: assessmentData.injuryHistory || false,
+          injuryRecent: assessmentData.injuryRecent || false,
+          kilometerRunTime: assessmentData.kilometerRunTime || null,
+          squatMaxReps: assessmentData.squatMaxReps || null,
+          goals: Array.isArray(assessmentData.goals) ? assessmentData.goals.join(',') : (assessmentData.goals || 'general-fitness'),
+          equipmentAccess: assessmentData.equipmentAccess || 'full_gym',
+          createdAt: new Date()
+        };
+        
+        assessment = await storage.createAssessment(completeAssessmentData);
+        console.log("Assessment record created successfully:", assessment.id);
       } catch (assessmentError) {
-        console.error("Failed to create assessment record:", assessmentError);
-        // Continue without assessment record if it fails
+        console.error("Critical error: Failed to create assessment record:", assessmentError);
+        return res.status(500).json({ 
+          message: "Failed to save assessment data. Please try again.",
+          error: "ASSESSMENT_SAVE_FAILED"
+        });
       }
 
       // Determine subscription status based on choice and payment
@@ -1272,6 +1292,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { subscriptionChoice, paymentIntentId } = req.body;
 
       console.log("Marking assessment complete for user:", userId, "with choice:", subscriptionChoice);
+
+      // Create a minimal assessment record to ensure database consistency
+      try {
+        const minimalAssessmentData = {
+          userId,
+          data: JSON.stringify({ 
+            completed: true, 
+            method: 'mark-complete-fallback',
+            subscriptionChoice: subscriptionChoice,
+            completedAt: new Date().toISOString()
+          }),
+          hyroxEventsCompleted: 0,
+          generalFitnessYears: 1,
+          primaryTrainingBackground: 'general',
+          weeklyTrainingDays: 3,
+          avgSessionLength: 60,
+          competitionFormat: 'singles',
+          age: 30,
+          injuryHistory: false,
+          injuryRecent: false,
+          goals: 'general-fitness',
+          equipmentAccess: 'full_gym',
+          createdAt: new Date()
+        };
+        
+        const assessment = await storage.createAssessment(minimalAssessmentData);
+        console.log("Minimal assessment record created:", assessment.id);
+      } catch (assessmentError) {
+        console.error("Failed to create minimal assessment record:", assessmentError);
+        // Log but don't fail - this is a fallback scenario
+      }
 
       // Determine subscription status
       let subscriptionStatus = "free_trial";
@@ -3940,6 +3991,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
       delete (req.session as any).referralCode;
     }
     res.json({ message: "Referral code cleared from session" });
+  });
+
+  // Verify assessment completion and data consistency
+  app.get("/api/verify-assessment", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const assessment = await storage.getUserAssessment(userId);
+
+      const verificationResult = {
+        userId,
+        userExists: !!user,
+        userAssessmentCompleted: user?.assessmentCompleted || false,
+        assessmentRecordExists: !!assessment,
+        assessmentId: assessment?.id || null,
+        subscriptionStatus: user?.subscriptionStatus || 'none',
+        currentProgramId: user?.currentProgramId || null,
+        needsAssessmentRecord: user?.assessmentCompleted && !assessment,
+        createdAt: user?.createdAt,
+        updatedAt: user?.updatedAt
+      };
+
+      // If user is marked as assessment complete but no assessment record exists, create one
+      if (verificationResult.needsAssessmentRecord) {
+        console.log(`Creating missing assessment record for user ${userId}`);
+        try {
+          const retroactiveAssessment = await storage.createAssessment({
+            userId,
+            data: JSON.stringify({ 
+              retroactive: true, 
+              created: new Date().toISOString(),
+              note: 'Created retroactively due to missing assessment record'
+            }),
+            hyroxEventsCompleted: 0,
+            generalFitnessYears: 1,
+            primaryTrainingBackground: 'general',
+            weeklyTrainingDays: 3,
+            avgSessionLength: 60,
+            competitionFormat: 'singles',
+            age: 30,
+            injuryHistory: false,
+            injuryRecent: false,
+            goals: 'general-fitness',
+            equipmentAccess: 'full_gym',
+            createdAt: new Date()
+          });
+          verificationResult.assessmentRecordExists = true;
+          verificationResult.assessmentId = retroactiveAssessment.id;
+          verificationResult.needsAssessmentRecord = false;
+        } catch (retroError) {
+          console.error("Failed to create retroactive assessment:", retroError);
+        }
+      }
+
+      res.json(verificationResult);
+    } catch (error) {
+      console.error("Error verifying assessment:", error);
+      res.status(500).json({ message: "Failed to verify assessment" });
+    }
   });
 
   // Authentication middleware

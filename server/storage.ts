@@ -520,10 +520,33 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Assessment operations
-  async createAssessment(assessment: InsertAssessment): Promise<Assessment> {
-    const [newAssessment] = await db.insert(assessments).values(assessment).returning();
-    return newAssessment;
-  }
+  async createAssessment(assessmentData: any) {
+    try {
+      console.log("Creating assessment with data:", {
+        userId: assessmentData.userId,
+        hasData: !!assessmentData.data,
+        dataLength: assessmentData.data?.length || 0,
+        createdAt: assessmentData.createdAt
+      });
+
+      // Validate required fields
+      if (!assessmentData.userId) {
+        throw new Error("User ID is required for assessment");
+      }
+
+      // Ensure data field is a string
+      if (assessmentData.data && typeof assessmentData.data !== 'string') {
+        assessmentData.data = JSON.stringify(assessmentData.data);
+      }
+
+      const result = await db.insert(assessments).values(assessmentData).returning();
+      console.log("Assessment created successfully:", result[0]?.id);
+      return result[0];
+    } catch (error) {
+      console.error("Database error creating assessment:", error);
+      throw error;
+    }
+  },
 
   async getUserAssessment(userId: string): Promise<Assessment | undefined> {
     const [assessment] = await db
@@ -717,7 +740,7 @@ export class DatabaseStorage implements IStorage {
     if (qualifiedAt) {
       updateData.qualifiedAt = qualifiedAt;
     }
-    
+
     const [referral] = await db
       .update(referrals)
       .set(updateData)
