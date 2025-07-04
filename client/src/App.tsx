@@ -38,9 +38,10 @@ function Router() {
 
   // Debug logging to understand redirect issue
   if (isAuthenticated && userStatus) {
-    console.log("User status check:", {
+    console.log("App routing - User status check:", {
       assessmentCompleted: (userStatus as any).assessmentCompleted,
       subscriptionStatus: (userStatus as any).subscriptionStatus,
+      currentPath: window.location.pathname,
       userStatus
     });
   }
@@ -65,7 +66,13 @@ function Router() {
   // Check if user needs to complete assessment
   // Allow access to payment page and subscription success even if assessment not completed
   const needsAssessment = userStatus && !(userStatus as any).assessmentCompleted;
-  if (needsAssessment) {
+  
+  // Don't force assessment if user is coming from payment pages or has subscription
+  const isOnPaymentFlow = window.location.pathname.includes('/payment') || 
+                         window.location.pathname.includes('/subscription-success');
+  const hasSubscription = userStatus && (userStatus as any).subscriptionStatus !== 'none';
+  
+  if (needsAssessment && !isOnPaymentFlow && !hasSubscription) {
     return (
       <Switch>
         <Route path="/payment" component={Payment} />

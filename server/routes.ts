@@ -2116,16 +2116,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get subscription details from Stripe
       const subscription = await stripe.subscriptions.retrieve(subscriptionId);
       
-      // Update user subscription status and Stripe info
+      // Update user subscription status, assessment completion, and Stripe info
       await storage.updateUserProfile(userId, {
         subscriptionStatus: "active",
+        assessmentCompleted: true,  // Ensure assessment is marked as completed
         updatedAt: new Date()
       });
       
       // Update Stripe subscription info in user record
       await storage.updateUserStripeInfo(userId, subscription.customer as string, subscriptionId);
 
-      console.log("Subscription confirmed successfully for user:", userId);
+      console.log("Subscription confirmed and assessment marked complete for user:", userId);
       
       res.json({
         success: true,

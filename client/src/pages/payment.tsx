@@ -35,7 +35,7 @@ function CheckoutForm({ clientSecret, subscriptionId }: { clientSecret: string, 
 
     // Determine if this is a payment intent or setup intent
     const isSetupIntent = clientSecret.startsWith('seti_');
-    
+
     let result;
     if (isSetupIntent) {
       // Confirm setup intent
@@ -52,7 +52,7 @@ function CheckoutForm({ clientSecret, subscriptionId }: { clientSecret: string, 
         },
       });
     }
-    
+
     const { error, paymentIntent, setupIntent } = result;
 
     if (error) {
@@ -62,16 +62,16 @@ function CheckoutForm({ clientSecret, subscriptionId }: { clientSecret: string, 
         description: error.message || "Your payment could not be processed. Please try again.",
         variant: "destructive"
       });
-      
+
       // Don't redirect to assessment on payment failure - stay on payment page
       // User can retry payment or go back manually
-      
+
     } else if (paymentIntent?.status === 'succeeded' || setupIntent?.status === 'succeeded') {
       // Payment or setup succeeded - update subscription status and complete assessment
       try {
         const intentId = paymentIntent?.id || setupIntent?.id;
         console.log("Payment/Setup succeeded, updating subscription status...", intentId);
-        
+
         // Update subscription status first
         await apiRequest("POST", "/api/subscription-confirmed", {
           subscriptionId,
@@ -98,7 +98,7 @@ function CheckoutForm({ clientSecret, subscriptionId }: { clientSecret: string, 
           }
         }
 
-        // Force comprehensive cache refresh
+        // Force comprehensive cache refresh and wait for completion
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: ["/api/user-onboarding-status"] }),
           queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] }),
@@ -106,41 +106,36 @@ function CheckoutForm({ clientSecret, subscriptionId }: { clientSecret: string, 
           queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] }),
           queryClient.invalidateQueries({ queryKey: ["/api/user-progress"] })
         ]);
-        
-        console.log("All caches invalidated after payment completion");
+
+        // Refetch user onboarding status to ensure it's updated
+        await queryClient.refetchQueries({ queryKey: ["/api/user-onboarding-status"] });
+        await queryClient.refetchQueries({ queryKey: ["/api/auth/user"] });
+
+        console.log("All caches invalidated and refetched after payment completion");
 
         toast({
           title: "Payment Successful!",
-          description: "Welcome to HybridX Premium! Your subscription is now active.",
+          description: "Welcome to HybridX Premium! Redirecting to your dashboard...",
         });
 
-        // Wait for cache refresh and redirect
+        // Longer delay to ensure all state updates are complete
         setTimeout(() => {
           console.log("Redirecting to dashboard after successful payment");
           setLocation("/dashboard");
         }, 2000);
-        
-      } catch (error) {
-        console.error("Post-payment processing error:", error);
-        
-        // Show different messages based on error type
-        let errorMessage = "Your payment was successful, but there was an issue completing setup.";
-        if (error.message?.includes("assessment")) {
-          errorMessage = "Payment successful! There was an issue completing your assessment, but you can complete it from your dashboard.";
-        } else if (error.message?.includes("subscription")) {
-          errorMessage = "Payment successful! Please refresh the page to see your subscription status.";
-        }
-        
+      } catch (error: any) {
+        console.error("Error updating subscription status:", error);
         toast({
           title: "Payment Successful",
-          description: errorMessage + " Contact support if you experience continued issues.",
+          description: "Your payment was processed but there was an issue updating your account. Please refresh the page.",
           variant: "destructive"
         });
-        
-        // Still redirect to dashboard since payment succeeded
+
+        // Still redirect to dashboard even if status update fails
         setTimeout(() => {
+          console.log("Redirecting to dashboard despite status update error");
           setLocation("/dashboard");
-        }, 4000);
+        }, 3000);
       }
     }
 
@@ -222,7 +217,7 @@ export default function Payment() {
     // Validate client secret format (accept multiple Stripe formats)
     const validSecretFormats = ['pi_', 'seti_', 'cs_test_', 'cs_live_'];
     const isValidSecret = validSecretFormats.some(format => secret.startsWith(format)) && secret.length >= 10;
-    
+
     if (!isValidSecret) {
       console.error("Invalid client secret format:", secret.substring(0, 10) + "...");
       setError("Invalid payment session. Please try subscribing again.");
