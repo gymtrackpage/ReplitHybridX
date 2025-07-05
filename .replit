@@ -11,7 +11,7 @@ build = ["sh", "-c", "npm run build"]
 run = ["sh", "-c", "NODE_ENV=production npm run start"]
 
 [workflows]
-runButton = "Clean Build"
+runButton = "Clean Restart"
 
 [[workflows.workflow]]
 name = "Project"

@@ -1210,6 +1210,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         subscriptionStatus = "active";
       } else if (subscriptionChoice === "premium") {
         subscriptionStatus = "pending"; // Premium requested but no payment confirmation
+      } else if (subscriptionChoice === "promo") {
+        subscriptionStatus = "active"; // Promo codes grant active status
       }
 
       // CRITICAL: Update user profile with assessment completion flag - this must succeed
@@ -3073,7 +3075,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { targetUserId } = req.params;
       const { isAdmin } = req.body;
 
-      const updatedUser = await storage.updateUserAdmin(targetUserId, isAdmin);
+      const updatedUser = await storage.updateUserAdmin(targetUserId, { isAdmin });
       res.json(updatedUser);
     } catch (error: any) {
       console.error("Admin user update error:", error);
@@ -4373,6 +4375,181 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error verifying assessment:", error);
       res.status(500).json({ message: "Failed to verify assessment" });
+    }
+  });
+
+  // Promo code validation endpoint
+  app.post("/api/promo-codes/validate", isAuthenticated, async (req: any, res) => {
+    try {
+      const { code } = req.body;
+      
+      if (!code || typeof code !== 'string') {
+        return res.status(400).json({ message: "Promo code is required" });
+      }
+
+      const promoCode = await storage.getPromoCodeByCode(code.trim().toUpperCase());
+      
+      if (!promoCode) {
+        return res.status(404).json({ message: "Invalid promo code" });
+      }
+
+      if (!promoCode.isActive) {
+        return res.status(400).json({ message: "Promo code is no longer active" });
+      }
+
+      if (promoCode.expiresAt && new Date(promoCode.expiresAt) < new Date()) {
+        return res.status(400).json({ message: "Promo code has expired" });
+      }
+
+      if (promoCode.maxUses && promoCode.usesCount >= promoCode.maxUses) {
+        return res.status(400).json({ message: "Promo code usage limit reached" });
+      }
+
+      const userId = req.user.claims.sub;
+      const hasUsed = await storage.hasUserUsedPromoCode(userId, promoCode.id);
+      
+      if (hasUsed) {
+        return res.status(400).json({ message: "You have already used this promo code" });
+      }
+
+      res.json({
+        valid: true,
+        promoCode: {
+          id: promoCode.id,
+          code: promoCode.code,
+          name: promoCode.name,
+          description: promoCode.description,
+          freeMonths: promoCode.freeMonths
+        }
+      });
+    } catch (error) {
+      console.error("Error validating promo code:", error);
+      res.status(500).json({ message: "Failed to validate promo code" });
+    }
+  });
+
+  // Apply promo code endpoint
+  app.post("/api/promo-codes/apply", isAuthenticated, async (req: any, res) => {
+    try {
+      const { code } = req.body;
+      const userId = req.user.claims.sub;
+      
+      if (!code || typeof code !== 'string') {
+        return res.status(400).json({ message: "Promo code is required" });
+      }
+
+      const promoCode = await storage.getPromoCodeByCode(code.trim().toUpperCase());
+      
+      if (!promoCode) {
+        return res.status(404).json({ message: "Invalid promo code" });
+      }
+
+      if (!promoCode.isActive) {
+        return res.status(400).json({ message: "Promo code is no longer active" });
+      }
+
+      if (promoCode.expiresAt && new Date(promoCode.expiresAt) < new Date()) {
+        return res.status(400).json({ message: "Promo code has expired" });
+      }
+
+      if (promoCode.maxUses && promoCode.usesCount >= promoCode.maxUses) {
+        return res.status(400).json({ message: "Promo code usage limit reached" });
+      }
+
+      const hasUsed = await storage.hasUserUsedPromoCode(userId, promoCode.id);
+      
+      if (hasUsed) {
+        return res.status(400).json({ message: "You have already used this promo code" });
+      }
+
+      // Grant free months to user
+      await storage.grantPromoFreeMonths(userId, promoCode.freeMonths);
+
+      // Record promo code usage
+      await storage.createPromoCodeUse({
+        promoCodeId: promoCode.id,
+        userId: userId,
+        freeMonthsGranted: promoCode.freeMonths
+      });
+
+      // Increment usage count
+      await storage.incrementPromoCodeUse(promoCode.id);
+
+      res.json({
+        success: true,
+        message: `${promoCode.freeMonths} free months granted successfully!`,
+        freeMonthsGranted: promoCode.freeMonths
+      });
+    } catch (error) {
+      console.error("Error applying promo code:", error);
+      res.status(500).json({ message: "Failed to apply promo code" });
+    }
+  });
+
+  // Admin: Get all promo codes
+  app.get("/api/admin/promo-codes", isAuthenticated, requireAdmin, async (req: any, res) => {
+    try {
+      const promoCodes = await storage.getAllPromoCodes();
+      
+      // Get usage details for each promo code
+      const promoCodesWithUses = await Promise.all(
+        promoCodes.map(async (promoCode) => {
+          const uses = await storage.getPromoCodeUses(promoCode.id);
+          return {
+            ...promoCode,
+            uses
+          };
+        })
+      );
+
+      res.json(promoCodesWithUses);
+    } catch (error) {
+      console.error("Error fetching promo codes:", error);
+      res.status(500).json({ message: "Failed to fetch promo codes" });
+    }
+  });
+
+  // Admin: Create promo code
+  app.post("/api/admin/promo-codes", isAuthenticated, requireAdmin, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const promoCodeData = {
+        ...req.body,
+        createdBy: userId,
+        code: req.body.code.toUpperCase()
+      };
+
+      const promoCode = await storage.createPromoCode(promoCodeData);
+      res.json(promoCode);
+    } catch (error) {
+      console.error("Error creating promo code:", error);
+      res.status(500).json({ message: "Failed to create promo code" });
+    }
+  });
+
+  // Admin: Update promo code
+  app.put("/api/admin/promo-codes/:id", isAuthenticated, requireAdmin, async (req: any, res) => {
+    try {
+      const promoCodeId = parseInt(req.params.id);
+      const updateData = req.body;
+      
+      const promoCode = await storage.updatePromoCode(promoCodeId, updateData);
+      res.json(promoCode);
+    } catch (error) {
+      console.error("Error updating promo code:", error);
+      res.status(500).json({ message: "Failed to update promo code" });
+    }
+  });
+
+  // Admin: Delete promo code
+  app.delete("/api/admin/promo-codes/:id", isAuthenticated, requireAdmin, async (req: any, res) => {
+    try {
+      const promoCodeId = parseInt(req.params.id);
+      await storage.deletePromoCode(promoCodeId);
+      res.json({ message: "Promo code deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting promo code:", error);
+      res.status(500).json({ message: "Failed to delete promo code" });
     }
   });
 

@@ -101,7 +101,7 @@ export interface IStorage {
   updateSubscriptionMonthsPaid(userId: string, monthsPaid: number): Promise<Subscription>;
 
   // Promo code operations
-  getPromoCodeByCode(code: string): Promise<PromoCode | undefined>;
+  getPromoCodeByCode(code: string): Promise<(PromoCode & { uses?: PromoCodeUse[] }) | undefined>;
   createPromoCode(promoCode: InsertPromoCode): Promise<PromoCode>;
   updatePromoCode(id: number, updates: Partial<InsertPromoCode>): Promise<PromoCode>;
   deletePromoCode(id: number): Promise<void>;
@@ -873,12 +873,21 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Promo code operations
-  async getPromoCodeByCode(code: string): Promise<PromoCode | undefined> {
+  async getPromoCodeByCode(code: string): Promise<(PromoCode & { uses?: PromoCodeUse[] }) | undefined> {
     const [promoCode] = await db
       .select()
       .from(promoCodes)
       .where(eq(promoCodes.code, code.toUpperCase()));
-    return promoCode;
+    
+    if (!promoCode) return undefined;
+    
+    // Get usage data for this promo code
+    const uses = await this.getPromoCodeUses(promoCode.id);
+    
+    return {
+      ...promoCode,
+      uses
+    };
   }
 
   async createPromoCode(promoCode: InsertPromoCode): Promise<PromoCode> {

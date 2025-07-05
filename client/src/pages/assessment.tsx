@@ -16,8 +16,7 @@ import {
   Trophy, 
   Calendar,
   CreditCard,
-  Zap,
-  Crown
+  Zap
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -365,7 +364,7 @@ export default function Assessment() {
       });
 
       // Complete assessment with promo access
-      await completeAssessmentMutation({
+      await completeAssessmentMutation.mutateAsync({
         assessmentData,
         programId: recommendation!.recommendedProgram.id,
         subscriptionChoice: "promo"
@@ -413,9 +412,18 @@ export default function Assessment() {
   };
 
   const handleFreeTrial = () => {
+    if (!recommendation?.recommendedProgram) {
+      toast({
+        title: "Error",
+        description: "Please complete the assessment first to get a program recommendation.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     completeAssessmentMutation.mutate({
       assessmentData,
-      programId: recommendation!.recommendedProgram.id,
+      programId: recommendation.recommendedProgram.id,
       subscriptionChoice: "free_trial"
     });
   };

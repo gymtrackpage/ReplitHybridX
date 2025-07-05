@@ -86,8 +86,8 @@ export default function Admin() {
 
   // Mutations
   const updateUserMutation = useMutation({
-    mutationFn: async (userData: any) => {
-      await apiRequest("PUT", `/api/admin/users/${userData.id}`, userData);
+    mutationFn: async (userData: { id: string; isAdmin: boolean }) => {
+      return apiRequest("PATCH", `/api/admin/users/${userData.id}`, { isAdmin: userData.isAdmin });
     },
     onSuccess: () => {
       toast({ title: "User Updated", description: "User information has been updated successfully." });
