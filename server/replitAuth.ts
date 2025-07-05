@@ -78,10 +78,15 @@ export async function setupAuth(app: Express) {
     tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers,
     verified: passport.AuthenticateCallback
   ) => {
-    const user = {};
-    updateUserSession(user, tokens);
-    await upsertUser(tokens.claims());
-    verified(null, user);
+    try {
+      const user = {};
+      updateUserSession(user, tokens);
+      await upsertUser(tokens.claims());
+      verified(null, user);
+    } catch (error) {
+      console.error("Auth verification error:", error);
+      verified(error, null);
+    }
   };
 
   for (const domain of process.env
@@ -114,22 +119,32 @@ export async function setupAuth(app: Express) {
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
   app.get("/api/login", (req, res, next) => {
-    const hostname = req.hostname;
-    
-    passport.authenticate(`replitauth:${hostname}`, {
-      prompt: "login consent",
-      scope: ["openid", "email", "profile", "offline_access"],
-    })(req, res, next);
+    try {
+      const hostname = req.hostname;
+      
+      passport.authenticate(`replitauth:${hostname}`, {
+        prompt: "login consent",
+        scope: ["openid", "email", "profile", "offline_access"],
+      })(req, res, next);
+    } catch (error) {
+      console.error("Login error:", error);
+      res.redirect("/login?error=auth_failed");
+    }
   });
 
   // Custom branded login route
   app.get("/api/auth/login", (req, res, next) => {
-    const hostname = req.hostname;
-    
-    passport.authenticate(`replitauth:${hostname}`, {
-      prompt: "login consent",
-      scope: ["openid", "email", "profile", "offline_access"],
-    })(req, res, next);
+    try {
+      const hostname = req.hostname;
+      
+      passport.authenticate(`replitauth:${hostname}`, {
+        prompt: "login consent",
+        scope: ["openid", "email", "profile", "offline_access"],
+      })(req, res, next);
+    } catch (error) {
+      console.error("Auth login error:", error);
+      res.redirect("/login?error=auth_failed");
+    }
   });
 
   app.get("/api/callback", (req, res, next) => {
@@ -141,6 +156,7 @@ export async function setupAuth(app: Express) {
     passport.authenticate(`replitauth:${hostname}`, {
       successReturnToOrRedirect: "/dashboard",
       failureRedirect: "/login",
+      failureFlash: false
     })(req, res, next);
   });
 

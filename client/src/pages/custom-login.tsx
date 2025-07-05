@@ -7,6 +7,17 @@ import { Loader2, Dumbbell, Target, Trophy, Users } from "lucide-react";
 export default function CustomLogin() {
   const [isLoading, setIsLoading] = useState(false);
   const [currentFeature, setCurrentFeature] = useState(0);
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Check for auth error in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const error = urlParams.get('error');
+    if (error === 'auth_failed') {
+      setAuthError('Authentication failed. Please try again.');
+      setIsLoading(false);
+    }
+  }, []);
 
   const features = [
     { icon: Target, text: "Personalized Programs", desc: "AI-powered training" },
@@ -23,9 +34,14 @@ export default function CustomLogin() {
   }, []);
 
   const handleLogin = () => {
-    setIsLoading(true);
-    // Redirect to your custom auth endpoint that handles OIDC flow
-    window.location.href = "/api/auth/login";
+    try {
+      setIsLoading(true);
+      // Redirect to your custom auth endpoint that handles OIDC flow
+      window.location.href = "/api/auth/login";
+    } catch (error) {
+      console.error("Login error:", error);
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -59,6 +75,13 @@ export default function CustomLogin() {
         </CardHeader>
 
         <CardContent className="space-y-6">
+          {/* Show auth error if present */}
+          {authError && (
+            <div className="bg-red-900/30 border border-red-700/50 text-red-400 px-4 py-3 rounded-lg text-sm text-center">
+              {authError}
+            </div>
+          )}
+
           {/* Enhanced login button */}
           <Button 
             onClick={handleLogin}
