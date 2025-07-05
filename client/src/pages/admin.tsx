@@ -82,6 +82,8 @@ export default function Admin() {
   const { data: promoCodes = [], isLoading: promoCodesLoading } = useQuery({
     queryKey: ["/api/admin/promo-codes"],
     enabled: activeTab === "promo-codes",
+    retry: 3,
+    staleTime: 30000,
   });
 
   // Mutations
