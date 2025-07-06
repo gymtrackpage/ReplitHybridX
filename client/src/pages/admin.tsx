@@ -312,7 +312,7 @@ export default function Admin() {
     formData.append("duration", uploadForm.duration.toString());
     formData.append("frequency", uploadForm.frequency.toString());
     formData.append("racecategory", uploadForm.racecategory);
-    
+
     uploadProgramMutation.mutate(formData);
   };
 
@@ -320,9 +320,9 @@ export default function Admin() {
     try {
       console.log("Fetching workouts for program:", programId);
       const response = await apiRequest("GET", `/api/admin/programs/${programId}/workouts`);
-      
+
       console.log("API response:", response);
-      
+
       // Ensure workouts is an array
       let workoutArray = [];
       if (Array.isArray(response)) {
@@ -333,10 +333,10 @@ export default function Admin() {
         // Handle case where response might be a single workout object
         workoutArray = [response];
       }
-      
+
       console.log("Final workout array for program", programId, ":", workoutArray);
       console.log("Workout count:", workoutArray.length);
-      
+
       setProgramWorkouts(prev => ({ ...prev, [programId]: workoutArray }));
     } catch (error) {
       console.error("Failed to fetch workouts for program", programId, ":", error);
@@ -628,7 +628,7 @@ export default function Admin() {
         {activeTab === "users" && (
           <div className="space-y-4">
             <h2 className="text-xl font-semibold">User Management</h2>
-            
+
             <Card>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
@@ -718,7 +718,7 @@ export default function Admin() {
                 Create Promo Code
               </Button>
             </div>
-            
+
             <div className="space-y-3">
               {promoCodesLoading ? (
                 <div className="text-center py-8">Loading promo codes...</div>
@@ -752,7 +752,7 @@ export default function Admin() {
                               <span>⏰ Expires {new Date(promoCode.expiresAt).toLocaleDateString()}</span>
                             )}
                           </div>
-                          
+
                           {promoCode.uses && promoCode.uses.length > 0 && (
                             <div className="mt-3 p-3 bg-gray-50 rounded-lg">
                               <h4 className="font-medium text-sm mb-2">Recent Usage</h4>
@@ -772,7 +772,7 @@ export default function Admin() {
                             </div>
                           )}
                         </div>
-                        
+
                         <div className="flex gap-2 ml-4">
                           <Button 
                             variant="outline" 
@@ -830,7 +830,7 @@ export default function Admin() {
                   onChange={(e) => setUploadForm({...uploadForm, name: e.target.value})}
                 />
               </div>
-              
+
               <div>
                 <Label htmlFor="description">Description</Label>
                 <Textarea
@@ -855,7 +855,7 @@ export default function Admin() {
                     </SelectContent>
                   </Select>
                 </div>
-                
+
                 <div>
                   <Label htmlFor="category">Category</Label>
                   <Select value={uploadForm.category} onValueChange={(value) => setUploadForm({...uploadForm, category: value})}>
@@ -882,7 +882,7 @@ export default function Admin() {
                     onChange={(e) => setUploadForm({...uploadForm, duration: parseInt(e.target.value) || 12})}
                   />
                 </div>
-                
+
                 <div>
                   <Label htmlFor="frequency">Frequency (days/week)</Label>
                   <Input
@@ -948,7 +948,7 @@ export default function Admin() {
                   onChange={(e) => setEditingProgram({...editingProgram, name: e.target.value})}
                 />
               </div>
-              
+
               <div>
                 <Label htmlFor="edit-description">Description</Label>
                 <Textarea
@@ -957,7 +957,7 @@ export default function Admin() {
                   onChange={(e) => setEditingProgram({...editingProgram, description: e.target.value})}
                 />
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="edit-difficulty">Difficulty</Label>
@@ -972,7 +972,7 @@ export default function Admin() {
                     </SelectContent>
                   </Select>
                 </div>
-                
+
                 <div>
                   <Label htmlFor="edit-category">Category</Label>
                   <Select value={editingProgram.category || "Hyrox"} onValueChange={(value) => setEditingProgram({...editingProgram, category: value})}>
@@ -988,7 +988,7 @@ export default function Admin() {
                   </Select>
                 </div>
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="edit-duration">Duration (weeks)</Label>
@@ -999,7 +999,7 @@ export default function Admin() {
                     onChange={(e) => setEditingProgram({...editingProgram, duration: parseInt(e.target.value) || 12})}
                   />
                 </div>
-                
+
                 <div>
                   <Label htmlFor="edit-frequency">Frequency (days/week)</Label>
                   <Input
@@ -1011,7 +1011,7 @@ export default function Admin() {
                 </div>
               </div>
             </div>
-            
+
             <div className="flex gap-2 mt-6">
               <Button 
                 variant="outline" 
@@ -1059,7 +1059,7 @@ export default function Admin() {
                   className="uppercase"
                 />
               </div>
-              
+
               <div>
                 <Label htmlFor="promoName">Display Name</Label>
                 <Input
@@ -1069,7 +1069,7 @@ export default function Admin() {
                   onChange={(e) => setPromoForm({...promoForm, name: e.target.value})}
                 />
               </div>
-              
+
               <div>
                 <Label htmlFor="promoDescription">Description (Optional)</Label>
                 <Textarea
@@ -1091,7 +1091,7 @@ export default function Admin() {
                     onChange={(e) => setPromoForm({...promoForm, freeMonths: parseInt(e.target.value) || 1})}
                   />
                 </div>
-                
+
                 <div>
                   <Label htmlFor="maxUses">Max Uses (Optional)</Label>
                   <Input
@@ -1157,7 +1157,7 @@ export default function Admin() {
                   className="uppercase"
                 />
               </div>
-              
+
               <div>
                 <Label htmlFor="editPromoName">Display Name</Label>
                 <Input
@@ -1166,7 +1166,7 @@ export default function Admin() {
                   onChange={(e) => setEditingPromoCode({...editingPromoCode, name: e.target.value})}
                 />
               </div>
-              
+
               <div>
                 <Label htmlFor="editPromoDescription">Description</Label>
                 <Textarea
@@ -1187,7 +1187,7 @@ export default function Admin() {
                     onChange={(e) => setEditingPromoCode({...editingPromoCode, freeMonths: parseInt(e.target.value) || 1})}
                   />
                 </div>
-                
+
                 <div>
                   <Label htmlFor="editMaxUses">Max Uses</Label>
                   <Input
@@ -1261,7 +1261,7 @@ export default function Admin() {
                   />
                 </div>
               </div>
-              
+
               <div>
                 <Label htmlFor="edit-workout-name">Workout Name</Label>
                 <Input
@@ -1270,7 +1270,7 @@ export default function Admin() {
                   onChange={(e) => setEditingWorkout({...editingWorkout, name: e.target.value})}
                 />
               </div>
-              
+
               <div>
                 <Label htmlFor="edit-workout-description">Description</Label>
                 <Textarea
@@ -1280,7 +1280,7 @@ export default function Admin() {
                   onChange={(e) => setEditingWorkout({...editingWorkout, description: e.target.value})}
                 />
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="edit-workout-duration">Duration (minutes)</Label>
@@ -1310,7 +1310,7 @@ export default function Admin() {
                   </Select>
                 </div>
               </div>
-              
+
               <div>
                 <Label htmlFor="edit-workout-exercises">Exercises (JSON format)</Label>
                 <Textarea
@@ -1333,7 +1333,7 @@ export default function Admin() {
                 </p>
               </div>
             </div>
-            
+
             <div className="flex gap-2 mt-6">
               <Button 
                 variant="outline" 
@@ -1362,7 +1362,7 @@ export default function Admin() {
                       return;
                     }
                   }
-                  
+
                   updateWorkoutMutation.mutate({
                     ...editingWorkout,
                     exercises: exercisesToSave
