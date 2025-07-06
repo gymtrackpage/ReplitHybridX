@@ -396,39 +396,39 @@ export default function Admin() {
 
       {/* Navigation Tabs */}
       <div className="bg-white border-b border-gray-200">
-        <div className="flex overflow-x-auto">
+        <div className="flex overflow-x-auto no-scrollbar">
           <button
             onClick={() => setActiveTab("programs")}
-            className={`flex items-center gap-2 px-4 py-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+            className={`flex items-center gap-2 px-4 py-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap min-w-0 ${
               activeTab === "programs" 
                 ? "border-yellow-500 text-yellow-600 bg-yellow-50" 
                 : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50"
             }`}
           >
-            <Database className="w-4 h-4" />
-            Programs
+            <Database className="w-4 h-4 flex-shrink-0" />
+            <span>Programs</span>
           </button>
           <button
             onClick={() => setActiveTab("users")}
-            className={`flex items-center gap-2 px-4 py-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+            className={`flex items-center gap-2 px-4 py-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap min-w-0 ${
               activeTab === "users" 
                 ? "border-yellow-500 text-yellow-600 bg-yellow-50" 
                 : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50"
             }`}
           >
-            <Users className="w-4 h-4" />
-            Users
+            <Users className="w-4 h-4 flex-shrink-0" />
+            <span>Users</span>
           </button>
           <button
             onClick={() => setActiveTab("promo-codes")}
-            className={`flex items-center gap-2 px-4 py-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+            className={`flex items-center gap-2 px-4 py-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap min-w-0 ${
               activeTab === "promo-codes" 
                 ? "border-yellow-500 text-yellow-600 bg-yellow-50" 
                 : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50"
             }`}
           >
-            <Crown className="w-4 h-4" />
-            Promo Codes
+            <Crown className="w-4 h-4 flex-shrink-0" />
+            <span>Promo Codes</span>
           </button>
         </div>
       </div>
