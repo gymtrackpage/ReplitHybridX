@@ -10,8 +10,8 @@ import {
   subscriptions,
   promoCodes,
   promoCodeUses,
-  type User,
   type UpsertUser,
+  type User,
   type Program,
   type InsertProgram,
   type Workout,
@@ -34,7 +34,7 @@ import {
   type InsertPromoCodeUse,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, asc, gte, lte, sql, isNotNull } from "drizzle-orm";
+import { eq, desc, and, gte, sql } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (required for Replit Auth)

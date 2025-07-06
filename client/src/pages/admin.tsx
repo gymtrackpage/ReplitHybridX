@@ -79,11 +79,16 @@ export default function Admin() {
     queryKey: ["/api/admin/stats"],
   });
 
-  const { data: promoCodes = [], isLoading: promoCodesLoading } = useQuery({
-    queryKey: ["/api/admin/promo-codes"],
-    enabled: activeTab === "promo-codes",
-    retry: 3,
-    staleTime: 30000,
+  const { data: promoCodes, isLoading: promoCodesLoading } = useQuery({
+    queryKey: ['admin-promo-codes'],
+    queryFn: async () => {
+      const response = await fetch('/api/admin/promo-codes', {
+        credentials: 'include'
+      });
+      if (!response.ok) throw new Error('Failed to fetch promo codes');
+      return response.json();
+    },
+    enabled: user?.isAdmin
   });
 
   // Mutations
@@ -224,75 +229,76 @@ export default function Admin() {
     }
   });
 
-  const createPromoCodeMutation = useMutation({
-    mutationFn: async (promoData: any) => {
-      return apiRequest("POST", "/api/admin/promo-codes", promoData);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/promo-codes"] });
-      setCreatePromoOpen(false);
-      setPromoForm({
-        code: "",
-        name: "",
-        description: "",
-        freeMonths: 1,
-        maxUses: "",
-        expiresAt: "",
-      });
-      toast({
-        title: "Success",
-        description: "Promo code created successfully",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to create promo code",
-        variant: "destructive",
-      });
-    }
-  });
-
-  const updatePromoCodeMutation = useMutation({
-    mutationFn: async ({ id, ...promoData }: any) => {
-      return apiRequest("PUT", `/api/admin/promo-codes/${id}`, promoData);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/promo-codes"] });
-      setEditingPromoCode(null);
-      toast({
-        title: "Success",
-        description: "Promo code updated successfully",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update promo code",
-        variant: "destructive",
-      });
-    }
-  });
-
-  const deletePromoCodeMutation = useMutation({
-    mutationFn: async (promoCodeId: number) => {
-      return apiRequest("DELETE", `/api/admin/promo-codes/${promoCodeId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/promo-codes"] });
-      toast({
-        title: "Success",
-        description: "Promo code deleted successfully",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to delete promo code",
-        variant: "destructive",
-      });
-    }
-  });
+    // Create promo code mutation
+    const createPromoCodeMutation = useMutation({
+      mutationFn: async (promoData: any) => {
+        const response = await fetch('/api/admin/promo-codes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(promoData)
+        });
+        if (!response.ok) throw new Error('Failed to create promo code');
+        return response.json();
+      },
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/promo-codes"] });
+        setCreatePromoOpen(false);
+        setPromoForm({
+          code: '',
+          name: '',
+          description: '',
+          freeMonths: 1,
+          maxUses: '',
+          expiresAt: ''
+        });
+        toast({ title: "Success", description: "Promo code created successfully" });
+      },
+      onError: (error: any) => {
+        toast({ title: "Error", description: error.message, variant: "destructive" });
+      }
+    });
+  
+    // Update promo code mutation
+    const updatePromoCodeMutation = useMutation({
+      mutationFn: async ({ id, ...data }: any) => {
+        const response = await fetch(`/api/admin/promo-codes/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(data)
+        });
+        if (!response.ok) throw new Error('Failed to update promo code');
+        return response.json();
+      },
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/promo-codes"] });
+        setEditingPromoCode(null);
+        toast({ title: "Success", description: "Promo code updated successfully" });
+      },
+      onError: (error: any) => {
+        toast({ title: "Error", description: error.message, variant: "destructive" });
+      }
+    });
+  
+    // Delete promo code mutation
+    const deletePromoCodeMutation = useMutation({
+      mutationFn: async (id: number) => {
+        const response = await fetch(`/api/admin/promo-codes/${id}`, {
+          method: 'DELETE',
+          credentials: 'include'
+        });
+        if (!response.ok) throw new Error('Failed to delete promo code');
+        return response.json();
+      },
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/promo-codes"] });
+        toast({ title: "Success", description: "Promo code deleted successfully" });
+      },
+      onError: (error: any) => {
+        toast({ title: "Error", description: error.message, variant: "destructive" });
+      }
+    });
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
