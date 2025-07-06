@@ -579,7 +579,7 @@ export class DatabaseStorage implements IStorage {
       };
 
       const result = await db.insert(assessments).values(validatedData).returning();
-      
+
       if (!result[0]) {
         throw new Error("Assessment creation failed - no result returned");
       }
@@ -878,12 +878,12 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(promoCodes)
       .where(eq(promoCodes.code, code.toUpperCase()));
-    
+
     if (!promoCode) return undefined;
-    
+
     // Get usage data for this promo code
     const uses = await this.getPromoCodeUses(promoCode.id);
-    
+
     return {
       ...promoCode,
       uses
@@ -906,7 +906,7 @@ export class DatabaseStorage implements IStorage {
     if (updateData.code) {
       updateData.code = updateData.code.toUpperCase();
     }
-    
+
     const [promoCode] = await db
       .update(promoCodes)
       .set(updateData)
