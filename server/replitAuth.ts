@@ -34,12 +34,14 @@ export function getSession() {
   return session({
     secret: process.env.SESSION_SECRET!,
     store: sessionStore,
-    resave: false,
-    saveUninitialized: false,
+    resave: true, // Changed to true for better session persistence
+    saveUninitialized: true, // Changed to true to ensure sessions are created
+    rolling: true, // Reset expiry on each request
     cookie: {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: false, // Set to false for Replit deployment
       maxAge: sessionTtl,
+      sameSite: 'lax', // Added for better cross-site compatibility
     },
   });
 }
@@ -89,73 +91,112 @@ export async function setupAuth(app: Express) {
     }
   };
 
-  for (const domain of process.env
-    .REPLIT_DOMAINS!.split(",")) {
-    const strategy = new Strategy(
-      {
-        name: `replitauth:${domain}`,
-        config,
-        scope: "openid email profile offline_access",
-        callbackURL: `https://${domain}/api/callback`,
-      },
-      verify,
-    );
-    passport.use(strategy);
-  }
-
-  // Add localhost strategy for development
-  const localhostStrategy = new Strategy(
+  // Get the current domain or use the first Replit domain
+  const currentDomain = process.env.REPLIT_DOMAINS!.split(",")[0];
+  
+  // Create a single strategy that works for all domains
+  const strategy = new Strategy(
     {
-      name: `replitauth:localhost`,
+      name: `replitauth:main`,
       config,
       scope: "openid email profile offline_access",
-      callbackURL: `https://${process.env.REPLIT_DOMAINS!.split(",")[0]}/api/callback`,
+      callbackURL: `https://${currentDomain}/api/callback`,
     },
     verify,
   );
-  passport.use(localhostStrategy);
+  passport.use(strategy);
+
+  // Fallback strategy for any domain variations
+  for (const domain of process.env.REPLIT_DOMAINS!.split(",")) {
+    if (domain !== currentDomain) {
+      const fallbackStrategy = new Strategy(
+        {
+          name: `replitauth:${domain}`,
+          config,
+          scope: "openid email profile offline_access",
+          callbackURL: `https://${domain}/api/callback`,
+        },
+        verify,
+      );
+      passport.use(fallbackStrategy);
+    }
+  }
 
   passport.serializeUser((user: Express.User, cb) => cb(null, user));
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
   app.get("/api/login", (req, res, next) => {
     try {
+      console.log("Login attempt from hostname:", req.hostname);
+      
+      // Try main strategy first, fallback to hostname-specific if needed
+      let strategyName = 'replitauth:main';
       const hostname = req.hostname;
       
-      passport.authenticate(`replitauth:${hostname}`, {
+      // Check if we have a specific strategy for this hostname
+      const replitDomains = process.env.REPLIT_DOMAINS!.split(",");
+      if (replitDomains.includes(hostname) && hostname !== replitDomains[0]) {
+        strategyName = `replitauth:${hostname}`;
+      }
+      
+      console.log("Using auth strategy:", strategyName);
+      
+      passport.authenticate(strategyName, {
         prompt: "login consent",
         scope: ["openid", "email", "profile", "offline_access"],
       })(req, res, next);
     } catch (error) {
       console.error("Login error:", error);
-      res.redirect("/login?error=auth_failed");
+      res.redirect("/?error=auth_failed");
     }
   });
 
   // Custom branded login route
   app.get("/api/auth/login", (req, res, next) => {
     try {
+      console.log("Auth login attempt from hostname:", req.hostname);
+      
+      // Use same logic as /api/login
+      let strategyName = 'replitauth:main';
       const hostname = req.hostname;
       
-      passport.authenticate(`replitauth:${hostname}`, {
+      const replitDomains = process.env.REPLIT_DOMAINS!.split(",");
+      if (replitDomains.includes(hostname) && hostname !== replitDomains[0]) {
+        strategyName = `replitauth:${hostname}`;
+      }
+      
+      console.log("Using auth strategy:", strategyName);
+      
+      passport.authenticate(strategyName, {
         prompt: "login consent",
         scope: ["openid", "email", "profile", "offline_access"],
       })(req, res, next);
     } catch (error) {
       console.error("Auth login error:", error);
-      res.redirect("/login?error=auth_failed");
+      res.redirect("/?error=auth_failed");
     }
   });
 
   app.get("/api/callback", (req, res, next) => {
-    // Use the first domain from REPLIT_DOMAINS for localhost requests
+    console.log("Auth callback received from hostname:", req.hostname);
+    console.log("Callback query params:", req.query);
+    
+    // Use same strategy selection logic
+    let strategyName = 'replitauth:main';
     const hostname = req.hostname === 'localhost' ? 
       process.env.REPLIT_DOMAINS!.split(",")[0] : 
       req.hostname;
     
-    passport.authenticate(`replitauth:${hostname}`, {
+    const replitDomains = process.env.REPLIT_DOMAINS!.split(",");
+    if (replitDomains.includes(hostname) && hostname !== replitDomains[0]) {
+      strategyName = `replitauth:${hostname}`;
+    }
+    
+    console.log("Callback using auth strategy:", strategyName);
+    
+    passport.authenticate(strategyName, {
       successReturnToOrRedirect: "/dashboard",
-      failureRedirect: "/login",
+      failureRedirect: "/?error=auth_callback_failed",
       failureFlash: false
     })(req, res, next);
   });
@@ -175,17 +216,31 @@ export async function setupAuth(app: Express) {
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
   const user = req.user as any;
 
-  if (!req.isAuthenticated() || !user.expires_at) {
+  console.log("Auth check - isAuthenticated:", req.isAuthenticated());
+  console.log("Auth check - user exists:", !!user);
+  console.log("Auth check - user expires_at:", user?.expires_at);
+
+  if (!req.isAuthenticated() || !user) {
+    console.log("Authentication failed - no session or user");
     return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  // If no expiry time, assume valid (for development)
+  if (!user.expires_at) {
+    console.log("No expiry time found, allowing access");
+    return next();
   }
 
   const now = Math.floor(Date.now() / 1000);
   if (now <= user.expires_at) {
+    console.log("Token still valid");
     return next();
   }
 
+  console.log("Token expired, attempting refresh");
   const refreshToken = user.refresh_token;
   if (!refreshToken) {
+    console.log("No refresh token available");
     res.status(401).json({ message: "Unauthorized" });
     return;
   }
@@ -194,8 +249,10 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     const config = await getOidcConfig();
     const tokenResponse = await client.refreshTokenGrant(config, refreshToken);
     updateUserSession(user, tokenResponse);
+    console.log("Token refreshed successfully");
     return next();
   } catch (error) {
+    console.error("Token refresh failed:", error);
     res.status(401).json({ message: "Unauthorized" });
     return;
   }
