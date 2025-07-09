@@ -141,28 +141,6 @@ function AppRoutes() {
   );
 }
 
-  return (
-    <Routes>
-      <Route path="/" element={<Landing />} />
-      <Route path="/login" element={<CustomLogin />} />
-      <Route path="/assessment" element={user ? <Assessment /> : <Navigate to="/login" />} />
-      <Route path="/payment" element={user ? <Payment /> : <Navigate to="/login" />} />
-      <Route path="/subscription-success" element={user ? <SubscriptionSuccess /> : <Navigate to="/login" />} />
-      <Route path="/dashboard" element={user ? <Dashboard /> : <Navigate to="/login" />} />
-      <Route path="/profile" element={user ? <Profile /> : <Navigate to="/login" />} />
-      <Route path="/progress" element={user ? <Progress /> : <Navigate to="/login" />} />
-      <Route path="/calendar" element={user ? <Calendar /> : <Navigate to="/login" />} />
-      <Route path="/workouts" element={user ? <Workouts /> : <Navigate to="/login" />} />
-      <Route path="/programs" element={user ? <Programs /> : <Navigate to="/login" />} />
-      <Route path="/settings" element={user ? <Settings /> : <Navigate to="/login" />} />
-      <Route path="/admin" element={user ? <Admin /> : <Navigate to="/login" />} />
-      <Route path="/random-workout" element={user ? <RandomWorkout /> : <Navigate to="/login" />} />
-      <Route path="/free-workouts" element={<FreeWorkouts />} />
-      <Route path="/referrals" element={user ? <ReferralDashboard /> : <Navigate to="/login" />} />
-    </Routes>
-  );
-}
-
 export default function App() {
   return (
     <ErrorBoundary>
