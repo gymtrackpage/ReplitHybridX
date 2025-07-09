@@ -34,7 +34,7 @@ import {
   type InsertPromoCodeUse,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, gte, sql } from "drizzle-orm";
+import { eq, desc, and, gte, sql, isNotNull, asc } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (required for Replit Auth)
