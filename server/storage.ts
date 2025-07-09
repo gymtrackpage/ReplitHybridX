@@ -460,38 +460,6 @@ export class DatabaseStorage implements IStorage {
       console.log(`Found exact workout: Week ${workout.week}, Day ${workout.day} - ${workout.name}`);
     }
 
-      // Find the next workout in sequence
-      const nextWorkout = allWorkouts.find(w => 
-        w.week > currentWeek || (w.week === currentWeek && w.day > currentDay)
-      );
-
-      if (nextWorkout) {
-        console.log(`Found next workout: Week ${nextWorkout.week}, Day ${nextWorkout.day}`);
-
-        // Update progress to match the found workout
-        await this.updateUserProgress(userId, {
-          currentWeek: nextWorkout.week,
-          currentDay: nextWorkout.day
-        });
-
-        workout = nextWorkout;
-      } else {
-        // If no next workout found, check if we need to cycle back to beginning
-        const firstWorkout = allWorkouts[0];
-        if (firstWorkout) {
-          console.log(`End of program reached. Cycling back to Week ${firstWorkout.week}, Day ${firstWorkout.day}`);
-
-          // Update progress to start over
-          await this.updateUserProgress(userId, {
-            currentWeek: firstWorkout.week,
-            currentDay: firstWorkout.day
-          });
-
-          workout = firstWorkout;
-        }
-      }
-    }
-
     if (workout) {
       console.log(`Returning workout: ${workout.name} (Week ${workout.week}, Day ${workout.day})`);
     } else {
@@ -710,18 +678,6 @@ export class DatabaseStorage implements IStorage {
 
     return result;
   }
-
-  async updateUser(userId: string, updates: any): Promise<User> {
-    const [user] = await db
-      .update(users)
-      .set({
-        ...updates,
-        updatedAt: new Date()
-      })
-      .where(eq(users.id, userId))
-      .returning();
-    return user;
-  };
 
   async getUserByStripeSubscriptionId(subscriptionId: string): Promise<User | undefined> {
     const [user] = await db
