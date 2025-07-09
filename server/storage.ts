@@ -721,7 +721,7 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, userId))
       .returning();
     return user;
-  }
+  };
 
   async getUserByStripeSubscriptionId(subscriptionId: string): Promise<User | undefined> {
     const [user] = await db
