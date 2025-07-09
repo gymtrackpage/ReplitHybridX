@@ -1,5 +1,5 @@
 import React from "react";
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { Router, Route, Switch, Redirect } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "./components/ui/toaster";
 import Landing from "./pages/landing";
@@ -92,6 +92,54 @@ function AppRoutes() {
       </div>
     );
   }
+
+  return (
+    <Switch>
+      <Route path="/" component={Landing} />
+      <Route path="/login" component={CustomLogin} />
+      <Route path="/dashboard">
+        {user ? <Dashboard /> : <Redirect to="/login" />}
+      </Route>
+      <Route path="/assessment">
+        {user ? <Assessment /> : <Redirect to="/login" />}
+      </Route>
+      <Route path="/profile">
+        {user ? <Profile /> : <Redirect to="/login" />}
+      </Route>
+      <Route path="/progress">
+        {user ? <Progress /> : <Redirect to="/login" />}
+      </Route>
+      <Route path="/calendar">
+        {user ? <Calendar /> : <Redirect to="/login" />}
+      </Route>
+      <Route path="/workouts">
+        {user ? <Workouts /> : <Redirect to="/login" />}
+      </Route>
+      <Route path="/programs">
+        {user ? <Programs /> : <Redirect to="/login" />}
+      </Route>
+      <Route path="/settings">
+        {user ? <Settings /> : <Redirect to="/login" />}
+      </Route>
+      <Route path="/admin">
+        {user?.role === 'admin' ? <Admin /> : <Redirect to="/dashboard" />}
+      </Route>
+      <Route path="/payment">
+        {user ? <Payment /> : <Redirect to="/login" />}
+      </Route>
+      <Route path="/subscription-success">
+        {user ? <SubscriptionSuccess /> : <Redirect to="/login" />}
+      </Route>
+      <Route path="/random-workout">
+        {user ? <RandomWorkout /> : <Redirect to="/login" />}
+      </Route>
+      <Route path="/free-workouts" component={FreeWorkouts} />
+      <Route path="/referral-dashboard">
+        {user ? <ReferralDashboard /> : <Redirect to="/login" />}
+      </Route>
+    </Switch>
+  );
+}
 
   return (
     <Routes>
