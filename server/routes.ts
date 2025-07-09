@@ -3198,11 +3198,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get current progress to determine next day
-      const progress = await storage.getUserProgress(userId);
+      let progress = await storage.getUserProgress(userId);
       if (!progress) {
         console.error("User progress not found for user:", userId);
         // Create initial progress if it doesn't exist
-        const initialProgress = await storage.createUserProgress({
+        progress = await storage.createUserProgress({
           userId,
           programId: workout.programId,
           currentWeek: 1,
@@ -3232,30 +3232,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .select()
         .from(workouts)
         .where(eq(workouts.programId, progress.programId))
-        .orderBy(workouts.week, workouts.day);
+        .orderBy(asc(workouts.week), asc(workouts.day));
 
       console.log(`Program has ${allWorkouts.length} total workouts`);
 
-      // Calculate next day/week progression
-      const currentDay =progress.currentDay || 1;
+      // Get current position
+      const currentDay = progress.currentDay || 1;
       const currentWeek = progress.currentWeek || 1;
+      
+      console.log(`Current position: Week ${currentWeek}, Day ${currentDay}`);
+
+      // Find what the next workout should be
       let nextDay = currentDay + 1;
       let nextWeek = currentWeek;
 
-      // Check if we need to advance to next week (6 training days per week: Mon-Sat)
-      // Day 7 (Sunday) is rest, so after day 6 we go to day 1 of next week
-      if (nextDay > 6) {
+      // Get the maximum day number in the current week
+      const currentWeekWorkouts = allWorkouts.filter(w => w.week === currentWeek);
+      const maxDayInCurrentWeek = Math.max(...currentWeekWorkouts.map(w => w.day));
+      
+      console.log(`Max day in current week ${currentWeek}: ${maxDayInCurrentWeek}`);
+
+      // If we've completed the last day of the current week, move to next week
+      if (nextDay > maxDayInCurrentWeek) {
         nextDay = 1;
         nextWeek = currentWeek + 1;
+        
+        // Check if the next week exists, if not find the next available week
+        const nextWeekWorkouts = allWorkouts.filter(w => w.week === nextWeek);
+        if (nextWeekWorkouts.length === 0) {
+          // Find the next available week
+          const availableWeeks = [...new Set(allWorkouts.map(w => w.week))].sort((a, b) => a - b);
+          const currentWeekIndex = availableWeeks.indexOf(currentWeek);
+          
+          if (currentWeekIndex >= 0 && currentWeekIndex < availableWeeks.length - 1) {
+            nextWeek = availableWeeks[currentWeekIndex + 1];
+            nextDay = 1;
+          } else {
+            // End of program, cycle back to beginning
+            nextWeek = availableWeeks[0];
+            nextDay = 1;
+          }
+        }
       }
 
-      // Verify the next workout exists, if not find the next available one
-      const nextWorkoutExists = allWorkouts.find(w => w.week === nextWeek && w.day === nextDay);
-
-      if (!nextWorkoutExists && allWorkouts.length > 0) {
+      // Verify the next workout exists
+      const nextWorkout = allWorkouts.find(w => w.week === nextWeek && w.day === nextDay);
+      
+      if (!nextWorkout && allWorkouts.length > 0) {
         console.log(`Next workout Week ${nextWeek} Day ${nextDay} doesn't exist. Finding next available workout...`);
 
-        // Find the next workout in chronological order
+        // Find the next workout in chronological order after current position
         const nextAvailableWorkout = allWorkouts.find(w => 
           w.week > currentWeek || (w.week === currentWeek && w.day > currentDay)
         );
@@ -3287,11 +3313,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Update user's total workout count and streak (only if not skipped)
       if (!skipped) {
-        const user = await storage.getUser(userId);
-        if (user) {
+        const currentUser = await storage.getUser(userId);
+        if (currentUser) {
           await storage.updateUserProfile(userId, {
-            totalWorkouts: (user.totalWorkouts || 0) + 1,
-            streak: (user.streak || 0) + 1
+            totalWorkouts: (currentUser.totalWorkouts || 0) + 1,
+            streak: (currentUser.streak || 0) + 1
           });
         }
       }

@@ -429,6 +429,36 @@ export class DatabaseStorage implements IStorage {
     // If no exact match found, try to find the next available workout
     if (!workout) {
       console.log(`No exact workout found for Week ${currentWeek}, Day ${currentDay}. Looking for next available workout...`);
+      
+      // Find the next workout in chronological order
+      workout = allWorkouts.find(w => 
+        w.week > currentWeek || (w.week === currentWeek && w.day > currentDay)
+      );
+      
+      // If still no workout found, start from the beginning
+      if (!workout) {
+        workout = allWorkouts[0];
+        console.log(`No future workouts found, starting from beginning: Week ${workout?.week}, Day ${workout?.day}`);
+        
+        // Update progress to reflect the reset
+        if (workout) {
+          await this.updateUserProgress(userId, {
+            currentWeek: workout.week,
+            currentDay: workout.day
+          });
+        }
+      } else {
+        console.log(`Found next available workout: Week ${workout.week}, Day ${workout.day}`);
+        
+        // Update progress to reflect the found workout
+        await this.updateUserProgress(userId, {
+          currentWeek: workout.week,
+          currentDay: workout.day
+        });
+      }
+    } else {
+      console.log(`Found exact workout: Week ${workout.week}, Day ${workout.day} - ${workout.name}`);
+    }
 
       // Find the next workout in sequence
       const nextWorkout = allWorkouts.find(w => 

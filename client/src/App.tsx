@@ -1,196 +1,131 @@
-import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
-import { Toaster } from "@/components/ui/toaster";
-import { Switch, Route } from "wouter";
-import { useAuth } from "@/hooks/useAuth";
-import { queryClient } from "@/lib/queryClient";
-import { Logo } from "@/components/Logo";
-import { Card, CardContent } from "@/components/ui/card";
-import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
-import { ReferralTracker } from "@/components/ReferralTracker";
-import { ErrorBoundary } from 'react-error-boundary'
+import React from "react";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Toaster } from "./components/ui/toaster";
+import Landing from "./pages/landing";
+import Dashboard from "./pages/dashboard";
+import Assessment from "./pages/assessment";
+import Profile from "./pages/profile";
+import Progress from "./pages/progress";
+import Calendar from "./pages/calendar";
+import Workouts from "./pages/workouts";
+import Programs from "./pages/programs";
+import Settings from "./pages/settings";
+import Admin from "./pages/admin";
+import Payment from "./pages/payment";
+import SubscriptionSuccess from "./pages/subscription-success";
+import RandomWorkout from "./pages/random-workout";
+import FreeWorkouts from "./pages/free-workouts";
+import CustomLogin from "./pages/custom-login";
+import ReferralDashboard from "./pages/ReferralDashboard";
+import { useAuth } from "./hooks/useAuth";
+import { ReferralTracker } from "./components/ReferralTracker";
+import { PWAInstallPrompt } from "./components/PWAInstallPrompt";
+import { OfflineIndicator } from "./components/OfflineIndicator";
 
-// Pages
-import Landing from "@/pages/landing";
-import Dashboard from "@/pages/dashboard";
-import Profile from "@/pages/profile";
-import Programs from "@/pages/programs";
-import Progress from "@/pages/progress";
-import Calendar from "@/pages/calendar";
-import Settings from "@/pages/settings";
-import Assessment from "@/pages/assessment";
-import Admin from "@/pages/admin";
-import Workouts from "@/pages/workouts";
-import Payment from "@/pages/payment";
-import SubscriptionSuccess from "@/pages/subscription-success";
-import RandomWorkout from "@/pages/random-workout";
-import FreeWorkouts from "@/pages/free-workouts";
-import CustomLogin from "@/pages/custom-login";
-import ReferralDashboard from "@/pages/ReferralDashboard";
+// Create a stable query client instance
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: (failureCount, error: any) => {
+        // Don't retry on 401/403 errors
+        if (error?.status === 401 || error?.status === 403) {
+          return false;
+        }
+        return failureCount < 3;
+      },
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      refetchOnWindowFocus: false,
+    },
+    mutations: {
+      retry: false,
+    },
+  },
+});
 
-function Router() {
-  const { isAuthenticated, isLoading } = useAuth();
-
-  const { data: userStatus, isLoading: statusLoading } = useQuery({
-    queryKey: ["/api/user-onboarding-status"],
-    enabled: isAuthenticated,
-    retry: false,
-  });
-
-  // Debug logging to understand redirect issue
-  if (isAuthenticated && userStatus) {
-    console.log("App routing - User status check:", {
-      assessmentCompleted: (userStatus as any).assessmentCompleted,
-      subscriptionStatus: (userStatus as any).subscriptionStatus,
-      currentPath: window.location.pathname,
-      timestamp: new Date().toISOString(),
-      userStatus
-    });
+// Error Boundary Component
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
   }
 
-  if (isLoading || (isAuthenticated && statusLoading)) {
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('App Error Boundary caught an error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <h2 className="text-xl font-semibold mb-2">Something went wrong</h2>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="px-4 py-2 bg-primary text-white rounded"
+            >
+              Reload Page
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+function AppRoutes() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
 
-  if (!isAuthenticated) {
-    return (
-      <Switch>
-        <Route path="/" component={Landing} />
-        <Route component={Landing} />
-      </Switch>
-    );
-  }
-
-  // Extract user status data with proper defaults
-  const assessmentCompleted = (userStatus as any)?.assessmentCompleted || false;
-  const subscriptionStatus = (userStatus as any)?.subscriptionStatus || 'none';
-  const currentProgramId = (userStatus as any)?.currentProgramId;
-  
-  // Allow access to payment and subscription success pages regardless of assessment status
-  const isOnPaymentFlow = window.location.pathname.includes('/payment') || 
-                         window.location.pathname.includes('/subscription-success');
-  
-  // Check if user has active subscription (including various active states)
-  const hasActiveSubscription = ['active', 'trialing', 'past_due'].includes(subscriptionStatus);
-  const isFreeTrial = subscriptionStatus === 'free_trial';
-  
-  // New users must complete assessment before accessing any features
-  // Exception: Allow payment flow pages and users with active subscriptions to skip assessment
-  const shouldShowAssessment = !assessmentCompleted && !isOnPaymentFlow && !hasActiveSubscription;
-  
-  console.log("App routing decision:", {
-    assessmentCompleted,
-    subscriptionStatus,
-    hasActiveSubscription,
-    isFreeTrial,
-    currentProgramId,
-    isOnPaymentFlow,
-    shouldShowAssessment,
-    currentPath: window.location.pathname,
-    userStatusRaw: userStatus
-  });
-
-  // Additional detailed logging for debugging assessment routing
-  if (shouldShowAssessment) {
-    console.log("🔄 Redirecting to assessment because:", {
-      assessmentNotCompleted: !assessmentCompleted,
-      notOnPaymentFlow: !isOnPaymentFlow,
-      noActiveSubscription: !hasActiveSubscription,
-      allConditions: {
-        assessmentCompleted,
-        isOnPaymentFlow,
-        hasActiveSubscription
-      }
-    });
-  } else {
-    console.log("✅ Allowing access to main app:", {
-      reason: hasActiveSubscription ? "Has active subscription" : 
-              assessmentCompleted ? "Assessment completed" : 
-              isOnPaymentFlow ? "On payment flow" : "Unknown"
-    });
-  }
-
-  // Additional detailed logging for debugging assessment routing
-  if (shouldShowAssessment) {
-    console.log("🔄 Redirecting to assessment because:", {
-      assessmentNotCompleted: !assessmentCompleted,
-      notOnPaymentFlow: !isOnPaymentFlow,
-      noActiveSubscription: !hasActiveSubscription,
-      allConditions: {
-        assessmentCompleted,
-        isOnPaymentFlow,
-        hasActiveSubscription
-      }
-    });
-  } else {
-    console.log("✅ Allowing access to main app:", {
-      reason: hasActiveSubscription ? "Has active subscription" : 
-              assessmentCompleted ? "Assessment completed" : 
-              isOnPaymentFlow ? "On payment flow" : "Unknown"
-    });
-  }
-  
-  // Force assessment completion for new users
-  if (shouldShowAssessment) {
-    return (
-      <Switch>
-        <Route path="/payment" component={Payment} />
-        <Route path="/subscription-success" component={SubscriptionSuccess} />
-        <Route path="/assessment" component={Assessment} />
-        <Route component={Assessment} />
-      </Switch>
-    );
-  }
-
   return (
-    <Switch>
-      <Route path="/login" component={CustomLogin} />
-      <Route path="/programs" component={Programs} />
-      <Route path="/assessment" component={Assessment} />
-      <Route path="/calendar" component={Calendar} />
-      <Route path="/workouts" component={Workouts} />
-      <Route path="/random-workout" component={RandomWorkout} />
-      <Route path="/free-workouts" component={FreeWorkouts} />
-      <Route path="/subscription-success" component={SubscriptionSuccess} />
-      <Route path="/payment" component={Payment} />
-      <Route path="/progress" component={Progress} />
-      <Route path="/profile" component={Profile} />
-      <Route path="/settings" component={Settings} />
-      <Route path="/admin" component={Admin} />
-      <Route path="/referral" component={() => import("./pages/ReferralDashboard").then(m => m.default)} />
-      <Route path="/dashboard" component={Dashboard} />
-      <Route path="/" component={Dashboard} />
-      <Route component={Dashboard} />
-    </Switch>
+    <Routes>
+      <Route path="/" element={<Landing />} />
+      <Route path="/login" element={<CustomLogin />} />
+      <Route path="/assessment" element={user ? <Assessment /> : <Navigate to="/login" />} />
+      <Route path="/payment" element={user ? <Payment /> : <Navigate to="/login" />} />
+      <Route path="/subscription-success" element={user ? <SubscriptionSuccess /> : <Navigate to="/login" />} />
+      <Route path="/dashboard" element={user ? <Dashboard /> : <Navigate to="/login" />} />
+      <Route path="/profile" element={user ? <Profile /> : <Navigate to="/login" />} />
+      <Route path="/progress" element={user ? <Progress /> : <Navigate to="/login" />} />
+      <Route path="/calendar" element={user ? <Calendar /> : <Navigate to="/login" />} />
+      <Route path="/workouts" element={user ? <Workouts /> : <Navigate to="/login" />} />
+      <Route path="/programs" element={user ? <Programs /> : <Navigate to="/login" />} />
+      <Route path="/settings" element={user ? <Settings /> : <Navigate to="/login" />} />
+      <Route path="/admin" element={user ? <Admin /> : <Navigate to="/login" />} />
+      <Route path="/random-workout" element={user ? <RandomWorkout /> : <Navigate to="/login" />} />
+      <Route path="/free-workouts" element={<FreeWorkouts />} />
+      <Route path="/referrals" element={user ? <ReferralDashboard /> : <Navigate to="/login" />} />
+    </Routes>
   );
-}
-
-function ErrorFallback({ error, resetErrorBoundary }) {
-  return (
-    <div role="alert">
-      <p>Something went wrong:</p>
-      <pre>{error.message}</pre>
-      <button onClick={resetErrorBoundary}>Try again</button>
-    </div>
-  )
 }
 
 export default function App() {
   return (
-    <ErrorBoundary 
-      FallbackComponent={ErrorFallback}
-      onError={(error, errorInfo) => {
-        console.error('App Error Boundary caught an error:', error, errorInfo);
-      }}
-    >
+    <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <Router />
-        <ReferralTracker />
-        <Toaster />
-        <PWAInstallPrompt />
+        <Router>
+          <AppRoutes />
+          <ReferralTracker />
+          <Toaster />
+          <PWAInstallPrompt />
+          <OfflineIndicator />
+        </Router>
       </QueryClientProvider>
     </ErrorBoundary>
   );
