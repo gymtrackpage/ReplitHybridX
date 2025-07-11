@@ -28,20 +28,22 @@ export function getSession() {
   const sessionStore = new pgStore({
     conString: process.env.DATABASE_URL,
     createTableIfMissing: true,
-    ttl: sessionTtl,
+    ttl: sessionTtl / 1000, // PostgreSQL store expects seconds, not milliseconds
     tableName: "sessions",
   });
   return session({
     secret: process.env.SESSION_SECRET!,
     store: sessionStore,
-    resave: true, // Changed to true for better session persistence
-    saveUninitialized: true, // Changed to true to ensure sessions are created
+    resave: false, // Don't save session if unmodified
+    saveUninitialized: false, // Don't create session until something stored
     rolling: true, // Reset expiry on each request
+    name: 'hybridx.sid', // Custom session name
     cookie: {
       httpOnly: true,
       secure: false, // Set to false for Replit deployment
       maxAge: sessionTtl,
-      sameSite: 'lax', // Added for better cross-site compatibility
+      sameSite: 'lax', // Better cross-site compatibility
+      path: '/', // Ensure cookie is available for all paths
     },
   });
 }
@@ -225,23 +227,31 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
-  // If no expiry time, assume valid (for development)
+  // If no expiry time, assume valid and extend session
   if (!user.expires_at) {
-    console.log("No expiry time found, allowing access");
+    console.log("No expiry time found, allowing access and extending session");
+    // Touch session to keep it alive
+    req.session.touch();
     return next();
   }
 
   const now = Math.floor(Date.now() / 1000);
-  if (now <= user.expires_at) {
-    console.log("Token still valid");
+  const bufferTime = 300; // 5 minutes buffer before expiry
+  
+  if (now <= (user.expires_at - bufferTime)) {
+    console.log("Token still valid, extending session");
+    // Touch session to keep it alive
+    req.session.touch();
     return next();
   }
 
-  console.log("Token expired, attempting refresh");
+  console.log("Token near expiry or expired, attempting refresh");
   const refreshToken = user.refresh_token;
   if (!refreshToken) {
-    console.log("No refresh token available");
-    res.status(401).json({ message: "Unauthorized" });
+    console.log("No refresh token available, clearing session");
+    req.logout(() => {
+      res.status(401).json({ message: "Session expired, please log in again" });
+    });
     return;
   }
 
@@ -249,11 +259,15 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     const config = await getOidcConfig();
     const tokenResponse = await client.refreshTokenGrant(config, refreshToken);
     updateUserSession(user, tokenResponse);
+    // Touch session to keep it alive after refresh
+    req.session.touch();
     console.log("Token refreshed successfully");
     return next();
   } catch (error) {
     console.error("Token refresh failed:", error);
-    res.status(401).json({ message: "Unauthorized" });
+    req.logout(() => {
+      res.status(401).json({ message: "Session expired, please log in again" });
+    });
     return;
   }
 };

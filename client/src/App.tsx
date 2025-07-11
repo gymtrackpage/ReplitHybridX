@@ -84,7 +84,7 @@ class ErrorBoundary extends React.Component<
 }
 
 function AppRoutes() {
-  const { user, loading } = useAuth();
+  const { user, loading, error } = useAuth();
 
   if (loading) {
     return (
@@ -92,6 +92,12 @@ function AppRoutes() {
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
+  }
+
+  // If there's an authentication error, redirect to login
+  if (error && (error as any)?.status === 401) {
+    // Clear any stale session data
+    localStorage.removeItem('auth-timestamp');
   }
 
   return (
