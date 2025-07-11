@@ -423,17 +423,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({ workouts: [] });
       }
 
-      // Get actual workout completions/skips from database
-      const completions = await storage.getUserWorkoutCompletions(userId);
+      // Get ALL workout completions for the user (not just current month)
+      const allCompletions = await db
+        .select()
+        .from(workoutCompletions)
+        .where(eq(workoutCompletions.userId, userId))
+        .orderBy(desc(workoutCompletions.completedAt));
 
-      // Create calendar entries only from actual historical data
+      // Create calendar entries from all completion data
       const calendarWorkouts = [];
 
-      // Add completed/skipped workouts
-      for (const completion of completions) {
+      // Add all completed/skipped workouts
+      for (const completion of allCompletions) {
         const completedDate = new Date(completion.completedAt);
         const completedMonthYear = completedDate.toISOString().substring(0, 7); // YYYY-MM
 
+        // Only include workouts for the requested month
         if (completedMonthYear === monthYear) {
           const workout = await storage.getWorkout(completion.workoutId);
           if (workout) {
@@ -450,8 +455,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 day: workout.day,
                 exercises: workout.exercises || [],
                 completedAt: completion.completedAt,
-                comments: completion.notes,
-                rating: completion.rating
+                duration: completion.duration,
+                comments: completion.notes || null,
+                rating: completion.rating || null,
+                completionId: completion.id
               }
             });
           }
@@ -493,6 +500,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Sort workouts by date
       calendarWorkouts.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+      console.log(`Calendar: Found ${calendarWorkouts.length} workouts for ${monthYear}, user ${userId}`);
 
       res.json({ workouts: calendarWorkouts });
     } catch (error) {

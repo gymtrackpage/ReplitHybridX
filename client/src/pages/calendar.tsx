@@ -112,6 +112,34 @@ export default function Calendar() {
           </div>
         </div>
 
+        {/* Monthly Stats */}
+        {workoutCalendar?.workouts && workoutCalendar.workouts.length > 0 && (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="grid grid-cols-3 gap-4 text-center">
+                <div>
+                  <div className="text-2xl font-bold text-green-600">
+                    {workoutCalendar.workouts.filter((w: any) => w.status === 'completed').length}
+                  </div>
+                  <div className="text-sm text-muted-foreground">Completed</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-red-600">
+                    {workoutCalendar.workouts.filter((w: any) => w.status === 'skipped').length}
+                  </div>
+                  <div className="text-sm text-muted-foreground">Skipped</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-blue-600">
+                    {workoutCalendar.workouts.filter((w: any) => w.status === 'upcoming').length}
+                  </div>
+                  <div className="text-sm text-muted-foreground">Upcoming</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Month Navigation */}
         <Card>
           <CardHeader className="pb-3">
@@ -170,12 +198,17 @@ export default function Calendar() {
                     
                     {/* Workout Status Pill */}
                     {workout && (
-                      <div 
-                        className={`
-                          absolute bottom-1 left-1/2 transform -translate-x-1/2 
-                          w-2 h-2 rounded-full ${getStatusColor(workout.status)}
-                        `}
-                      />
+                      <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 flex flex-col items-center">
+                        <div 
+                          className={`
+                            w-2 h-2 rounded-full ${getStatusColor(workout.status)}
+                          `}
+                        />
+                        {/* Show completion indicator for completed workouts */}
+                        {workout.status === 'completed' && workout.workout.comments && (
+                          <div className="w-1 h-1 bg-blue-400 rounded-full mt-0.5" title="Has comments" />
+                        )}
+                      </div>
                     )}
                   </div>
                 );
@@ -195,6 +228,10 @@ export default function Calendar() {
               <div className="flex items-center gap-1">
                 <div className="w-2 h-2 rounded-full bg-red-500" />
                 <span>Skipped/Missed</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-1 h-1 rounded-full bg-blue-400" />
+                <span>Has comments</span>
               </div>
             </div>
           </CardContent>
@@ -275,23 +312,58 @@ export default function Calendar() {
                 </div>
               )}
 
-              {/* Comments (for completed workouts) */}
-              {selectedWorkout.workout.comments && (
-                <div>
-                  <h4 className="font-medium mb-2 flex items-center gap-2">
-                    <MessageSquare className="h-4 w-4" />
-                    Comments
+              {/* Completion Details (for completed/skipped workouts) */}
+              {(selectedWorkout.status === 'completed' || selectedWorkout.status === 'skipped') && (
+                <div className="space-y-3 bg-gray-50 p-4 rounded-lg">
+                  <h4 className="font-medium flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4" />
+                    Completion Details
                   </h4>
-                  <p className="text-sm text-muted-foreground p-3 bg-gray-50 rounded">
-                    {selectedWorkout.workout.comments}
-                  </p>
-                </div>
-              )}
+                  
+                  <div className="space-y-2 text-sm">
+                    {selectedWorkout.workout.completedAt && (
+                      <div>
+                        <span className="font-medium">Completed:</span>{' '}
+                        {format(new Date(selectedWorkout.workout.completedAt), 'PPpp')}
+                      </div>
+                    )}
+                    
+                    {selectedWorkout.workout.duration && (
+                      <div>
+                        <span className="font-medium">Duration:</span>{' '}
+                        {selectedWorkout.workout.duration} minutes
+                      </div>
+                    )}
+                    
+                    {selectedWorkout.workout.rating && selectedWorkout.workout.rating > 0 && (
+                      <div>
+                        <span className="font-medium">Rating:</span>{' '}
+                        <span className="text-yellow-600">
+                          {'★'.repeat(selectedWorkout.workout.rating)}
+                          {'☆'.repeat(5 - selectedWorkout.workout.rating)}
+                        </span>
+                      </div>
+                    )}
+                    
+                    {selectedWorkout.status === 'skipped' && (
+                      <div className="text-red-600 font-medium">
+                        This workout was skipped
+                      </div>
+                    )}
+                  </div>
 
-              {/* Completion Info */}
-              {selectedWorkout.workout.completedAt && (
-                <div className="text-xs text-muted-foreground">
-                  Completed on {format(new Date(selectedWorkout.workout.completedAt), 'PPpp')}
+                  {/* Comments */}
+                  {selectedWorkout.workout.comments && (
+                    <div>
+                      <h5 className="font-medium mb-2 flex items-center gap-2">
+                        <MessageSquare className="h-4 w-4" />
+                        Your Comments
+                      </h5>
+                      <p className="text-sm text-muted-foreground bg-white p-3 rounded border">
+                        {selectedWorkout.workout.comments}
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 
