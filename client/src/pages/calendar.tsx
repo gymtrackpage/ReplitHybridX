@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { MobileLayout } from "@/components/layout/mobile-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +18,15 @@ import {
 } from "lucide-react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday, addMonths, subMonths, isSameMonth } from "date-fns";
 
+interface Exercise {
+  name: string;
+  sets?: number;
+  reps?: number;
+  duration?: number;
+  distance?: string;
+  description?: string;
+}
+
 interface WorkoutStatus {
   date: string;
   status: 'upcoming' | 'completed' | 'skipped' | 'missed';
@@ -29,7 +38,7 @@ interface WorkoutStatus {
     workoutType: string;
     week: number;
     day: number;
-    exercises: any[];
+    exercises: Exercise[];
     completedAt?: string;
     comments?: string;
     duration?: number;
@@ -37,6 +46,8 @@ interface WorkoutStatus {
     completionId?: number;
   };
 }
+
+const EXERCISE_PREVIEW_LIMIT = 3;
 
 export default function Calendar() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -88,34 +99,24 @@ export default function Calendar() {
   const monthEnd = endOfMonth(currentMonth);
   const calendarDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
-  const getWorkoutForDate = (date: Date): WorkoutStatus | null => {
+  // Optimize workout lookup with Map for O(1) performance
+  const workoutsByDate = useMemo(() => {
     if (!workoutCalendar?.workouts || !Array.isArray(workoutCalendar.workouts)) {
-      return null;
+      return new Map<string, WorkoutStatus>();
     }
     
+    const map = new Map<string, WorkoutStatus>();
+    workoutCalendar.workouts.forEach((workout: WorkoutStatus) => {
+      if (workout?.date) {
+        map.set(workout.date, workout);
+      }
+    });
+    return map;
+  }, [workoutCalendar?.workouts]);
+
+  const getWorkoutForDate = (date: Date): WorkoutStatus | null => {
     const dateString = format(date, 'yyyy-MM-dd');
-    
-    try {
-      const workout = workoutCalendar.workouts.find((workout: WorkoutStatus) => {
-        if (!workout || !workout.date) return false;
-        
-        // Try exact string match first
-        if (workout.date === dateString) return true;
-        
-        // Then try date comparison for safety
-        try {
-          return isSameDay(new Date(workout.date), date);
-        } catch (dateError) {
-          console.warn("Invalid date in workout:", workout.date);
-          return false;
-        }
-      });
-      
-      return workout || null;
-    } catch (error) {
-      console.error("Error finding workout for date:", dateString, error);
-      return null;
-    }
+    return workoutsByDate.get(dateString) || null;
   };
 
   const getStatusColor = (status: string) => {
@@ -224,19 +225,19 @@ export default function Calendar() {
               <div className="grid grid-cols-3 gap-4 text-center">
                 <div>
                   <div className="text-2xl font-bold text-green-600">
-                    {workoutCalendar.workouts.filter((w: any) => w.status === 'completed').length}
+                    {(workoutCalendar.workouts || []).filter((w: WorkoutStatus) => w.status === 'completed').length}
                   </div>
                   <div className="text-sm text-muted-foreground">Completed</div>
                 </div>
                 <div>
                   <div className="text-2xl font-bold text-red-600">
-                    {workoutCalendar.workouts.filter((w: any) => w.status === 'skipped').length}
+                    {(workoutCalendar.workouts || []).filter((w: WorkoutStatus) => w.status === 'skipped').length}
                   </div>
                   <div className="text-sm text-muted-foreground">Skipped</div>
                 </div>
                 <div>
                   <div className="text-2xl font-bold text-blue-600">
-                    {workoutCalendar.workouts.filter((w: any) => w.status === 'upcoming').length}
+                    {(workoutCalendar.workouts || []).filter((w: WorkoutStatus) => w.status === 'upcoming').length}
                   </div>
                   <div className="text-sm text-muted-foreground">Upcoming</div>
                 </div>
@@ -287,15 +288,26 @@ export default function Calendar() {
                 const isSelected = selectedDate && isSameDay(date, selectedDate);
                 const isTodayDate = isToday(date);
                 
+                const handleKeyDown = (e: React.KeyboardEvent) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleDateClick(date);
+                  }
+                };
+                
                 return (
                   <div
                     key={date.toISOString()}
                     className={`
-                      relative p-2 h-12 cursor-pointer border rounded-lg transition-colors
+                      relative p-2 h-12 cursor-pointer border rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500
                       ${isSelected ? 'bg-blue-100 border-blue-300' : 'hover:bg-gray-50'}
                       ${isTodayDate ? 'border-yellow-400 bg-yellow-50' : 'border-gray-200'}
                     `}
                     onClick={() => handleDateClick(date)}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`${format(date, 'MMMM d, yyyy')}${workout ? ` - ${workout.workout.name} (${workout.status})` : ' - No workout scheduled'}`}
+                    onKeyDown={handleKeyDown}
                   >
                     <span className={`text-sm ${isTodayDate ? 'font-bold text-yellow-700' : ''}`}>
                       {format(date, 'd')}
@@ -351,7 +363,13 @@ export default function Calendar() {
                 {selectedWorkout.workout.name}
               </CardTitle>
               <CardDescription>
-                {format(new Date(selectedWorkout.date), 'EEEE, MMMM d, yyyy')} • 
+                {(() => {
+                  try {
+                    return format(new Date(selectedWorkout.date), 'EEEE, MMMM d, yyyy');
+                  } catch {
+                    return 'Invalid date';
+                  }
+                })()} • 
                 Week {selectedWorkout.workout.week}, Day {selectedWorkout.workout.day}
               </CardDescription>
             </CardHeader>
@@ -393,7 +411,7 @@ export default function Calendar() {
                     Exercises ({selectedWorkout.workout.exercises.length})
                   </h4>
                   <div className="space-y-2">
-                    {selectedWorkout.workout.exercises.slice(0, 3).map((exercise: any, index: number) => (
+                    {selectedWorkout.workout.exercises.slice(0, EXERCISE_PREVIEW_LIMIT).map((exercise: Exercise, index: number) => (
                       <div key={index} className="text-sm p-2 bg-gray-50 rounded">
                         <div className="font-medium">{exercise.name}</div>
                         {exercise.sets && exercise.reps && (
@@ -408,9 +426,9 @@ export default function Calendar() {
                         )}
                       </div>
                     ))}
-                    {selectedWorkout.workout.exercises.length > 3 && (
+                    {selectedWorkout.workout.exercises.length > EXERCISE_PREVIEW_LIMIT && (
                       <div className="text-sm text-muted-foreground text-center">
-                        +{selectedWorkout.workout.exercises.length - 3} more exercises
+                        +{selectedWorkout.workout.exercises.length - EXERCISE_PREVIEW_LIMIT} more exercises
                       </div>
                     )}
                   </div>
@@ -429,7 +447,13 @@ export default function Calendar() {
                     {selectedWorkout.workout.completedAt && (
                       <div>
                         <span className="font-medium">Completed:</span>{' '}
-                        {format(new Date(selectedWorkout.workout.completedAt), 'PPpp')}
+                        {(() => {
+                          try {
+                            return format(new Date(selectedWorkout.workout.completedAt), 'PPpp');
+                          } catch {
+                            return 'Invalid date';
+                          }
+                        })()}
                       </div>
                     )}
                     
@@ -494,7 +518,13 @@ export default function Calendar() {
               <CalendarIcon className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <h3 className="text-lg font-semibold mb-2">No Workout Scheduled</h3>
               <p className="text-muted-foreground">
-                {format(selectedDate, 'EEEE, MMMM d, yyyy')} is a rest day or no workout is scheduled.
+                {(() => {
+                  try {
+                    return format(selectedDate, 'EEEE, MMMM d, yyyy');
+                  } catch {
+                    return 'Selected date';
+                  }
+                })()} is a rest day or no workout is scheduled.
               </p>
             </CardContent>
           </Card>
