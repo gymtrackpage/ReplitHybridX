@@ -35,7 +35,7 @@ const queryClient = new QueryClient({
   },
 });
 
-function App() {
+export default function App() {
   return (
     <React.StrictMode>
       <QueryClientProvider client={queryClient}>
