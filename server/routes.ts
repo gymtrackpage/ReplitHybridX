@@ -400,113 +400,145 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const monthYear = req.query.month;
 
-      if (!monthYear) {
-        return res.status(400).json({ message: "Month parameter required (YYYY-MM format)" });
+      console.log(`Calendar API called for user ${userId}, month: ${monthYear}`);
+
+      if (!monthYear || typeof monthYear !== 'string' || !monthYear.match(/^\d{4}-\d{2}$/)) {
+        return res.status(400).json({ 
+          message: "Month parameter required in YYYY-MM format",
+          received: monthYear 
+        });
       }
 
       // Get user and check access level
       const user = await storage.getUser(userId);
       const userProgress = await storage.getUserProgress(userId);
 
+      console.log(`User assessment completed: ${user?.assessmentCompleted}, has program: ${!!userProgress?.programId}`);
+
       // Check if user has proper access to programs
       const hasAssessment = user?.assessmentCompleted;
       const hasActiveProgram = userProgress?.programId;
       const isAdmin = user?.isAdmin;
-      const isPremium = user?.subscriptionStatus === 'active';
+      const isPremium = user?.subscriptionStatus === 'active' || user?.subscriptionStatus === 'free_trial';
 
       // Only show calendar for users with proper access
       if (!isAdmin && !hasAssessment) {
-        return res.json({ workouts: [] });
+        console.log(`No assessment completed for user ${userId}`);
+        return res.json({ workouts: [], message: "Assessment not completed" });
       }
 
       if (!hasActiveProgram) {
-        return res.json({ workouts: [] });
+        console.log(`No active program for user ${userId}`);
+        return res.json({ workouts: [], message: "No active program" });
       }
 
-      // Get ALL workout completions for the user (not just current month)
+      // Get ALL workout completions for the user
       const allCompletions = await db
         .select()
         .from(workoutCompletions)
         .where(eq(workoutCompletions.userId, userId))
         .orderBy(desc(workoutCompletions.completedAt));
 
-      // Create calendar entries from all completion data
+      console.log(`Found ${allCompletions.length} total completions for user ${userId}`);
+
+      // Create calendar entries from completion data
       const calendarWorkouts = [];
 
-      // Add all completed/skipped workouts
+      // Add all completed/skipped workouts for the requested month
       for (const completion of allCompletions) {
-        const completedDate = new Date(completion.completedAt);
-        const completedMonthYear = completedDate.toISOString().substring(0, 7); // YYYY-MM
+        try {
+          const completedDate = new Date(completion.completedAt);
+          const completedMonthYear = completedDate.toISOString().substring(0, 7); // YYYY-MM
 
-        // Only include workouts for the requested month
-        if (completedMonthYear === monthYear) {
-          const workout = await storage.getWorkout(completion.workoutId);
-          if (workout) {
-            calendarWorkouts.push({
-              date: completedDate.toISOString().split('T')[0],
-              status: completion.skipped ? 'skipped' : 'completed',
-              workout: {
-                id: workout.id,
-                name: workout.name,
-                description: workout.description,
-                estimatedDuration: workout.estimatedDuration || 60,
-                workoutType: workout.workoutType || 'training',
-                week: workout.week,
-                day: workout.day,
-                exercises: workout.exercises || [],
-                completedAt: completion.completedAt,
-                duration: completion.duration,
-                comments: completion.notes || null,
-                rating: completion.rating || null,
-                completionId: completion.id
-              }
-            });
+          // Only include workouts for the requested month
+          if (completedMonthYear === monthYear) {
+            const workout = await storage.getWorkout(completion.workoutId);
+            if (workout) {
+              calendarWorkouts.push({
+                date: completedDate.toISOString().split('T')[0],
+                status: completion.skipped ? 'skipped' : 'completed',
+                workout: {
+                  id: workout.id,
+                  name: workout.name,
+                  description: workout.description || '',
+                  estimatedDuration: workout.estimatedDuration || workout.duration || 60,
+                  workoutType: workout.workoutType || 'Training',
+                  week: workout.week || 0,
+                  day: workout.day || 0,
+                  exercises: Array.isArray(workout.exercises) ? workout.exercises : [],
+                  completedAt: completion.completedAt,
+                  duration: completion.duration || null,
+                  comments: completion.notes || null,
+                  rating: completion.rating || null,
+                  completionId: completion.id
+                }
+              });
+            } else {
+              console.warn(`Workout ${completion.workoutId} not found for completion ${completion.id}`);
+            }
           }
+        } catch (completionError) {
+          console.error(`Error processing completion ${completion.id}:`, completionError);
         }
       }
 
       // For premium/admin users, add today's workout if it exists and hasn't been completed
       if ((isPremium || isAdmin) && userProgress) {
-        const today = new Date();
-        const todayString = today.toISOString().split('T')[0];
-        const todayMonthYear = today.toISOString().substring(0, 7);
+        try {
+          const today = new Date();
+          const todayString = today.toISOString().split('T')[0];
+          const todayMonthYear = today.toISOString().substring(0, 7);
 
-        if (todayMonthYear === monthYear) {
-          // Check if today's workout already exists in calendar
-          const todayWorkoutExists = calendarWorkouts.some(w => w.date === todayString);
+          if (todayMonthYear === monthYear) {
+            // Check if today's workout already exists in calendar
+            const todayWorkoutExists = calendarWorkouts.some(w => w.date === todayString);
 
-          if (!todayWorkoutExists) {
-            // Get today's scheduled workout
-            const todaysWorkout = await storage.getTodaysWorkout(userId);
-            if (todaysWorkout) {
-              calendarWorkouts.push({
-                date: todayString,
-                status: 'upcoming',
-                workout: {
-                  id: todaysWorkout.id,
-                  name: todaysWorkout.name,
-                  description: todaysWorkout.description,
-                  estimatedDuration: todaysWorkout.estimatedDuration || 60,
-                  workoutType: todaysWorkout.workoutType || 'training',
-                  week: todaysWorkout.week,
-                  day: todaysWorkout.day,
-                  exercises: todaysWorkout.exercises || []
-                }
-              });
+            if (!todayWorkoutExists) {
+              // Get today's scheduled workout
+              const todaysWorkout = await storage.getTodaysWorkout(userId);
+              if (todaysWorkout) {
+                calendarWorkouts.push({
+                  date: todayString,
+                  status: 'upcoming',
+                  workout: {
+                    id: todaysWorkout.id,
+                    name: todaysWorkout.name,
+                    description: todaysWorkout.description || '',
+                    estimatedDuration: todaysWorkout.estimatedDuration || todaysWorkout.duration || 60,
+                    workoutType: todaysWorkout.workoutType || 'Training',
+                    week: todaysWorkout.week || 0,
+                    day: todaysWorkout.day || 0,
+                    exercises: Array.isArray(todaysWorkout.exercises) ? todaysWorkout.exercises : []
+                  }
+                });
+              }
             }
           }
+        } catch (todayError) {
+          console.error("Error adding today's workout to calendar:", todayError);
         }
       }
 
       // Sort workouts by date
       calendarWorkouts.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-      console.log(`Calendar: Found ${calendarWorkouts.length} workouts for ${monthYear}, user ${userId}`);
+      console.log(`Calendar: Returning ${calendarWorkouts.length} workouts for ${monthYear}, user ${userId}`);
 
-      res.json({ workouts: calendarWorkouts });
+      res.json({ 
+        workouts: calendarWorkouts,
+        userAccess: {
+          hasAssessment,
+          hasActiveProgram,
+          isPremium,
+          isAdmin
+        }
+      });
     } catch (error) {
       console.error("Error fetching workout calendar:", error);
-      res.status(500).json({ message: "Failed to fetch workout calendar" });
+      res.status(500).json({ 
+        message: "Failed to fetch workout calendar",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
     }
   });
 
@@ -2226,13 +2258,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Validate price ID exists
+      // Validate price ID exists and test it
       const PRICE_ID = 'price_1RgOOZGKLIEfAkDGfqPezReg';
       if (!PRICE_ID) {
         console.error("Stripe price ID not configured");
         return res.status(500).json({ 
           message: "Subscription pricing not configured. Please contact support.",
           error: "PRICE_ID_NOT_CONFIGURED"
+        });
+      }
+
+      // Verify price exists in Stripe and get details
+      let priceDetails;
+      try {
+        priceDetails = await stripe.prices.retrieve(PRICE_ID);
+        console.log("Price validation successful:", {
+          id: priceDetails.id,
+          amount: priceDetails.unit_amount,
+          currency: priceDetails.currency,
+          active: priceDetails.active
+        });
+        
+        if (!priceDetails.active) {
+          console.error("Price ID is not active in Stripe:", PRICE_ID);
+          return res.status(500).json({ 
+            message: "Subscription pricing is currently unavailable. Please contact support.",
+            error: "PRICE_NOT_ACTIVE"
+          });
+        }
+      } catch (priceError: any) {
+        console.error("Price validation failed:", priceError.message);
+        return res.status(500).json({ 
+          message: "Subscription pricing configuration error. Please contact support.",
+          error: "INVALID_PRICE_ID",
+          details: priceError.message
         });
       }
 

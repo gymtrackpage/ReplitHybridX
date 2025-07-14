@@ -46,17 +46,42 @@ export default function Calendar() {
   const { data: workoutCalendar, isLoading, error } = useQuery({
     queryKey: ["/api/workout-calendar", format(currentMonth, 'yyyy-MM')],
     queryFn: async () => {
-      const monthParam = format(currentMonth, 'yyyy-MM');
-      const response = await fetch(`/api/workout-calendar?month=${monthParam}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch workout calendar');
+      try {
+        const monthParam = format(currentMonth, 'yyyy-MM');
+        console.log(`Fetching calendar data for ${monthParam}`);
+        
+        const response = await fetch(`/api/workout-calendar?month=${monthParam}`, {
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`Calendar API error ${response.status}:`, errorText);
+          throw new Error(`Failed to fetch workout calendar: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log(`Calendar data for ${monthParam}:`, data);
+        
+        // Ensure workouts is always an array
+        if (!data.workouts || !Array.isArray(data.workouts)) {
+          console.warn("Invalid workouts data, defaulting to empty array:", data);
+          return { workouts: [], userAccess: data.userAccess };
+        }
+        
+        return data;
+      } catch (fetchError) {
+        console.error("Calendar fetch error:", fetchError);
+        throw fetchError;
       }
-      const data = await response.json();
-      console.log(`Calendar data for ${monthParam}:`, data);
-      return data;
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 2 * 60 * 1000, // 2 minutes
     refetchOnWindowFocus: false,
+    retry: 2,
+    retryDelay: 1000,
   });
 
   const monthStart = startOfMonth(currentMonth);
@@ -65,16 +90,32 @@ export default function Calendar() {
 
   const getWorkoutForDate = (date: Date): WorkoutStatus | null => {
     if (!workoutCalendar?.workouts || !Array.isArray(workoutCalendar.workouts)) {
-      console.log("No workouts data available:", workoutCalendar);
       return null;
     }
     
     const dateString = format(date, 'yyyy-MM-dd');
-    const workout = workoutCalendar.workouts.find((workout: WorkoutStatus) => 
-      workout.date === dateString || isSameDay(new Date(workout.date), date)
-    );
     
-    return workout || null;
+    try {
+      const workout = workoutCalendar.workouts.find((workout: WorkoutStatus) => {
+        if (!workout || !workout.date) return false;
+        
+        // Try exact string match first
+        if (workout.date === dateString) return true;
+        
+        // Then try date comparison for safety
+        try {
+          return isSameDay(new Date(workout.date), date);
+        } catch (dateError) {
+          console.warn("Invalid date in workout:", workout.date);
+          return false;
+        }
+      });
+      
+      return workout || null;
+    } catch (error) {
+      console.error("Error finding workout for date:", dateString, error);
+      return null;
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -136,10 +177,26 @@ export default function Calendar() {
           </div>
           <Card>
             <CardContent className="text-center py-8">
-              <p className="text-red-500 mb-4">Failed to load calendar data</p>
-              <Button onClick={() => window.location.reload()}>
-                Refresh Page
-              </Button>
+              <CalendarIcon className="h-12 w-12 mx-auto text-red-400 mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Calendar Unavailable</h3>
+              <p className="text-red-500 mb-4">
+                {error instanceof Error ? error.message : "Failed to load calendar data"}
+              </p>
+              <div className="space-y-2">
+                <Button 
+                  onClick={() => window.location.reload()}
+                  className="w-full"
+                >
+                  Refresh Page
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => window.location.href = '/dashboard'}
+                  className="w-full"
+                >
+                  Return to Dashboard
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>

@@ -234,7 +234,7 @@ function CheckoutForm({ clientSecret, subscriptionId }: { clientSecret: string, 
         size="lg"
       >
         <CreditCard className="h-4 w-4 mr-2" />
-        {isProcessing ? "Processing..." : "Complete Payment - £5/month"}
+        {isProcessing ? "Processing Payment..." : "Complete Payment - £5.00/month"}
       </Button>
 
       <p className="text-xs text-center text-gray-500">

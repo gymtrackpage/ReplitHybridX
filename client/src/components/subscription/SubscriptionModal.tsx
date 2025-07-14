@@ -129,8 +129,8 @@ export function SubscriptionModal({ open, onOpenChange, feature }: SubscriptionM
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="text-center">
-                <div className="text-3xl font-bold text-yellow-600">£5</div>
-                <div className="text-sm text-muted-foreground">per month</div>
+                <div className="text-3xl font-bold text-yellow-600">£5.00</div>
+                <div className="text-sm text-muted-foreground">per month • Cancel anytime</div>
               </div>
               
               <div className="space-y-2">
