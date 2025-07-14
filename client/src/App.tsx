@@ -1,7 +1,8 @@
 
 import React from "react";
 import { Router, Route, Switch, Redirect } from "wouter";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "./lib/queryClient";
 import { Toaster } from "./components/ui/toaster";
 import Landing from "./pages/landing";
 import Dashboard from "./pages/dashboard";
@@ -23,26 +24,6 @@ import { useAuth } from "./hooks/useAuth";
 import { ReferralTracker } from "./components/ReferralTracker";
 import { PWAInstallPrompt } from "./components/PWAInstallPrompt";
 import { OfflineIndicator } from "./components/OfflineIndicator";
-
-// Create a stable query client instance
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: (failureCount, error: any) => {
-        // Don't retry on 401/403 errors
-        if (error?.status === 401 || error?.status === 403) {
-          return false;
-        }
-        return failureCount < 3;
-      },
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      refetchOnWindowFocus: false,
-    },
-    mutations: {
-      retry: false,
-    },
-  },
-});
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component<
@@ -154,10 +135,7 @@ export default function App() {
       <QueryClientProvider client={queryClient}>
         <Router>
           <AppRoutes />
-          <ReferralTracker />
           <Toaster />
-          <PWAInstallPrompt />
-          <OfflineIndicator />
         </Router>
       </QueryClientProvider>
     </ErrorBoundary>

@@ -1079,60 +1079,124 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Month parameter required (YYYY-MM format)" });
       }
 
-      // Get user's current program and progress
+      console.log(`Calendar: Fetching data for ${monthYear}, user ${userId}`);
+
+      // Get user and check access level
+      const user = await storage.getUser(userId);
       const userProgress = await storage.getUserProgress(userId);
-      if (!userProgress || !userProgress.programId) {
+
+      // Check if user has proper access to programs
+      const hasAssessment = user?.assessmentCompleted;
+      const hasActiveProgram = userProgress?.programId;
+      const isAdmin = user?.isAdmin;
+      const isPremium = user?.subscriptionStatus === 'active';
+
+      // Only show calendar for users with proper access
+      if (!isAdmin && !hasAssessment) {
+        return res.json({ workouts: [] });
+      }
+
+      if (!hasActiveProgram) {
         return res.json({ workouts: [] });
       }
 
       // Get all workouts for the user's current program
       const programWorkouts = await storage.getProgramWorkouts(userProgress.programId);
 
-      // Get user's workout completions
-      const completions = await storage.getUserWorkoutCompletions(userId);
+      // Get ALL workout completions for the user (not just current month)
+      const allCompletions = await db
+        .select()
+        .from(workoutCompletions)
+        .where(eq(workoutCompletions.userId, userId))
+        .orderBy(desc(workoutCompletions.completedAt));
 
-      // Calculate workout schedule based on start date and program structure
-      const startDate = userProgress.startDate ? new Date(userProgress.startDate) : new Date();
-      const workoutCalendar = [];
+      // Create calendar entries from all completion data
+      const calendarWorkouts = [];
 
-      for (const workout of programWorkouts) {
-        // Calculate the date for this workout based on week/day
-        const workoutDate = new Date(startDate);
-        workoutDate.setDate(startDate.getDate() + ((workout.week - 1) * 7) + (workout.day - 1));
+      // Add all completed/skipped workouts
+      for (const completion of allCompletions) {
+        const completedDate = new Date(completion.completedAt);
+        const completedMonthYear = completedDate.toISOString().substring(0, 7); // YYYY-MM
 
-        // Check if this workout date falls in the requested month
-        const workoutMonthYear = workoutDate.toISOString().substring(0, 7); // YYYY-MM
-        if (workoutMonthYear === monthYear) {
-          // Check completion status
-          const completion = completions.find((c: any) => c.workoutId === workout.id);
-          let status = 'upcoming';
-
-          if (completion) {
-            status = 'completed';
-          } else if (workoutDate < new Date()) {
-            status = 'missed';
+        // Only include workouts for the requested month
+        if (completedMonthYear === monthYear) {
+          const workout = await storage.getWorkout(completion.workoutId);
+          if (workout) {
+            calendarWorkouts.push({
+              date: completedDate.toISOString().split('T')[0],
+              status: completion.skipped ? 'skipped' : 'completed',
+              workout: {
+                id: workout.id,
+                name: workout.name,
+                description: workout.description,
+                estimatedDuration: workout.estimatedDuration || 60,
+                workoutType: workout.workoutType || 'training',
+                week: workout.week,
+                day: workout.day,
+                exercises: workout.exercises || [],
+                completedAt: completion.completedAt,
+                duration: completion.duration,
+                comments: completion.notes || null,
+                rating: completion.rating || null,
+                completionId: completion.id
+              }
+            });
           }
-
-          workoutCalendar.push({
-            date: workoutDate.toISOString().split('T')[0],
-            status,
-            workout: {
-              id: workout.id,
-              name: workout.name,
-              description: workout.description,
-              estimatedDuration: workout.estimatedDuration || 60,
-              workoutType: 'training',
-              week: workout.week,
-              day: workout.day,
-              exercises: workout.exercises || [],
-              completedAt: completion?.completedAt,
-              comments: completion?.notes
-            }
-          });
         }
       }
 
-      res.json({ workouts: workoutCalendar });
+      // For premium/admin users, add scheduled workouts from the program
+      if ((isPremium || isAdmin) && userProgress) {
+        const startDate = userProgress.startDate ? new Date(userProgress.startDate) : new Date();
+        
+        for (const workout of programWorkouts) {
+          // Calculate the date for this workout based on week/day
+          const workoutDate = new Date(startDate);
+          workoutDate.setDate(startDate.getDate() + ((workout.week - 1) * 7) + (workout.day - 1));
+
+          // Check if this workout date falls in the requested month
+          const workoutMonthYear = workoutDate.toISOString().substring(0, 7); // YYYY-MM
+          if (workoutMonthYear === monthYear) {
+            // Check if this workout was already completed (and thus already in calendar)
+            const alreadyExists = calendarWorkouts.some(w => w.workout.id === workout.id);
+            
+            if (!alreadyExists) {
+              // Check completion status for any workout with this ID
+              const completion = allCompletions.find((c: any) => c.workoutId === workout.id);
+              let status = 'upcoming';
+
+              if (completion) {
+                // Skip this workout - it's already been added as completed above
+                continue;
+              } else if (workoutDate < new Date()) {
+                status = 'missed';
+              }
+
+              calendarWorkouts.push({
+                date: workoutDate.toISOString().split('T')[0],
+                status,
+                workout: {
+                  id: workout.id,
+                  name: workout.name,
+                  description: workout.description,
+                  estimatedDuration: workout.estimatedDuration || 60,
+                  workoutType: workout.workoutType || 'training',
+                  week: workout.week,
+                  day: workout.day,
+                  exercises: workout.exercises || []
+                }
+              });
+            }
+          }
+        }
+      }
+
+      // Sort workouts by date
+      calendarWorkouts.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+      console.log(`Calendar: Found ${calendarWorkouts.length} workouts for ${monthYear}, user ${userId}`);
+
+      res.json({ workouts: calendarWorkouts });
     } catch (error) {
       console.error("Error fetching workout calendar:", error);
       res.status(500).json({ message: "Failed to fetch workout calendar" });

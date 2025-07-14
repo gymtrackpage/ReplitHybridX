@@ -32,6 +32,9 @@ interface WorkoutStatus {
     exercises: any[];
     completedAt?: string;
     comments?: string;
+    duration?: number;
+    rating?: number;
+    completionId?: number;
   };
 }
 
