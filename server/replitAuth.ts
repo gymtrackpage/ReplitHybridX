@@ -23,28 +23,40 @@ const getOidcConfig = memoize(
 );
 
 export function getSession() {
-  const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
+  const sessionTtl = 30 * 24 * 60 * 60 * 1000; // Increased to 30 days
   const pgStore = connectPg(session);
   const sessionStore = new pgStore({
     conString: process.env.DATABASE_URL,
     createTableIfMissing: true,
     ttl: sessionTtl / 1000, // PostgreSQL store expects seconds, not milliseconds
     tableName: "sessions",
+    // Add connection pool settings for better reliability
+    pool: {
+      min: 0,
+      max: 10,
+      acquireTimeoutMillis: 60000,
+      idleTimeoutMillis: 30000
+    },
+    // Enable automatic session cleanup
+    pruneSessionInterval: 24 * 60 * 60, // 24 hours
   });
+  
   return session({
     secret: process.env.SESSION_SECRET!,
     store: sessionStore,
     resave: false, // Don't save session if unmodified
     saveUninitialized: false, // Don't create session until something stored
-    rolling: true, // Reset expiry on each request
+    rolling: true, // Reset expiry on each request - keeps session alive with activity
     name: 'hybridx.sid', // Custom session name
     cookie: {
       httpOnly: true,
       secure: false, // Set to false for Replit deployment
-      maxAge: sessionTtl,
+      maxAge: sessionTtl, // 30 days
       sameSite: 'lax', // Better cross-site compatibility
       path: '/', // Ensure cookie is available for all paths
     },
+    // Add session touch on API calls to keep sessions alive
+    touchAfter: 24 * 60 * 60, // Only touch session once per day to reduce DB writes
   });
 }
 
@@ -227,28 +239,33 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
-  // If no expiry time, assume valid and extend session
+  // Always touch session to maintain activity-based persistence
+  req.session.touch();
+
+  // If no expiry time, assume valid and continue
   if (!user.expires_at) {
-    console.log("No expiry time found, allowing access and extending session");
-    // Touch session to keep it alive
-    req.session.touch();
+    console.log("No expiry time found, allowing access with session extension");
     return next();
   }
 
   const now = Math.floor(Date.now() / 1000);
-  const bufferTime = 300; // 5 minutes buffer before expiry
+  const bufferTime = 900; // Increased to 15 minutes buffer before expiry
   
   if (now <= (user.expires_at - bufferTime)) {
-    console.log("Token still valid, extending session");
-    // Touch session to keep it alive
-    req.session.touch();
+    console.log("Token still valid, session extended");
     return next();
   }
 
   console.log("Token near expiry or expired, attempting refresh");
   const refreshToken = user.refresh_token;
   if (!refreshToken) {
-    console.log("No refresh token available, clearing session");
+    console.log("No refresh token available, but keeping session alive for grace period");
+    // Instead of immediately logging out, give a grace period
+    if (now <= (user.expires_at + 3600)) { // 1 hour grace period
+      console.log("Within grace period, allowing access");
+      return next();
+    }
+    console.log("Grace period expired, clearing session");
     req.logout(() => {
       res.status(401).json({ message: "Session expired, please log in again" });
     });
@@ -259,12 +276,16 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     const config = await getOidcConfig();
     const tokenResponse = await client.refreshTokenGrant(config, refreshToken);
     updateUserSession(user, tokenResponse);
-    // Touch session to keep it alive after refresh
-    req.session.touch();
-    console.log("Token refreshed successfully");
+    console.log("Token refreshed successfully, session extended");
     return next();
   } catch (error) {
     console.error("Token refresh failed:", error);
+    // Try to continue with existing session if refresh fails but not too old
+    if (now <= (user.expires_at + 3600)) { // 1 hour grace period
+      console.log("Refresh failed but within grace period, allowing access");
+      return next();
+    }
+    console.log("Refresh failed and beyond grace period, clearing session");
     req.logout(() => {
       res.status(401).json({ message: "Session expired, please log in again" });
     });
