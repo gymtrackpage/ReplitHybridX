@@ -482,40 +482,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // For premium/admin users, add today's workout if it exists and hasn't been completed
-      if ((isPremium || isAdmin) && userProgress) {
+      // Generate scheduled workouts for the month if user has premium access
+      if ((isPremium || isAdmin) && userProgress && userProgress.startDate) {
         try {
-          const today = new Date();
-          const todayString = today.toISOString().split('T')[0];
-          const todayMonthYear = today.toISOString().substring(0, 7);
+          const startDate = new Date(userProgress.startDate);
+          const monthStart = new Date(monthYear + '-01');
+          const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
+          
+          // Get all workouts for the user's program
+          const programWorkouts = await db
+            .select()
+            .from(workouts)
+            .where(eq(workouts.programId, userProgress.programId))
+            .orderBy(asc(workouts.week), asc(workouts.day));
 
-          if (todayMonthYear === monthYear) {
-            // Check if today's workout already exists in calendar
-            const todayWorkoutExists = calendarWorkouts.some(w => w.date === todayString);
+          console.log(`Found ${programWorkouts.length} program workouts for program ${userProgress.programId}`);
 
-            if (!todayWorkoutExists) {
-              // Get today's scheduled workout
-              const todaysWorkout = await storage.getTodaysWorkout(userId);
-              if (todaysWorkout) {
-                calendarWorkouts.push({
-                  date: todayString,
-                  status: 'upcoming',
-                  workout: {
-                    id: todaysWorkout.id,
-                    name: todaysWorkout.name,
-                    description: todaysWorkout.description || '',
-                    estimatedDuration: todaysWorkout.estimatedDuration || todaysWorkout.duration || 60,
-                    workoutType: todaysWorkout.workoutType || 'Training',
-                    week: todaysWorkout.week || 0,
-                    day: todaysWorkout.day || 0,
-                    exercises: Array.isArray(todaysWorkout.exercises) ? todaysWorkout.exercises : []
-                  }
-                });
+          // Generate scheduled workouts for each day in the month
+          for (let currentDate = new Date(Math.max(monthStart.getTime(), startDate.getTime())); 
+               currentDate <= monthEnd; 
+               currentDate.setDate(currentDate.getDate() + 1)) {
+            
+            const daysSinceStart = Math.floor((currentDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+            const dateString = currentDate.toISOString().split('T')[0];
+            
+            // Skip if this date already has a completion
+            const hasCompletion = calendarWorkouts.some(w => w.date === dateString);
+            if (hasCompletion) {
+              continue;
+            }
+            
+            // Calculate what workout should be scheduled for this day
+            // Assume 6 training days per week (Monday to Saturday)
+            const dayOfWeek = currentDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
+            
+            // Skip Sundays (rest day)
+            if (dayOfWeek === 0) {
+              continue;
+            }
+            
+            // Calculate week and day in program
+            const weeksSinceStart = Math.floor(daysSinceStart / 7);
+            const programWeek = weeksSinceStart + 1;
+            const programDay = dayOfWeek; // 1 = Monday, 2 = Tuesday, etc.
+            
+            // Find the workout for this week and day
+            const scheduledWorkout = programWorkouts.find(w => 
+              w.week === programWeek && w.day === programDay
+            );
+            
+            if (scheduledWorkout) {
+              // Determine status based on date
+              const today = new Date();
+              const currentDateOnly = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+              const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+              
+              let status = 'upcoming';
+              if (currentDateOnly.getTime() < todayOnly.getTime()) {
+                status = 'missed'; // Past date with no completion
+              } else if (currentDateOnly.getTime() === todayOnly.getTime()) {
+                status = 'upcoming'; // Today's workout
               }
+              
+              calendarWorkouts.push({
+                date: dateString,
+                status: status,
+                workout: {
+                  id: scheduledWorkout.id,
+                  name: scheduledWorkout.name,
+                  description: scheduledWorkout.description || '',
+                  estimatedDuration: scheduledWorkout.estimatedDuration || scheduledWorkout.duration || 60,
+                  workoutType: scheduledWorkout.workoutType || 'Training',
+                  week: scheduledWorkout.week || 0,
+                  day: scheduledWorkout.day || 0,
+                  exercises: Array.isArray(scheduledWorkout.exercises) ? scheduledWorkout.exercises : []
+                }
+              });
             }
           }
-        } catch (todayError) {
-          console.error("Error adding today's workout to calendar:", todayError);
+        } catch (scheduleError) {
+          console.error("Error generating scheduled workouts:", scheduleError);
         }
       }
 
@@ -951,6 +997,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
               // If calculated start date is in the future, use today
               if (startDate > today) {
+
+
+  // Debug endpoint for calendar troubleshooting
+  app.get('/api/debug/calendar-data', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const userProgress = await storage.getUserProgress(userId);
+      const completions = await storage.getWorkoutCompletions(userId);
+      
+      let programWorkouts = [];
+      if (userProgress?.programId) {
+        programWorkouts = await db
+          .select()
+          .from(workouts)
+          .where(eq(workouts.programId, userProgress.programId))
+          .orderBy(asc(workouts.week), asc(workouts.day));
+      }
+
+      const debugData = {
+        user: {
+          id: userId,
+          assessmentCompleted: user?.assessmentCompleted,
+          subscriptionStatus: user?.subscriptionStatus,
+          currentProgramId: user?.currentProgramId,
+          isAdmin: user?.isAdmin
+        },
+        userProgress: {
+          programId: userProgress?.programId,
+          startDate: userProgress?.startDate,
+          currentWeek: userProgress?.currentWeek,
+          currentDay: userProgress?.currentDay,
+          completedWorkouts: userProgress?.completedWorkouts
+        },
+        programWorkouts: {
+          count: programWorkouts.length,
+          sampleWorkouts: programWorkouts.slice(0, 3).map(w => ({
+            id: w.id,
+            week: w.week,
+            day: w.day,
+            name: w.name
+          }))
+        },
+        completions: {
+          count: completions.length,
+          recent: completions.slice(0, 3).map(c => ({
+            id: c.id,
+            workoutId: c.workoutId,
+            completedAt: c.completedAt,
+            skipped: c.skipped
+          }))
+        }
+      };
+
+      res.json(debugData);
+    } catch (error) {
+      console.error("Error in debug endpoint:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
                 startDate = new Date(today);
               }
             }
