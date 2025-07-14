@@ -43,8 +43,20 @@ export default function Calendar() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedWorkout, setSelectedWorkout] = useState<WorkoutStatus | null>(null);
 
-  const { data: workoutCalendar, isLoading } = useQuery({
+  const { data: workoutCalendar, isLoading, error } = useQuery({
     queryKey: ["/api/workout-calendar", format(currentMonth, 'yyyy-MM')],
+    queryFn: async () => {
+      const monthParam = format(currentMonth, 'yyyy-MM');
+      const response = await fetch(`/api/workout-calendar?month=${monthParam}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch workout calendar');
+      }
+      const data = await response.json();
+      console.log(`Calendar data for ${monthParam}:`, data);
+      return data;
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnWindowFocus: false,
   });
 
   const monthStart = startOfMonth(currentMonth);
@@ -52,11 +64,17 @@ export default function Calendar() {
   const calendarDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
   const getWorkoutForDate = (date: Date): WorkoutStatus | null => {
-    if (!workoutCalendar?.workouts) return null;
+    if (!workoutCalendar?.workouts || !Array.isArray(workoutCalendar.workouts)) {
+      console.log("No workouts data available:", workoutCalendar);
+      return null;
+    }
     
-    return workoutCalendar.workouts.find((workout: WorkoutStatus) => 
-      isSameDay(new Date(workout.date), date)
-    ) || null;
+    const dateString = format(date, 'yyyy-MM-dd');
+    const workout = workoutCalendar.workouts.find((workout: WorkoutStatus) => 
+      workout.date === dateString || isSameDay(new Date(workout.date), date)
+    );
+    
+    return workout || null;
   };
 
   const getStatusColor = (status: string) => {
@@ -86,7 +104,8 @@ export default function Calendar() {
   };
 
   const navigateMonth = (direction: 'prev' | 'next') => {
-    setCurrentMonth(prev => direction === 'prev' ? subMonths(prev, 1) : addMonths(prev, 1));
+    const newMonth = direction === 'prev' ? subMonths(currentMonth, 1) : addMonths(currentMonth, 1);
+    setCurrentMonth(newMonth);
     setSelectedDate(null);
     setSelectedWorkout(null);
   };
@@ -97,6 +116,32 @@ export default function Calendar() {
         <div className="space-y-6">
           <div className="h-8 bg-gray-200 rounded animate-pulse" />
           <div className="h-96 bg-gray-200 rounded animate-pulse" />
+        </div>
+      </MobileLayout>
+    );
+  }
+
+  if (error) {
+    console.error("Calendar error:", error);
+    return (
+      <MobileLayout>
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-3xl font-bold">Calendar</h1>
+              <p className="text-muted-foreground">
+                Track your workout schedule and progress
+              </p>
+            </div>
+          </div>
+          <Card>
+            <CardContent className="text-center py-8">
+              <p className="text-red-500 mb-4">Failed to load calendar data</p>
+              <Button onClick={() => window.location.reload()}>
+                Refresh Page
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </MobileLayout>
     );
@@ -116,7 +161,7 @@ export default function Calendar() {
         </div>
 
         {/* Monthly Stats */}
-        {workoutCalendar?.workouts && workoutCalendar.workouts.length > 0 && (
+        {workoutCalendar?.workouts && Array.isArray(workoutCalendar.workouts) && workoutCalendar.workouts.length > 0 && (
           <Card>
             <CardContent className="pt-6">
               <div className="grid grid-cols-3 gap-4 text-center">
