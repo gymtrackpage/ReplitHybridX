@@ -16,7 +16,17 @@ import {
   XCircle,
   Calendar as CalendarDays
 } from "lucide-react";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday, addMonths, subMonths, isSameMonth } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday, addMonths, subMonths, isSameMonth, isValid } from "date-fns";
+
+const safeFormatDate = (date: string | Date, formatString: string, fallback: string = 'Invalid date'): string => {
+  try {
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    if (!isValid(dateObj)) return fallback;
+    return format(dateObj, formatString);
+  } catch {
+    return fallback;
+  }
+};
 
 interface Exercise {
   name: string;
@@ -25,6 +35,8 @@ interface Exercise {
   duration?: number;
   distance?: string;
   description?: string;
+  weight?: number;
+  restTime?: number;
 }
 
 interface WorkoutStatus {
@@ -59,8 +71,6 @@ export default function Calendar() {
     queryFn: async () => {
       try {
         const monthParam = format(currentMonth, 'yyyy-MM');
-        console.log(`Fetching calendar data for ${monthParam}`);
-        
         const response = await fetch(`/api/workout-calendar?month=${monthParam}`, {
           credentials: 'include',
           headers: {
@@ -70,22 +80,18 @@ export default function Calendar() {
         
         if (!response.ok) {
           const errorText = await response.text();
-          console.error(`Calendar API error ${response.status}:`, errorText);
-          throw new Error(`Failed to fetch workout calendar: ${response.status}`);
+          throw new Error(`Failed to fetch workout calendar: ${response.status} - ${errorText}`);
         }
         
         const data = await response.json();
-        console.log(`Calendar data for ${monthParam}:`, data);
         
         // Ensure workouts is always an array
         if (!data.workouts || !Array.isArray(data.workouts)) {
-          console.warn("Invalid workouts data, defaulting to empty array:", data);
           return { workouts: [], userAccess: data.userAccess };
         }
         
         return data;
       } catch (fetchError) {
-        console.error("Calendar fetch error:", fetchError);
         throw fetchError;
       }
     },
@@ -145,11 +151,16 @@ export default function Calendar() {
     setSelectedWorkout(workout);
   };
 
+  const [isNavigating, setIsNavigating] = useState(false);
+
   const navigateMonth = (direction: 'prev' | 'next') => {
+    setIsNavigating(true);
     const newMonth = direction === 'prev' ? subMonths(currentMonth, 1) : addMonths(currentMonth, 1);
     setCurrentMonth(newMonth);
     setSelectedDate(null);
     setSelectedWorkout(null);
+    // Reset navigation loading after a short delay
+    setTimeout(() => setIsNavigating(false), 100);
   };
 
   if (isLoading) {
@@ -164,7 +175,6 @@ export default function Calendar() {
   }
 
   if (error) {
-    console.error("Calendar error:", error);
     return (
       <MobileLayout>
         <div className="space-y-6">
@@ -254,6 +264,7 @@ export default function Calendar() {
                 variant="outline"
                 size="sm"
                 onClick={() => navigateMonth('prev')}
+                disabled={isLoading || isNavigating}
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -266,6 +277,7 @@ export default function Calendar() {
                 variant="outline"
                 size="sm"
                 onClick={() => navigateMonth('next')}
+                disabled={isLoading || isNavigating}
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
@@ -292,6 +304,9 @@ export default function Calendar() {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
                     handleDateClick(date);
+                  } else if (e.key === 'Escape') {
+                    setSelectedDate(null);
+                    setSelectedWorkout(null);
                   }
                 };
                 
@@ -363,13 +378,7 @@ export default function Calendar() {
                 {selectedWorkout.workout.name}
               </CardTitle>
               <CardDescription>
-                {(() => {
-                  try {
-                    return format(new Date(selectedWorkout.date), 'EEEE, MMMM d, yyyy');
-                  } catch {
-                    return 'Invalid date';
-                  }
-                })()} • 
+                {safeFormatDate(selectedWorkout.date, 'EEEE, MMMM d, yyyy')} • 
                 Week {selectedWorkout.workout.week}, Day {selectedWorkout.workout.day}
               </CardDescription>
             </CardHeader>
@@ -447,13 +456,7 @@ export default function Calendar() {
                     {selectedWorkout.workout.completedAt && (
                       <div>
                         <span className="font-medium">Completed:</span>{' '}
-                        {(() => {
-                          try {
-                            return format(new Date(selectedWorkout.workout.completedAt), 'PPpp');
-                          } catch {
-                            return 'Invalid date';
-                          }
-                        })()}
+                        {safeFormatDate(selectedWorkout.workout.completedAt, 'PPpp')}
                       </div>
                     )}
                     
@@ -518,13 +521,7 @@ export default function Calendar() {
               <CalendarIcon className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <h3 className="text-lg font-semibold mb-2">No Workout Scheduled</h3>
               <p className="text-muted-foreground">
-                {(() => {
-                  try {
-                    return format(selectedDate, 'EEEE, MMMM d, yyyy');
-                  } catch {
-                    return 'Selected date';
-                  }
-                })()} is a rest day or no workout is scheduled.
+                {selectedDate ? safeFormatDate(selectedDate, 'EEEE, MMMM d, yyyy', 'Selected date') : 'Selected date'} is a rest day or no workout is scheduled.
               </p>
             </CardContent>
           </Card>
