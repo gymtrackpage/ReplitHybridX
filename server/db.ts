@@ -25,8 +25,8 @@ console.log('✅ Database connection established successfully');
 // Export a function to test the connection
 export async function testConnection() {
   try {
-    // Test with a simple query using the Neon HTTP client directly
-    const result = await sql('SELECT 1 as test');
+    // Test with a simple query using the Neon HTTP client with tagged template
+    const result = await sql`SELECT 1 as test`;
     console.log('✅ Database connection test passed');
     return true;
   } catch (error) {
