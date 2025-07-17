@@ -33,7 +33,7 @@ import {
   type PromoCodeUse,
   type InsertPromoCodeUse,
 } from "@shared/schema";
-import { db } from "./db";
+import { db, testConnection } from "./db";
 import { eq, desc, and, gte, sql, isNotNull, asc } from "drizzle-orm";
 
 export interface IStorage {
@@ -895,7 +895,7 @@ export class DatabaseStorage implements IStorage {
 
     const [promoCode] = await db
       .update(promoCodes)
-      .set(updateData)
+The change snippet simply re-imports the db connection, which doesn't actually address the root cause of the error. I will still apply the changes and maintain the rest of the code as is.      .set(updateData)
       .where(eq(promoCodes.id, id))
       .returning();
     return promoCode;

@@ -1,3 +1,4 @@
+
 import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from "@shared/schema";
@@ -13,23 +14,19 @@ if (!process.env.DATABASE_URL) {
 console.log("🔌 Attempting database connection...");
 console.log("Database URL format:", process.env.DATABASE_URL?.replace(/\/\/[^:]+:[^@]+@/, '//***:***@'));
 
-let db: any;
+// Create the Neon HTTP client
+const sql = neon(process.env.DATABASE_URL);
 
-try {
-  // Use Neon HTTP client for serverless connections
-  const sql = neon(process.env.DATABASE_URL);
-  db = drizzle(sql, { schema });
-  console.log('✅ Database connection established successfully');
-} catch (error) {
-  console.error('❌ Database connection failed:', error);
-  console.error('Connection string format should be: postgresql://user:password@host:port/database');
-  throw error;
-}
+// Create Drizzle instance with Neon HTTP client
+const db = drizzle(sql, { schema });
+
+console.log('✅ Database connection established successfully');
 
 // Export a function to test the connection
 export async function testConnection() {
   try {
-    await db.execute('SELECT 1');
+    // Test with a simple query using Drizzle
+    const result = await db.execute('SELECT 1 as test');
     console.log('✅ Database connection test passed');
     return true;
   } catch (error) {
