@@ -296,9 +296,9 @@ export function WorkoutCompletionDialog({ isOpen, onClose, workout, onComplete }
           )}
 
           <div>
-            <Label>Rating (1-10)</Label>
+            <Label>Rating (1-5)</Label>
             <div className="flex gap-1 mt-2">
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
+              {[1, 2, 3, 4, 5].map((num) => (
                 <Button
                   key={num}
                   variant={rating === num ? "default" : "outline"}
