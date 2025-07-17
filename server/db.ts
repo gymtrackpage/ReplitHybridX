@@ -1,9 +1,6 @@
-import { Pool, neonConfig } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-serverless';
-import ws from "ws";
+import { neon } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from "@shared/schema";
-
-neonConfig.webSocketConstructor = ws;
 
 if (!process.env.DATABASE_URL) {
   console.error("❌ DATABASE_URL environment variable is missing!");
@@ -16,50 +13,23 @@ if (!process.env.DATABASE_URL) {
 console.log("🔌 Attempting database connection...");
 console.log("Database URL format:", process.env.DATABASE_URL?.replace(/\/\/[^:]+:[^@]+@/, '//***:***@'));
 
-let pool: Pool;
 let db: any;
 
 try {
-  // Initialize pool with proper error handling
-  pool = new Pool({ 
-    connectionString: process.env.DATABASE_URL,
-    connectionTimeoutMillis: 10000,
-    idleTimeoutMillis: 30000,
-    max: 10
-  });
-
-  // Test the pool connection before creating drizzle instance
-  await pool.query('SELECT 1');
-  
-  db = drizzle(pool, { schema });
+  // Use Neon HTTP client for serverless connections
+  const sql = neon(process.env.DATABASE_URL);
+  db = drizzle(sql, { schema });
   console.log('✅ Database connection established successfully');
 } catch (error) {
   console.error('❌ Database connection failed:', error);
   console.error('Connection string format should be: postgresql://user:password@host:port/database');
-  
-  // Fallback: try direct connection if pool fails
-  try {
-    console.log('🔄 Attempting direct connection...');
-    const { neon } = await import('@neondatabase/serverless');
-    const sql = neon(process.env.DATABASE_URL!);
-    db = drizzle(sql, { schema });
-    pool = null; // Set pool to null to indicate direct connection
-    console.log('✅ Direct database connection established');
-  } catch (fallbackError) {
-    console.error('❌ Direct connection also failed:', fallbackError);
-    throw fallbackError;
-  }
+  throw error;
 }
 
 // Export a function to test the connection
 export async function testConnection() {
   try {
-    if (pool) {
-      await pool.query('SELECT 1');
-    } else {
-      // Test with drizzle if using direct connection
-      await db.execute('SELECT 1');
-    }
+    await db.execute('SELECT 1');
     console.log('✅ Database connection test passed');
     return true;
   } catch (error) {
@@ -68,4 +38,4 @@ export async function testConnection() {
   }
 }
 
-export { pool, db };
+export { db };
