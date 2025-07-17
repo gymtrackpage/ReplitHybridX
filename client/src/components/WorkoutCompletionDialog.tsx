@@ -101,7 +101,17 @@ export function WorkoutCompletionDialog({ isOpen, onClose, workout, onComplete }
         return response;
       } catch (error: any) {
         console.error("API request failed:", error);
-        // Re-throw with more detailed error information
+        
+        // Handle 409 conflicts as potential successes
+        if (error.status === 409 || (error.message && error.message.includes("already been shared"))) {
+          return {
+            success: true,
+            warning: true,
+            message: "Workout may have been shared successfully. Check your Strava activity feed to confirm."
+          };
+        }
+        
+        // Re-throw other errors with more detailed error information
         throw {
           message: error.message || "Failed to share workout to Strava",
           status: error.status,
@@ -112,10 +122,19 @@ export function WorkoutCompletionDialog({ isOpen, onClose, workout, onComplete }
     },
     onSuccess: (data: any) => {
       console.log("Strava share success:", data);
-      toast({
-        title: "Shared to Strava!",
-        description: data?.message || "Your workout has been shared to Strava successfully.",
-      });
+      
+      if (data.warning) {
+        toast({
+          title: "Strava Share",
+          description: data.message || "Workout may have been shared successfully. Check your Strava activity feed to confirm.",
+        });
+      } else {
+        toast({
+          title: "Shared to Strava!",
+          description: data?.message || "Your workout has been shared to Strava successfully.",
+        });
+      }
+      
       setShowStravaShare(false);
       // Now trigger the next workout loading
       onComplete({ rating, notes, duration });
