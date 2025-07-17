@@ -24,19 +24,13 @@ const getOidcConfig = memoize(
 
 export function getSession() {
   const sessionTtl = 30 * 24 * 60 * 60 * 1000; // Increased to 30 days
+  const { pool } = require('./db');
   const pgStore = connectPg(session);
   const sessionStore = new pgStore({
-    conString: process.env.DATABASE_URL,
+    pool: pool, // Use the shared pool from db.ts
     createTableIfMissing: true,
     ttl: sessionTtl / 1000, // PostgreSQL store expects seconds, not milliseconds
     tableName: "sessions",
-    // Add connection pool settings for better reliability
-    pool: {
-      min: 0,
-      max: 10,
-      acquireTimeoutMillis: 60000,
-      idleTimeoutMillis: 30000
-    },
     // Enable automatic session cleanup
     pruneSessionInterval: 24 * 60 * 60, // 24 hours
   });
