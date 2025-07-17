@@ -22,9 +22,9 @@ const getOidcConfig = memoize(
   { maxAge: 3600 * 1000 }
 );
 
-export function getSession() {
+export async function getSession() {
   const sessionTtl = 30 * 24 * 60 * 60 * 1000; // Increased to 30 days
-  const { pool } = require('./db');
+  const { pool } = await import('./db');
   const pgStore = connectPg(session);
   const sessionStore = new pgStore({
     pool: pool, // Use the shared pool from db.ts
@@ -35,7 +35,7 @@ export function getSession() {
     pruneSessionInterval: 24 * 60 * 60, // 24 hours
     schemaName: 'public', // Explicitly set schema
   });
-  
+
   return session({
     secret: process.env.SESSION_SECRET!,
     store: sessionStore,
@@ -79,7 +79,7 @@ async function upsertUser(
 
 export async function setupAuth(app: Express) {
   app.set("trust proxy", 1);
-  app.use(getSession());
+  app.use(await getSession());
   app.use(passport.initialize());
   app.use(passport.session());
 
@@ -102,7 +102,7 @@ export async function setupAuth(app: Express) {
 
   // Get the current domain or use the first Replit domain
   const currentDomain = process.env.REPLIT_DOMAINS!.split(",")[0];
-  
+
   // Create a single strategy that works for all domains
   const strategy = new Strategy(
     {
@@ -137,19 +137,19 @@ export async function setupAuth(app: Express) {
   app.get("/api/login", (req, res, next) => {
     try {
       console.log("Login attempt from hostname:", req.hostname);
-      
+
       // Try main strategy first, fallback to hostname-specific if needed
       let strategyName = 'replitauth:main';
       const hostname = req.hostname;
-      
+
       // Check if we have a specific strategy for this hostname
       const replitDomains = process.env.REPLIT_DOMAINS!.split(",");
       if (replitDomains.includes(hostname) && hostname !== replitDomains[0]) {
         strategyName = `replitauth:${hostname}`;
       }
-      
+
       console.log("Using auth strategy:", strategyName);
-      
+
       passport.authenticate(strategyName, {
         prompt: "login consent",
         scope: ["openid", "email", "profile", "offline_access"],
@@ -164,18 +164,18 @@ export async function setupAuth(app: Express) {
   app.get("/api/auth/login", (req, res, next) => {
     try {
       console.log("Auth login attempt from hostname:", req.hostname);
-      
+
       // Use same logic as /api/login
       let strategyName = 'replitauth:main';
       const hostname = req.hostname;
-      
+
       const replitDomains = process.env.REPLIT_DOMAINS!.split(",");
       if (replitDomains.includes(hostname) && hostname !== replitDomains[0]) {
         strategyName = `replitauth:${hostname}`;
       }
-      
+
       console.log("Using auth strategy:", strategyName);
-      
+
       passport.authenticate(strategyName, {
         prompt: "login consent",
         scope: ["openid", "email", "profile", "offline_access"],
@@ -189,20 +189,20 @@ export async function setupAuth(app: Express) {
   app.get("/api/callback", (req, res, next) => {
     console.log("Auth callback received from hostname:", req.hostname);
     console.log("Callback query params:", req.query);
-    
+
     // Use same strategy selection logic
     let strategyName = 'replitauth:main';
     const hostname = req.hostname === 'localhost' ? 
       process.env.REPLIT_DOMAINS!.split(",")[0] : 
       req.hostname;
-    
+
     const replitDomains = process.env.REPLIT_DOMAINS!.split(",");
     if (replitDomains.includes(hostname) && hostname !== replitDomains[0]) {
       strategyName = `replitauth:${hostname}`;
     }
-    
+
     console.log("Callback using auth strategy:", strategyName);
-    
+
     passport.authenticate(strategyName, {
       successReturnToOrRedirect: "/dashboard",
       failureRedirect: "/?error=auth_callback_failed",
@@ -245,7 +245,7 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
 
   const now = Math.floor(Date.now() / 1000);
   const bufferTime = 900; // Increased to 15 minutes buffer before expiry
-  
+
   if (now <= (user.expires_at - bufferTime)) {
     console.log("Token still valid, session extended");
     return next();
