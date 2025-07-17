@@ -233,15 +233,27 @@ export class StravaImageService {
     exercises = exercises.filter(ex => ex && (ex.name || ex.exercise || ex.type));
 
     console.log("🖼️ Processed exercises for image generation:", exercises.length, "valid exercises");
-    console.log('🖼️ Starting image generation for workout:', workoutName);
-    console.log('🖼️ Exercises data:', exercises ? exercises.length : 'none');
 
     let browser = null;
     let page = null;
 
     try {
-      browser = await this.initBrowser();
+      // Check if we can initialize browser
+      try {
+        browser = await this.initBrowser();
+        if (!browser) {
+          throw new Error('Browser initialization returned null');
+        }
+      } catch (browserError) {
+        console.error('🚫 Browser initialization failed:', browserError);
+        return null; // Return null instead of throwing
+      }
+
       page = await browser.newPage();
+      
+      // Set a shorter timeout for page operations
+      await page.setDefaultTimeout(30000);
+      await page.setDefaultNavigationTimeout(30000);
 
       // Process exercises to create description
       let description = '';
@@ -277,27 +289,26 @@ export class StravaImageService {
       const safeName = (workoutName || 'HybridX Workout').replace(/[<>"'&]/g, '');
       const safeDescription = description.replace(/[<>"'&]/g, '');
 
-      // Create HTML template directly (no file dependency)
+      // Create HTML template
       const htmlTemplate = this.createHtmlTemplate(safeName, safeDescription);
 
       console.log('🖼️ Setting page content...');
 
-      // Set viewport first
+      // Set viewport
       await page.setViewport({ width: 1200, height: 630 });
-      console.log('🖼️ Viewport set to 1200x630');
 
-      // Set page content with extended timeout
+      // Set page content with shorter timeout
       await page.setContent(htmlTemplate, { 
-        waitUntil: 'networkidle0',
-        timeout: 45000  // Increased timeout
+        waitUntil: 'domcontentloaded', // Changed from networkidle0 for better reliability
+        timeout: 30000
       });
 
-      // Wait longer for rendering to complete
-      await page.waitForTimeout(3000);
+      // Wait for rendering
+      await page.waitForTimeout(2000);
 
       console.log('🖼️ Taking screenshot...');
 
-      // Generate image with higher quality
+      // Generate image
       const imageBuffer = await page.screenshot({
         type: 'png',
         fullPage: false,
@@ -308,23 +319,24 @@ export class StravaImageService {
       console.log('🖼️ Screenshot taken, buffer size:', imageBuffer.length, 'bytes');
 
       if (!imageBuffer || imageBuffer.length === 0) {
-        throw new Error('Generated image buffer is empty');
+        console.error('🚫 Generated image buffer is empty');
+        return null;
       }
 
       // Validate the image buffer
       if (imageBuffer.length < 1000) {
-        throw new Error('Generated image buffer too small, likely corrupted');
+        console.error('🚫 Generated image buffer too small:', imageBuffer.length, 'bytes');
+        return null;
       }
 
       return imageBuffer;
     } catch (error: any) {
       console.error('💥 Error generating workout image:');
       console.error('  Error message:', error.message);
-      console.error('  Error stack:', error.stack);
-
-      // Don't throw error, return null to allow activity creation without image
-      console.warn('⚠️ Image generation failed, continuing without image');
-      throw error;
+      console.error('  Error type:', error.name);
+      
+      // Return null instead of throwing to allow Strava upload without image
+      return null;
     } finally {
       if (page) {
         try {

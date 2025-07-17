@@ -272,56 +272,45 @@ export class StravaService {
           console.log('🖼️ Preparing to upload image to Strava activity:', activityId);
           console.log('🖼️ Image buffer size:', imageBuffer.length, 'bytes');
 
-          // Wait for the activity to be fully processed by Strava - increased delay
+          // Wait for the activity to be fully processed by Strava
           console.log('⏱️ Waiting for Strava activity to be fully processed...');
-          await new Promise(resolve => setTimeout(resolve, 20000)); // Increased to 20 seconds
+          await new Promise(resolve => setTimeout(resolve, 15000));
 
-          // Retry logic for image upload with longer delays
-          let uploadSuccess = false;
-          let attempts = 0;
-          const maxAttempts = 6; // Increased attempts
-
-          while (!uploadSuccess && attempts < maxAttempts) {
-            attempts++;
-            try {
-              console.log(`🔄 Image upload attempt ${attempts}/${maxAttempts}...`);
+          // Single attempt for image upload with proper error handling
+          try {
+            console.log('🔄 Attempting image upload...');
+            
+            // Verify activity exists before trying to upload image
+            const activityCheck = await axios.get(`${STRAVA_BASE_URL}/activities/${activityId}`, {
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Accept': 'application/json'
+              },
+              timeout: 10000
+            });
+            
+            if (activityCheck.status === 200) {
+              console.log('✅ Activity verified, proceeding with image upload');
+              await this.uploadActivityPhoto(accessToken, activityId, imageBuffer);
+              console.log('✅ Successfully uploaded workout image to Strava activity');
               
-              // Verify activity exists before trying to upload image
-              const activityCheck = await axios.get(`${STRAVA_BASE_URL}/activities/${activityId}`, {
-                headers: {
-                  'Authorization': `Bearer ${accessToken}`,
-                  'Accept': 'application/json'
-                },
-                timeout: 10000
-              });
-              
-              if (activityCheck.status === 200) {
-                console.log('✅ Activity verified, proceeding with image upload');
-                await this.uploadActivityPhoto(accessToken, activityId, imageBuffer);
-                console.log('✅ Successfully uploaded workout image to Strava activity');
-                uploadSuccess = true;
-              } else {
-                throw new Error(`Activity not ready (status: ${activityCheck.status})`);
-              }
-            } catch (photoError: any) {
-              console.error(`❌ Image upload attempt ${attempts} failed:`, photoError.message);
-              
-              if (attempts < maxAttempts) {
-                // Wait before retry, with exponential backoff
-                const waitTime = 8000 * Math.pow(1.5, attempts - 1); // 8s, 12s, 18s, 27s, 40s
-                console.log(`⏱️ Waiting ${waitTime}ms before retry...`);
-                await new Promise(resolve => setTimeout(resolve, waitTime));
-              }
+              return { 
+                success: true, 
+                activityId,
+                message: 'Workout shared to Strava with image successfully!'
+              };
+            } else {
+              throw new Error(`Activity not ready (status: ${activityCheck.status})`);
             }
-          }
-
-          if (!uploadSuccess) {
-            console.warn('⚠️ All image upload attempts failed, but activity was created successfully');
-            // Return success but with a warning message
+          } catch (photoError: any) {
+            console.warn(`⚠️ Image upload failed:`, photoError.message);
+            
+            // Return success without image rather than failing completely
             return { 
               success: true, 
               activityId, 
-              warning: 'Activity created successfully, but image upload failed. You can manually add images in the Strava app.' 
+              warning: 'Workout shared to Strava successfully, but image upload failed. You can manually add images in the Strava app.',
+              message: 'Workout shared to Strava successfully (without image)'
             };
           }
         } catch (error) {
@@ -330,16 +319,23 @@ export class StravaService {
           return { 
             success: true, 
             activityId, 
-            warning: 'Activity created successfully, but image upload failed. You can manually add images in the Strava app.' 
+            warning: 'Workout shared to Strava successfully, but image upload failed.',
+            message: 'Workout shared to Strava successfully (without image)'
           };
         }
       } else {
         if (!imageBuffer) {
-          console.log('⚠️ No image buffer provided for Strava upload');
+          console.log('ℹ️ No image buffer provided for Strava upload (image generation may have failed)');
         }
         if (!activityId) {
           console.log('⚠️ No activity ID available for image upload');
         }
+        
+        return { 
+          success: true, 
+          activityId,
+          message: 'Workout shared to Strava successfully!'
+        };
       }
 
       return { success: true, activityId };
