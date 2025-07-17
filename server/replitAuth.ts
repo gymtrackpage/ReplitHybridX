@@ -33,6 +33,7 @@ export function getSession() {
     tableName: "sessions",
     // Enable automatic session cleanup
     pruneSessionInterval: 24 * 60 * 60, // 24 hours
+    schemaName: 'public', // Explicitly set schema
   });
   
   return session({
