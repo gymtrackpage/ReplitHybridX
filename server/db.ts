@@ -1,5 +1,6 @@
+
 import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-serverless";
+import { drizzle } from "drizzle-orm/neon-http";
 import { sql as sqlOperator } from "drizzle-orm";
 import * as schema from "../shared/schema";
 
@@ -10,9 +11,10 @@ if (!process.env.DATABASE_URL) {
 console.log("🔌 Attempting database connection...");
 console.log("Database URL format:", process.env.DATABASE_URL?.replace(/\/\/[^:]+:[^@]+@/, '//***:***@'));
 
-// Create Neon client with minimal configuration to avoid issues
+// Create Neon client
 const sql = neon(process.env.DATABASE_URL);
 
+// Use the correct HTTP adapter for Neon
 export const db = drizzle(sql, { 
   schema,
   logger: process.env.NODE_ENV === 'development'
