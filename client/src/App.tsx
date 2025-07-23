@@ -25,16 +25,7 @@ import Admin from "@/pages/admin";
 import ReferralDashboard from "@/pages/ReferralDashboard";
 import CustomLogin from "@/pages/custom-login";
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
-      refetchOnWindowFocus: false,
-      retry: 3,
-      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-    },
-  },
-});
+
 
 export default function App() {
   return (

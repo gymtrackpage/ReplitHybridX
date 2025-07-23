@@ -1,4 +1,3 @@
-import { useAuth } from "@/hooks/useAuth";
 import { Navigation } from "./navigation";
 
 interface MainLayoutProps {
