@@ -847,6 +847,11 @@ export function selectHyroxProgram(
   availablePrograms?: Array<{ program: any; metadata: ProgramMetadata }>
 ): ProgramRecommendation {
   try {
+    // Validate input data
+    if (!assessmentData) {
+      throw new Error("Assessment data is required");
+    }
+
     // If no programs provided, use legacy approach as fallback
     if (!availablePrograms || availablePrograms.length === 0) {
       console.log("Using legacy program selection (no database programs provided)");
@@ -871,46 +876,62 @@ export function selectHyroxProgram(
       return recommendPrograms(assessmentData, convertedPrograms);
     }
 
+    // Validate available programs
+    const validPrograms = availablePrograms.filter(p => 
+      p && p.program && p.metadata && p.program.id
+    );
+
+    if (validPrograms.length === 0) {
+      throw new Error("No valid programs available");
+    }
+
     // Use new metadata-based algorithm
-    return recommendPrograms(assessmentData, availablePrograms);
+    return recommendPrograms(assessmentData, validPrograms);
     
   } catch (error) {
     console.error("Error in selectHyroxProgram:", error);
+    console.error("Assessment data:", JSON.stringify(assessmentData, null, 2));
+    console.error("Available programs count:", availablePrograms?.length || 0);
     
-    // Robust fallback
-    const userProfile = generateUserProfile(assessmentData);
-    const fallbackProgram = availablePrograms?.[0] || {
-      program: HYROX_PROGRAMS[DEFAULT_PROGRAM_ID],
-      metadata: {
-        difficulty: 'Intermediate' as const,
-        frequency: 4,
-        category: 'Hyrox' as const,
-        raceCategory: 'Singles' as const
-      }
-    };
-    
-    return {
-      recommendedPrograms: [scoreProgram(
-        fallbackProgram.program, 
-        fallbackProgram.metadata, 
-        userProfile
-      )],
-      userProfile,
-      modifications: [],
-      reasoningExplanation: "An error occurred during program selection. A default program has been assigned.",
-      // Legacy compatibility fields
-      recommendedProgram: fallbackProgram.program,
-      experienceLevel: userProfile.preferredDifficulty,
-      trainingBackground: userProfile.preferredCategory,
-      timeAvailability: `${userProfile.availableFrequency} days/week`,
-      specialCategory: userProfile.preferredRaceCategory,
-      fitnessProfile: {
-        runningCapacity: 5,
-        strengthFoundation: 5,
-        movementQuality: 5,
-        workCapacity: 5,
-        stationEfficiency: 5
-      }
-    };
+    // Robust fallback with comprehensive error logging
+    try {
+      const userProfile = generateUserProfile(assessmentData);
+      const fallbackProgram = availablePrograms?.[0] || {
+        program: HYROX_PROGRAMS[DEFAULT_PROGRAM_ID],
+        metadata: {
+          difficulty: 'Intermediate' as const,
+          frequency: 4,
+          category: 'Hyrox' as const,
+          raceCategory: 'Singles' as const
+        }
+      };
+      
+      return {
+        recommendedPrograms: [scoreProgram(
+          fallbackProgram.program, 
+          fallbackProgram.metadata, 
+          userProfile
+        )],
+        userProfile,
+        modifications: [],
+        reasoningExplanation: `An error occurred during program selection: ${error instanceof Error ? error.message : 'Unknown error'}. A default program has been assigned.`,
+        // Legacy compatibility fields
+        recommendedProgram: fallbackProgram.program,
+        experienceLevel: userProfile.preferredDifficulty,
+        trainingBackground: userProfile.preferredCategory,
+        timeAvailability: `${userProfile.availableFrequency} days/week`,
+        specialCategory: userProfile.preferredRaceCategory,
+        fitnessProfile: {
+          runningCapacity: 5,
+          strengthFoundation: 5,
+          movementQuality: 5,
+          workCapacity: 5,
+          stationEfficiency: 5
+        }
+      };
+    } catch (fallbackError) {
+      console.error("Critical error: Fallback program selection also failed:", fallbackError);
+      throw new Error("Program selection system unavailable");
+    }
   }
 }

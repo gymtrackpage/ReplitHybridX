@@ -1,11 +1,40 @@
 
 import express, { type Request, type Response, type NextFunction } from "express";
+import compression from "compression";
+import helmet from "helmet";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+
+// Security headers
+app.use(helmet({
+  crossOriginEmbedderPolicy: false, // Disable for development
+  contentSecurityPolicy: process.env.NODE_ENV === 'production' ? {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "https://api.stripe.com"]
+    }
+  } : false
+}));
+
+// Compression middleware
+app.use(compression({
+  level: 6,
+  threshold: 1024,
+  filter: (req, res) => {
+    if (req.headers['x-no-compression']) {
+      return false;
+    }
+    return compression.filter(req, res);
+  }
+}));
+
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -55,12 +84,35 @@ async function startServer() {
     console.log("✅ Routes registered successfully");
 
     // Error handling middleware
-    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+    app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
       const status = err.status || err.statusCode || 500;
       const message = err.message || "Internal Server Error";
 
-      console.error(`❌ Server error [${status}]:`, message);
-      res.status(status).json({ message });
+      // Structured error logging
+      const errorLog = {
+        timestamp: new Date().toISOString(),
+        status,
+        message,
+        method: req.method,
+        url: req.url,
+        userAgent: req.get('User-Agent'),
+        ip: req.ip,
+        stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+        body: req.method === 'POST' ? JSON.stringify(req.body).slice(0, 500) : undefined
+      };
+
+      console.error(`❌ Server error [${status}]:`, JSON.stringify(errorLog, null, 2));
+
+      // Don't expose internal errors in production
+      const clientMessage = status >= 500 && process.env.NODE_ENV === 'production' 
+        ? "Internal Server Error" 
+        : message;
+
+      res.status(status).json({ 
+        message: clientMessage,
+        timestamp: errorLog.timestamp,
+        ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+      });
     });
 
     // Setup Vite or static files

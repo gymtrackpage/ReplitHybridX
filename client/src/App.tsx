@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Logo } from "@/components/Logo";
 import { ReferralTracker } from "@/components/ReferralTracker";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 // Pages
 import Landing from "@/pages/landing";
@@ -38,29 +39,31 @@ const queryClient = new QueryClient({
 export default function App() {
   return (
     <React.StrictMode>
-      <QueryClientProvider client={queryClient}>
-        <Router>
-          <Route path="/" component={Landing} />
-          <Route path="/login" component={CustomLogin} />
-          <Route path="/dashboard" component={Dashboard} />
-          <Route path="/assessment" component={Assessment} />
-          <Route path="/profile" component={Profile} />
-          <Route path="/workouts" component={Workouts} />
-          <Route path="/programs" component={Programs} />
-          <Route path="/progress" component={Progress} />
-          <Route path="/calendar" component={Calendar} />
-          <Route path="/settings" component={Settings} />
-          <Route path="/random-workout" component={RandomWorkout} />
-          <Route path="/free-workouts" component={FreeWorkouts} />
-          <Route path="/payment" component={Payment} />
-          <Route path="/subscription-success" component={SubscriptionSuccess} />
-          <Route path="/admin" component={Admin} />
-          <Route path="/referrals" component={ReferralDashboard} />
-        </Router>
-        <ReferralTracker />
-        <Toaster />
-        <PWAInstallPrompt />
-      </QueryClientProvider>
+      <ErrorBoundary>
+        <QueryClientProvider client={queryClient}>
+          <Router>
+            <Route path="/" component={Landing} />
+            <Route path="/login" component={CustomLogin} />
+            <Route path="/dashboard" component={Dashboard} />
+            <Route path="/assessment" component={Assessment} />
+            <Route path="/profile" component={Profile} />
+            <Route path="/workouts" component={Workouts} />
+            <Route path="/programs" component={Programs} />
+            <Route path="/progress" component={Progress} />
+            <Route path="/calendar" component={Calendar} />
+            <Route path="/settings" component={Settings} />
+            <Route path="/random-workout" component={RandomWorkout} />
+            <Route path="/free-workouts" component={FreeWorkouts} />
+            <Route path="/payment" component={Payment} />
+            <Route path="/subscription-success" component={SubscriptionSuccess} />
+            <Route path="/admin" component={Admin} />
+            <Route path="/referrals" component={ReferralDashboard} />
+          </Router>
+          <ReferralTracker />
+          <Toaster />
+          <PWAInstallPrompt />
+        </QueryClientProvider>
+      </ErrorBoundary>
     </React.StrictMode>
   );
 }

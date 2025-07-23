@@ -44,7 +44,7 @@ export async function apiRequest(method: string, url: string, body?: any) {
     if (!response.ok) {
       let errorMessage;
       let errorData: any = {};
-      
+
       try {
         const contentType = response.headers.get('content-type');
         if (contentType && contentType.includes('application/json')) {
@@ -64,7 +64,7 @@ export async function apiRequest(method: string, url: string, body?: any) {
       error.status = response.status;
       error.data = errorData;
       error.needsAuth = errorData.needsAuth || response.status === 401;
-      
+
       // Handle authentication errors consistently
       if (response.status === 401) {
         console.warn('Authentication required, redirecting to login');
@@ -117,19 +117,28 @@ export const getQueryFn: <T>(options: {
     return await res.json();
   };
 
+import { QueryClient } from "@tanstack/react-query";
+
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      queryFn: getQueryFn({ on401: "throw" }),
-      refetchInterval: false,
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      gcTime: 1000 * 60 * 30, // 30 minutes (renamed from cacheTime)
       refetchOnWindowFocus: false,
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      retry: 1,
+      retry: (failureCount, error: any) => {
+        // Don't retry on 4xx errors
+        if (error?.status >= 400 && error?.status < 500) {
+          return false;
+        }
+        return failureCount < 3;
+      },
       retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+      // Network mode for offline support
+      networkMode: 'online',
     },
     mutations: {
-      retry: 1,
-      retryDelay: 1000,
+      retry: false, // Don't retry mutations by default
+      networkMode: 'online',
     },
   },
 });

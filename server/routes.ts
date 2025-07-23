@@ -489,19 +489,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const monthStart = new Date(monthYear + '-01');
           const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
           
-          // Get all workouts for the user's program
+          // Limit query to only necessary fields to reduce memory usage
           const programWorkouts = await db
-            .select()
+            .select({
+              id: workouts.id,
+              week: workouts.week,
+              day: workouts.day,
+              name: workouts.name,
+              description: workouts.description,
+              estimatedDuration: workouts.estimatedDuration,
+              duration: workouts.duration,
+              workoutType: workouts.workoutType,
+              exercises: workouts.exercises
+            })
             .from(workouts)
             .where(eq(workouts.programId, userProgress.programId))
-            .orderBy(asc(workouts.week), asc(workouts.day));
+            .orderBy(asc(workouts.week), asc(workouts.day))
+            .limit(500); // Prevent excessive memory usage
 
           console.log(`Found ${programWorkouts.length} program workouts for program ${userProgress.programId}`);
 
-          // Generate scheduled workouts for each day in the month
-          for (let currentDate = new Date(Math.max(monthStart.getTime(), startDate.getTime())); 
-               currentDate <= monthEnd; 
-               currentDate.setDate(currentDate.getDate() + 1)) {
+          // Generate scheduled workouts for each day in the month (limit iteration)
+          const maxDays = Math.min(31, Math.ceil((monthEnd.getTime() - Math.max(monthStart.getTime(), startDate.getTime())) / (1000 * 60 * 60 * 24)));
+          
+          for (let dayOffset = 0; dayOffset <= maxDays; dayOffset++) {
+            const currentDate = new Date(Math.max(monthStart.getTime(), startDate.getTime()) + (dayOffset * 24 * 60 * 60 * 1000));
+            
+            if (currentDate > monthEnd) break;
             
             const daysSinceStart = Math.floor((currentDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
             const dateString = currentDate.toISOString().split('T')[0];
@@ -818,10 +832,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Simple in-memory cache for programs (since they don't change frequently)
+  let programsCache: any = null;
+  let programsCacheTime = 0;
+  const PROGRAMS_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
   // Programs routes
   app.get('/api/programs', async (req, res) => {
     try {
+      const now = Date.now();
+      
+      // Return cached data if still valid
+      if (programsCache && (now - programsCacheTime) < PROGRAMS_CACHE_TTL) {
+        return res.json(programsCache);
+      }
+      
       const programs = await storage.getPrograms();
+      
+      // Update cache
+      programsCache = programs;
+      programsCacheTime = now;
+      
       res.json(programs);
     } catch (error) {
       console.error("Error fetching programs:", error);
@@ -1230,7 +1261,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Complete assessment after payment success or free trial selection
-  app.post('/api/complete-assessment', isAuthenticated, async (req: any, res) => {
+  app.post('/api/complete-assessment', isAuthenticated, authRateLimit, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { assessmentData, programId, subscriptionChoice, paymentIntentId } = req.body;
@@ -1242,6 +1273,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ 
           message: "Missing required assessment data",
           required: ["assessmentData", "programId", "subscriptionChoice"]
+        });
+      }
+
+      // Validate assessment data structure
+      const requiredFields = ['age', 'generalFitnessYears', 'weeklyTrainingDays'];
+      const missingFields = requiredFields.filter(field => 
+        assessmentData[field] === undefined || assessmentData[field] === null
+      );
+      
+      if (missingFields.length > 0) {
+        return res.status(400).json({
+          message: "Missing required assessment fields",
+          missingFields
+        });
+      }
+
+      // Validate data ranges
+      if (assessmentData.age < 13 || assessmentData.age > 100) {
+        return res.status(400).json({ message: "Age must be between 13 and 100" });
+      }
+      
+      if (assessmentData.weeklyTrainingDays < 1 || assessmentData.weeklyTrainingDays > 7) {
+        return res.status(400).json({ message: "Weekly training days must be between 1 and 7" });
+      }
+
+      // Validate program exists
+      const programExists = await storage.getProgram(programId);
+      if (!programExists) {
+        return res.status(400).json({ message: "Invalid program ID" });
+      }
+
+      // Validate subscription choice
+      const validChoices = ['free_trial', 'premium', 'promo'];
+      if (!validChoices.includes(subscriptionChoice)) {
+        return res.status(400).json({ 
+          message: "Invalid subscription choice",
+          validChoices 
         });
       }
 
@@ -2333,7 +2401,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create subscription endpoint
-  app.post("/api/create-subscription", isAuthenticated, async (req: any, res) => {
+  app.post("/api/create-subscription", isAuthenticated, authRateLimit, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       console.log("Create subscription request for user:", userId);
