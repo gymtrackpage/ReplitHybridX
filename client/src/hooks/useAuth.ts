@@ -8,22 +8,17 @@ export function useAuth() {
       if (error?.status === 401 || error?.status === 403) {
         return false;
       }
-      return failureCount < 2; // Increased retry attempts for network issues
+      return failureCount < 1; // Reduced retry attempts
     },
-    staleTime: 10 * 60 * 1000, // Increased to 10 minutes
-    refetchOnWindowFocus: true, // Refetch when window gains focus
-    refetchOnMount: true, // Always refetch on mount
-    refetchOnReconnect: true, // Refetch when network reconnects
-    // Keep data fresh but don't overfetch
-    refetchInterval: 15 * 60 * 1000, // Refetch every 15 minutes when active
-    refetchIntervalInBackground: false, // Don't refetch in background
-    // Enhanced error handling
-    onError: (error: any) => {
-      if (error?.status === 401 || error?.status === 403) {
-        // Clear any cached data on auth errors
-        console.log("Authentication error, clearing cache");
-      }
-    },
+    staleTime: 30 * 60 * 1000, // 30 minutes - much longer stale time
+    gcTime: 2 * 60 * 60 * 1000, // 2 hours - keep in cache longer
+    refetchOnWindowFocus: false, // Don't refetch on focus
+    refetchOnMount: false, // Don't refetch on every mount
+    refetchOnReconnect: true, // Only refetch on reconnect
+    refetchInterval: false, // Disable periodic refetching
+    refetchIntervalInBackground: false,
+    // Only fetch when explicitly needed
+    networkMode: 'offlineFirst',
   });
 
   return {

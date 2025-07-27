@@ -118,26 +118,36 @@ export const getQueryFn: <T>(options: {
   };
 
 // Export the queryClient instance
+import { QueryClient } from "@tanstack/react-query";
+
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
-      gcTime: 1000 * 60 * 30, // 30 minutes (renamed from cacheTime)
-      refetchOnWindowFocus: false,
       retry: (failureCount, error: any) => {
-        // Don't retry on 4xx errors
-        if (error?.status >= 400 && error?.status < 500) {
+        // Don't retry on 401/403 errors (authentication issues)
+        if (error?.status === 401 || error?.status === 403) {
           return false;
         }
-        return failureCount < 3;
+        return failureCount < 2;
       },
-      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-      // Network mode for offline support
-      networkMode: 'online',
+      staleTime: 15 * 60 * 1000, // 15 minutes - increased to reduce refetching
+      gcTime: 60 * 60 * 1000, // 60 minutes - keep data longer
+      refetchOnWindowFocus: false, // Disable to prevent auth checks on every focus
+      refetchOnMount: false, // Don't always refetch on mount
+      refetchOnReconnect: true,
+      networkMode: 'offlineFirst',
+      // More lenient error handling
+      throwOnError: false, // Don't throw errors automatically
     },
     mutations: {
-      retry: false, // Don't retry mutations by default
-      networkMode: 'online',
+      retry: (failureCount, error: any) => {
+        // Don't retry mutations on auth errors
+        if (error?.status === 401 || error?.status === 403) {
+          return false;
+        }
+        return failureCount < 1;
+      },
+      networkMode: 'offlineFirst',
     },
   },
 });
