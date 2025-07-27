@@ -24,16 +24,16 @@ const getOidcConfig = memoize(
 
 export async function getSession() {
   const sessionTtl = 30 * 24 * 60 * 60 * 1000; // 30 days
-  
+
   // Try to use PostgreSQL store first, fallback to memory store if DB issues
   let sessionStore;
   try {
     const { db } = await import('./db');
     const { sql as sqlOperator } = await import('drizzle-orm');
-    
+
     // Test database connection first
     await db.execute(sqlOperator`SELECT 1`);
-    
+
     const pgStore = connectPg(session);
     sessionStore = new pgStore({
       pool: db as any, // Cast for compatibility
@@ -258,7 +258,7 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
   // Only attempt refresh/logout if token is significantly expired (beyond grace period)
   if (now > (user.expires_at + gracePeriod)) {
     const refreshToken = user.refresh_token;
-    
+
     if (!refreshToken) {
       // Only logout if we're way past expiry AND no refresh token
       req.logout(() => {
@@ -287,3 +287,14 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
   // Token is still valid or within grace period
   return next();
 };
+import { Request, Response, NextFunction } from 'express';
+
+// Enhanced logging helper
+function failureErrorWithLog(code: string, message: string, details?: any) {
+  const error = {
+    success: false,
+    error: { code, message, details }
+  };
+  console.error(`❌ Auth Error [${code}]:`, message, details || '');
+  return error;
+}
