@@ -36,7 +36,7 @@ export async function getSession() {
 
     const pgStore = connectPg(session);
     sessionStore = new pgStore({
-      pool: db as any, // Cast for compatibility
+      pool: db as any,
       createTableIfMissing: true,
       ttl: sessionTtl / 1000,
       tableName: "sessions",
