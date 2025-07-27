@@ -3,7 +3,7 @@ import { Strategy, type VerifyFunction } from "openid-client/passport";
 
 import passport from "passport";
 import session from "express-session";
-import type { Express, RequestHandler } from "express";
+import type { Express, RequestHandler, Request, Response, NextFunction } from "express";
 import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
 import { storage } from "./storage";
@@ -29,10 +29,10 @@ export async function getSession() {
   let sessionStore;
   try {
     const { db } = await import('./db');
-    const { sql as sqlOperator } = await import('drizzle-orm');
+    const { sql } = await import('drizzle-orm');
 
     // Test database connection first
-    await db.execute(sqlOperator`SELECT 1`);
+    await db.execute(sql`SELECT 1`);
 
     const pgStore = connectPg(session);
     sessionStore = new pgStore({
@@ -64,7 +64,6 @@ export async function getSession() {
       sameSite: 'lax',
       path: '/',
     },
-    touchAfter: 60 * 60, // Touch session every hour instead of daily
   });
 }
 
@@ -287,7 +286,6 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
   // Token is still valid or within grace period
   return next();
 };
-import { Request, Response, NextFunction } from 'express';
 
 // Enhanced logging helper
 function failureErrorWithLog(code: string, message: string, details?: any) {
