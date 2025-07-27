@@ -14,9 +14,11 @@ let sql: ReturnType<typeof neon>;
 let db: ReturnType<typeof drizzle>;
 
 try {
-  // Create Neon client with proper configuration
+  // Create Neon client with enhanced configuration
   sql = neon(process.env.DATABASE_URL!, {
     fetchConnectionCache: true,
+    fullResults: false, // Optimize for smaller responses
+    arrayMode: false,
   });
 
   // Use the correct HTTP adapter for Neon
@@ -26,8 +28,18 @@ try {
   });
 
   console.log("✅ Database connection established successfully");
-} catch (error) {
+} catch (error: any) {
   console.error("❌ Database connection failed:", error);
+  
+  // Provide more specific error guidance
+  if (error.message?.includes('ENOTFOUND')) {
+    console.error("DNS resolution failed - check your DATABASE_URL hostname");
+  } else if (error.message?.includes('authentication')) {
+    console.error("Authentication failed - check your DATABASE_URL credentials");
+  } else if (error.message?.includes('timeout')) {
+    console.error("Connection timeout - check network connectivity");
+  }
+  
   throw new Error(`Failed to initialize database connection: ${error.message}`);
 }
 
@@ -40,16 +52,22 @@ export async function testConnection() {
     const result = await db.execute(sqlOperator`SELECT 1 as test`);
     console.log('✅ Database connection test passed');
     return true;
-  } catch (error) {
-    console.error('❌ Database connection test failed:', error);
+  } catch (error: any) {
+    console.error('❌ Database connection test failed:', error.message);
 
     // Try alternative connection test with direct SQL
     try {
       const directResult = await sql`SELECT 1 as test`;
       console.log('✅ Direct SQL connection test passed');
       return true;
-    } catch (directError) {
-      console.error('❌ Direct SQL connection also failed:', directError);
+    } catch (directError: any) {
+      console.error('❌ Direct SQL connection also failed:', directError.message);
+      
+      // Log specific guidance for common errors
+      if (directError.message?.includes('client.query is not a function')) {
+        console.error('This suggests a Neon adapter configuration issue');
+      }
+      
       return false;
     }
   }

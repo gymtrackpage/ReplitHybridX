@@ -29,6 +29,7 @@ export async function getSession() {
   let sessionStore;
   try {
     const { db } = await import('./db');
+    const { sql as sqlOperator } = await import('drizzle-orm');
     
     // Test database connection first
     await db.execute(sqlOperator`SELECT 1`);
@@ -43,7 +44,7 @@ export async function getSession() {
       schemaName: 'public',
     });
     console.log("✅ Using PostgreSQL session store");
-  } catch (error) {
+  } catch (error: any) {
     console.warn("⚠️ PostgreSQL session store failed, using memory store:", error.message);
     // Fallback to memory store if database connection fails
     sessionStore = new session.MemoryStore();
@@ -237,35 +238,29 @@ export async function setupAuth(app: Express) {
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
   const user = req.user as any;
 
-  console.log("Auth check - isAuthenticated:", req.isAuthenticated());
-  console.log("Auth check - user exists:", !!user);
-
   if (!req.isAuthenticated() || !user) {
-    console.log("Authentication failed - no session or user");
     return res.status(401).json({ message: "Unauthorized" });
   }
 
   // Always touch session to maintain activity-based persistence
-  if (req.session.touch) {
+  if (req.session && req.session.touch) {
     req.session.touch();
   }
 
   // If no expiry time, assume valid and continue (common for persistent sessions)
   if (!user.expires_at) {
-    console.log("No expiry time found, allowing access");
     return next();
   }
 
   const now = Math.floor(Date.now() / 1000);
-  const gracePeriod = 7 * 24 * 60 * 60; // 7 days grace period
+  const gracePeriod = 30 * 24 * 60 * 60; // 30 days grace period - much longer
 
-  // Only attempt refresh/logout if token is significantly expired
+  // Only attempt refresh/logout if token is significantly expired (beyond grace period)
   if (now > (user.expires_at + gracePeriod)) {
-    console.log("Token significantly expired, attempting refresh");
     const refreshToken = user.refresh_token;
     
     if (!refreshToken) {
-      console.log("No refresh token available, session expired");
+      // Only logout if we're way past expiry AND no refresh token
       req.logout(() => {
         res.status(401).json({ message: "Session expired, please log in again" });
       });
@@ -276,18 +271,19 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
       const config = await getOidcConfig();
       const tokenResponse = await client.refreshTokenGrant(config, refreshToken);
       updateUserSession(user, tokenResponse);
-      console.log("Token refreshed successfully");
       return next();
     } catch (error) {
-      console.error("Token refresh failed:", error);
-      req.logout(() => {
-        res.status(401).json({ message: "Session expired, please log in again" });
-      });
-      return;
+      // If refresh fails, still allow access within grace period
+      // Only logout if we're significantly past expiry
+      if (now > (user.expires_at + (2 * gracePeriod))) {
+        req.logout(() => {
+          res.status(401).json({ message: "Session expired, please log in again" });
+        });
+        return;
+      }
     }
   }
 
   // Token is still valid or within grace period
-  console.log("Session valid, allowing access");
   return next();
 };

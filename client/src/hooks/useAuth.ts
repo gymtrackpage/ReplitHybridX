@@ -10,16 +10,16 @@ export function useAuth() {
       if (error?.status === 401 || error?.status === 403) {
         return false;
       }
-      return failureCount < 1; // Reduced retry attempts
+      return failureCount < 1;
     },
-    staleTime: 10 * 60 * 1000, // 10 minutes - reasonable stale time
-    gcTime: 60 * 60 * 1000, // 1 hour - keep in cache
+    staleTime: 60 * 60 * 1000, // 1 hour - much longer stale time
+    gcTime: 24 * 60 * 60 * 1000, // 24 hours - keep in cache longer
     refetchOnWindowFocus: false, // Don't refetch on focus
-    refetchOnMount: "always", // Always check auth on mount
-    refetchOnReconnect: true, // Refetch on reconnect
+    refetchOnMount: false, // Don't always check on mount - trust cache
+    refetchOnReconnect: true, // Only refetch on reconnect
     refetchInterval: false, // Disable periodic refetching
     refetchIntervalInBackground: false,
-    networkMode: 'online', // Only fetch when online
+    networkMode: 'online',
   });
 
   return {

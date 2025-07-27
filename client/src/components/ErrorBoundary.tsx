@@ -68,14 +68,34 @@ export class ErrorBoundary extends Component<Props, State> {
                 </details>
               )}
 
-              <div className="flex gap-2 justify-center">
-                <Button onClick={this.handleReset} variant="outline">
+              <div className="flex gap-2">
+                <Button 
+                  onClick={() => window.location.reload()} 
+                  variant="outline"
+                  className="flex-1"
+                >
                   <RefreshCw className="w-4 h-4 mr-2" />
-                  Try Again
-                </Button>
-                <Button onClick={() => window.location.reload()}>
                   Refresh Page
                 </Button>
+                <Button 
+                  onClick={() => this.setState({ hasError: false, error: null, errorInfo: null })}
+                  className="flex-1"
+                >
+                  Try Again
+                </Button>
+              </div>
+
+              {/* Add helpful guidance */}
+              <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                <p className="text-sm text-blue-800 dark:text-blue-200">
+                  <strong>Common fixes:</strong>
+                </p>
+                <ul className="text-xs text-blue-700 dark:text-blue-300 mt-1 space-y-1">
+                  <li>• Clear your browser cache and cookies</li>
+                  <li>• Check your internet connection</li>
+                  <li>• Try refreshing the page</li>
+                  <li>• If the problem persists, try logging out and back in</li>
+                </ul>
               </div>
             </CardContent>
           </Card>
