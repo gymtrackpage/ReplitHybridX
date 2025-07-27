@@ -28,10 +28,14 @@ export async function getSession() {
   // Try to use PostgreSQL store first, fallback to memory store if DB issues
   let sessionStore;
   try {
-    const { pool } = await import('./db');
+    const { db } = await import('./db');
+    
+    // Test database connection first
+    await db.execute(sqlOperator`SELECT 1`);
+    
     const pgStore = connectPg(session);
     sessionStore = new pgStore({
-      pool: pool,
+      pool: db as any, // Cast for compatibility
       createTableIfMissing: true,
       ttl: sessionTtl / 1000,
       tableName: "sessions",

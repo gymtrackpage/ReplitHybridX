@@ -1,4 +1,3 @@
-
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,7 +27,7 @@ export class ErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('ErrorBoundary caught an error:', error, errorInfo);
     this.setState({ error, errorInfo });
-    
+
     // Log error to external service in production
     if (process.env.NODE_ENV === 'production') {
       // TODO: Send to error tracking service
@@ -58,7 +57,7 @@ export class ErrorBoundary extends Component<Props, State> {
               <p className="text-muted-foreground text-center">
                 We're sorry, but something unexpected happened. Please try refreshing the page.
               </p>
-              
+
               {process.env.NODE_ENV === 'development' && this.state.error && (
                 <details className="bg-gray-100 p-2 rounded text-xs">
                   <summary className="cursor-pointer font-medium">Error Details</summary>
@@ -68,7 +67,7 @@ export class ErrorBoundary extends Component<Props, State> {
                   </pre>
                 </details>
               )}
-              
+
               <div className="flex gap-2 justify-center">
                 <Button onClick={this.handleReset} variant="outline">
                   <RefreshCw className="w-4 h-4 mr-2" />
