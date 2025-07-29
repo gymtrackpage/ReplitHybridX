@@ -880,13 +880,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const completions = await storage.getWorkoutCompletions(userId);
       
       let programWorkouts = [];
+      let program = null;
       if (userProgress?.programId) {
+        program = await storage.getProgram(userProgress.programId);
         programWorkouts = await db
           .select()
           .from(workouts)
           .where(eq(workouts.programId, userProgress.programId))
           .orderBy(asc(workouts.week), asc(workouts.day));
       }
+
+      // Group workouts by week for better visibility
+      const workoutsByWeek = new Map();
+      programWorkouts.forEach(workout => {
+        if (!workoutsByWeek.has(workout.week)) {
+          workoutsByWeek.set(workout.week, []);
+        }
+        workoutsByWeek.get(workout.week).push({
+          id: workout.id,
+          day: workout.day,
+          name: workout.name,
+          duration: workout.duration || workout.estimatedDuration
+        });
+      });
 
       const debugData = {
         user: {
@@ -896,30 +912,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
           currentProgramId: user?.currentProgramId,
           isAdmin: user?.isAdmin
         },
-        userProgress: {
-          programId: userProgress?.programId,
-          startDate: userProgress?.startDate,
-          currentWeek: userProgress?.currentWeek,
-          currentDay: userProgress?.currentDay,
-          completedWorkouts: userProgress?.completedWorkouts
-        },
+        program: program ? {
+          id: program.id,
+          name: program.name,
+          duration: program.duration,
+          frequency: program.frequency,
+          difficulty: program.difficulty
+        } : null,
+        userProgress: userProgress ? {
+          programId: userProgress.programId,
+          startDate: userProgress.startDate,
+          currentWeek: userProgress.currentWeek,
+          currentDay: userProgress.currentDay,
+          completedWorkouts: userProgress.completedWorkouts,
+          totalWorkouts: userProgress.totalWorkouts
+        } : null,
         programWorkouts: {
           count: programWorkouts.length,
-          sampleWorkouts: programWorkouts.slice(0, 3).map(w => ({
+          weekRange: programWorkouts.length > 0 ? 
+            `Week ${Math.min(...programWorkouts.map(w => w.week))} - Week ${Math.max(...programWorkouts.map(w => w.week))}` : 
+            'No workouts',
+          byWeek: Object.fromEntries(workoutsByWeek),
+          sampleWorkouts: programWorkouts.slice(0, 5).map(w => ({
             id: w.id,
             week: w.week,
             day: w.day,
-            name: w.name
+            name: w.name,
+            estimatedDuration: w.estimatedDuration || w.duration
           }))
         },
         completions: {
           count: completions.length,
-          recent: completions.slice(0, 3).map(c => ({
+          recent: completions.slice(0, 5).map(c => ({
             id: c.id,
             workoutId: c.workoutId,
             completedAt: c.completedAt,
-            skipped: c.skipped
+            skipped: c.skipped,
+            duration: c.duration,
+            notes: c.notes
           }))
+        },
+        systemInfo: {
+          currentDate: new Date().toISOString(),
+          startDateCalculation: userProgress?.startDate ? {
+            startDate: userProgress.startDate,
+            daysSinceStart: Math.floor((new Date().getTime() - new Date(userProgress.startDate).getTime()) / (1000 * 60 * 60 * 24))
+          } : null
         }
       };
 
