@@ -23,10 +23,12 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday
 
 const safeFormatDate = (date: string | Date, formatString: string, fallback: string = 'Invalid date'): string => {
   try {
+    if (!date) return fallback;
     const dateObj = typeof date === 'string' ? new Date(date) : date;
-    if (!isValid(dateObj)) return fallback;
+    if (!dateObj || !isValid(dateObj)) return fallback;
     return format(dateObj, formatString);
-  } catch {
+  } catch (error) {
+    console.warn('Date formatting error:', error, 'for date:', date);
     return fallback;
   }
 };
@@ -122,142 +124,156 @@ export default function Calendar() {
 
   // Generate calendar data with proper workout scheduling
   const calendarData = useMemo(() => {
-    if (!userProgress || !dashboardData?.progress) return new Map<string, WorkoutStatus>();
-    
-    const progress = dashboardData.progress;
-    const startDate = progress.startDate ? new Date(progress.startDate) : new Date();
-    const currentWeek = progress.currentWeek || 1;
-    const currentDay = progress.currentDay || 1;
-    const today = new Date();
-    
-    // Create a map of completions by workout ID and date
-    const completionsByWorkoutAndDate = new Map<string, any>();
-    completions.forEach((completion: any) => {
-      const completionDate = format(new Date(completion.completedAt), 'yyyy-MM-dd');
-      const key = `${completion.workoutId}-${completionDate}`;
-      completionsByWorkoutAndDate.set(key, completion);
-    });
-
-    // Sort program workouts by week and day
-    const sortedWorkouts = [...programWorkouts].sort((a, b) => {
-      if (a.week !== b.week) return a.week - b.week;
-      return a.day - b.day;
-    });
-
-    const calendarMap = new Map<string, WorkoutStatus>();
-
-    calendarDays.forEach(date => {
-      const dateString = format(date, 'yyyy-MM-dd');
-      const daysSinceStart = Math.floor((date.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-      
-      // Skip dates before program start
-      if (daysSinceStart < 0) {
-        calendarMap.set(dateString, {
-          date: dateString,
-          status: 'rest'
+    try {
+      if (!userProgress || !dashboardData?.progress || !Array.isArray(programWorkouts)) {
+        console.log('Calendar data: Missing required data', {
+          userProgress: !!userProgress,
+          dashboardProgress: !!dashboardData?.progress,
+          programWorkouts: Array.isArray(programWorkouts) ? programWorkouts.length : 'not array'
         });
-        return;
+        return new Map<string, WorkoutStatus>();
       }
-
-      // Calculate what week and day this should be
-      const weeksSinceStart = Math.floor(daysSinceStart / 7);
-      const dayOfWeek = daysSinceStart % 7;
-      const scheduledWeek = weeksSinceStart + 1;
-      const scheduledDay = dayOfWeek + 1;
-
-      // Skip Sundays (day 7) as rest days
-      if (scheduledDay === 7 || scheduledDay > 6) {
-        calendarMap.set(dateString, {
-          date: dateString,
-          status: 'rest'
-        });
-        return;
-      }
-
-      // Find the workout for this scheduled week and day
-      let scheduledWorkout = sortedWorkouts.find(w => 
-        w.week === scheduledWeek && w.day === scheduledDay
-      );
-
-      // If we're past the current week/day, calculate the next workout based on progress
-      const isInFuture = isBefore(today, date) || isToday(date);
       
-      if (isInFuture && (scheduledWeek > currentWeek || (scheduledWeek === currentWeek && scheduledDay > currentDay))) {
-        // Calculate offset from current position
-        const currentWorkoutIndex = sortedWorkouts.findIndex(w => 
-          w.week === currentWeek && w.day === currentDay
-        );
-        
-        if (currentWorkoutIndex >= 0) {
-          const daysAhead = Math.floor((date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-          const targetIndex = currentWorkoutIndex + daysAhead + (isToday(date) ? 0 : 1);
-          
-          // Handle program cycling
-          if (targetIndex < sortedWorkouts.length) {
-            scheduledWorkout = sortedWorkouts[targetIndex];
-          } else {
-            // Cycle back to beginning if we've reached the end
-            const cycleIndex = targetIndex % sortedWorkouts.length;
-            scheduledWorkout = sortedWorkouts[cycleIndex];
+      const progress = dashboardData.progress;
+      const startDate = progress.startDate ? new Date(progress.startDate) : new Date();
+      const currentWeek = progress.currentWeek || 1;
+      const currentDay = progress.currentDay || 1;
+      const today = new Date();
+      
+      console.log('Calendar data generation:', {
+        startDate: startDate.toISOString(),
+        currentWeek,
+        currentDay,
+        programWorkoutsCount: programWorkouts.length,
+        completionsCount: completions.length
+      });
+      
+      // Create a map of completions by date for faster lookup
+      const completionsByDate = new Map<string, any[]>();
+      completions.forEach((completion: any) => {
+        try {
+          const completionDate = format(new Date(completion.completedAt), 'yyyy-MM-dd');
+          if (!completionsByDate.has(completionDate)) {
+            completionsByDate.set(completionDate, []);
           }
-        }
-      }
-
-      if (!scheduledWorkout) {
-        calendarMap.set(dateString, {
-          date: dateString,
-          status: 'rest'
-        });
-        return;
-      }
-
-      // Check if this workout was completed
-      const completionKey = `${scheduledWorkout.id}-${dateString}`;
-      const completion = completionsByWorkoutAndDate.get(completionKey);
-      
-      // Also check for any completion on this date (in case workout changed)
-      const dateCompletions = completions.filter((c: any) => 
-        format(new Date(c.completedAt), 'yyyy-MM-dd') === dateString
-      );
-
-      let status: WorkoutStatus['status'] = 'upcoming';
-      let workoutCompletion = completion;
-
-      if (dateCompletions.length > 0) {
-        // Use the most recent completion for this date
-        workoutCompletion = dateCompletions[dateCompletions.length - 1];
-        status = workoutCompletion.skipped ? 'skipped' : 'completed';
-      } else if (isBefore(date, today) && !isToday(date)) {
-        // Past date with no completion = missed
-        status = 'missed';
-      } else if (isToday(date)) {
-        status = 'upcoming';
-      } else {
-        status = 'upcoming';
-      }
-
-      calendarMap.set(dateString, {
-        date: dateString,
-        status,
-        workout: {
-          id: scheduledWorkout.id,
-          name: scheduledWorkout.name,
-          description: scheduledWorkout.description || '',
-          estimatedDuration: scheduledWorkout.estimatedDuration || 60,
-          workoutType: scheduledWorkout.workoutType || 'Training',
-          week: scheduledWorkout.week,
-          day: scheduledWorkout.day,
-          exercises: Array.isArray(scheduledWorkout.exercises) ? scheduledWorkout.exercises : [],
-          completedAt: workoutCompletion?.completedAt,
-          duration: workoutCompletion?.duration,
-          comments: workoutCompletion?.notes,
-          rating: workoutCompletion?.rating,
-          completionId: workoutCompletion?.id
+          completionsByDate.get(completionDate)?.push(completion);
+        } catch (error) {
+          console.warn('Error processing completion:', completion, error);
         }
       });
-    });
 
-    return calendarMap;
+      // Sort program workouts by week and day for consistent ordering
+      const sortedWorkouts = [...programWorkouts].sort((a, b) => {
+        if (a.week !== b.week) return a.week - b.week;
+        return a.day - b.day;
+      });
+
+      const calendarMap = new Map<string, WorkoutStatus>();
+
+      calendarDays.forEach(date => {
+        try {
+          const dateString = format(date, 'yyyy-MM-dd');
+          const daysSinceStart = Math.floor((date.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+          
+          // Skip dates before program start
+          if (daysSinceStart < 0) {
+            calendarMap.set(dateString, {
+              date: dateString,
+              status: 'rest'
+            });
+            return;
+          }
+
+          // Calculate scheduled week and day (6-day training week)
+          const weeksSinceStart = Math.floor(daysSinceStart / 7);
+          const dayOfWeek = daysSinceStart % 7;
+          const scheduledWeek = weeksSinceStart + 1;
+          const scheduledDay = dayOfWeek + 1;
+
+          // Sunday is rest day (day 7 or 0)
+          if (scheduledDay > 6) {
+            calendarMap.set(dateString, {
+              date: dateString,
+              status: 'rest'
+            });
+            return;
+          }
+
+          // Find the workout for this week and day
+          let scheduledWorkout = sortedWorkouts.find(w => 
+            w.week === scheduledWeek && w.day === scheduledDay
+          );
+
+          // If no exact match, find the closest available workout
+          if (!scheduledWorkout && sortedWorkouts.length > 0) {
+            // Calculate total training days passed
+            const totalTrainingDays = Math.floor(daysSinceStart * (6/7)); // 6 training days per week
+            const workoutIndex = totalTrainingDays % sortedWorkouts.length;
+            scheduledWorkout = sortedWorkouts[workoutIndex];
+          }
+
+          // Check for completions on this date
+          const dateCompletions = completionsByDate.get(dateString) || [];
+          let status: WorkoutStatus['status'] = 'upcoming';
+          let workoutCompletion = null;
+
+          if (dateCompletions.length > 0) {
+            // Use the most recent completion for this date
+            workoutCompletion = dateCompletions[dateCompletions.length - 1];
+            status = workoutCompletion.skipped ? 'skipped' : 'completed';
+          } else if (isBefore(date, today) && !isToday(date)) {
+            // Past date with no completion = missed (only if workout was scheduled)
+            status = scheduledWorkout ? 'missed' : 'rest';
+          } else if (isToday(date)) {
+            status = 'upcoming';
+          } else {
+            status = 'upcoming';
+          }
+
+          if (!scheduledWorkout) {
+            calendarMap.set(dateString, {
+              date: dateString,
+              status: 'rest'
+            });
+            return;
+          }
+
+          calendarMap.set(dateString, {
+            date: dateString,
+            status,
+            workout: {
+              id: scheduledWorkout.id,
+              name: scheduledWorkout.name,
+              description: scheduledWorkout.description || '',
+              estimatedDuration: scheduledWorkout.estimatedDuration || scheduledWorkout.duration || 60,
+              workoutType: scheduledWorkout.workoutType || 'Training',
+              week: scheduledWorkout.week,
+              day: scheduledWorkout.day,
+              exercises: Array.isArray(scheduledWorkout.exercises) ? scheduledWorkout.exercises : [],
+              completedAt: workoutCompletion?.completedAt,
+              duration: workoutCompletion?.duration,
+              comments: workoutCompletion?.notes,
+              rating: workoutCompletion?.rating,
+              completionId: workoutCompletion?.id
+            }
+          });
+        } catch (error) {
+          console.error('Error processing calendar date:', date, error);
+          // Set as rest day if there's an error
+          const dateString = format(date, 'yyyy-MM-dd');
+          calendarMap.set(dateString, {
+            date: dateString,
+            status: 'rest'
+          });
+        }
+      });
+
+      console.log('Calendar map generated with', calendarMap.size, 'entries');
+      return calendarMap;
+    } catch (error) {
+      console.error('Error generating calendar data:', error);
+      return new Map<string, WorkoutStatus>();
+    }
   }, [calendarDays, userProgress, dashboardData, completions, programWorkouts]);
 
   const getWorkoutForDate = (date: Date): WorkoutStatus | null => {
@@ -315,12 +331,25 @@ export default function Calendar() {
     };
   }, [calendarData]);
 
+  // Debug logging
+  console.log('Calendar render state:', {
+    userProgress: !!userProgress,
+    dashboardData: !!dashboardData,
+    completions: completions?.length || 0,
+    programWorkouts: programWorkouts?.length || 0,
+    calendarDataSize: calendarData?.size || 0,
+    currentMonth: currentMonth.toISOString()
+  });
+
   if (!userProgress || !dashboardData) {
     return (
       <MobileLayout>
         <div className="space-y-6">
           <div className="h-8 bg-gray-200 rounded animate-pulse" />
           <div className="h-96 bg-gray-200 rounded animate-pulse" />
+          <div className="text-center text-gray-500 mt-4">
+            Loading calendar data...
+          </div>
         </div>
       </MobileLayout>
     );
@@ -410,14 +439,15 @@ export default function Calendar() {
               ))}
               
               {/* Calendar Days */}
-              {calendarDays.map(date => {
+              {calendarDays.map((date, index) => {
                 const workout = getWorkoutForDate(date);
                 const isSelected = selectedDate && isSameDay(date, selectedDate);
                 const isTodayDate = isToday(date);
+                const dateKey = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
                 
                 return (
                   <div
-                    key={date.toISOString()}
+                    key={dateKey}
                     className={`
                       relative aspect-square cursor-pointer border rounded-lg transition-all p-2 flex flex-col items-center justify-center
                       ${isSelected ? 'bg-blue-100 border-blue-300 scale-105' : 'hover:bg-gray-50'}
@@ -430,7 +460,7 @@ export default function Calendar() {
                     </span>
                     
                     {/* Workout Status Indicator */}
-                    {workout && workout.status !== 'rest' && (
+                    {workout && workout.status !== 'rest' && workout.workout && (
                       <div className="mt-1 flex flex-col items-center">
                         <div 
                           className={`
@@ -441,11 +471,20 @@ export default function Calendar() {
                           {workout.status === 'completed' ? '✓' :
                            workout.status === 'skipped' ? '⏸' :
                            workout.status === 'missed' ? '✗' :
-                           workout.workout ? workout.workout.day : ''}
+                           workout.workout.day || 'W'}
                         </div>
-                        {workout.workout?.comments && (
+                        {workout.workout.comments && (
                           <div className="w-1 h-1 bg-blue-400 rounded-full mt-0.5" />
                         )}
+                      </div>
+                    )}
+                    
+                    {/* Rest Day Indicator */}
+                    {workout && workout.status === 'rest' && (
+                      <div className="mt-1">
+                        <div className="w-4 h-4 rounded-full bg-gray-300 flex items-center justify-center">
+                          <span className="text-xs text-gray-600">R</span>
+                        </div>
                       </div>
                     )}
                   </div>
