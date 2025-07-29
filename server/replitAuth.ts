@@ -28,15 +28,14 @@ export async function getSession() {
   // Try to use PostgreSQL store first, fallback to memory store if DB issues
   let sessionStore;
   try {
-    const { db } = await import('./db');
-    const { sql } = await import('drizzle-orm');
-
+    const { sql } = await import('./db');
+    
     // Test database connection first
-    await db.execute(sql`SELECT 1`);
+    await sql`SELECT 1`;
 
     const pgStore = connectPg(session);
     sessionStore = new pgStore({
-      pool: db as any,
+      conString: process.env.DATABASE_URL,
       createTableIfMissing: true,
       ttl: sessionTtl / 1000,
       tableName: "sessions",
