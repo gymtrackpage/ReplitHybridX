@@ -310,16 +310,36 @@ export default function Calendar() {
         }
       });
 
+      const mapValues = Array.from(calendarMap.values());
       console.log('Calendar map generated:', {
         totalEntries: calendarMap.size,
-        workoutDays: Array.from(calendarMap.values()).filter(w => w.workout).length,
-        completedDays: Array.from(calendarMap.values()).filter(w => w.status === 'completed').length,
-        upcomingDays: Array.from(calendarMap.values()).filter(w => w.status === 'upcoming').length
+        workoutDays: mapValues.filter(w => w.workout).length,
+        completedDays: mapValues.filter(w => w.status === 'completed').length,
+        upcomingDays: mapValues.filter(w => w.status === 'upcoming').length,
+        restDays: mapValues.filter(w => w.status === 'rest').length,
+        missedDays: mapValues.filter(w => w.status === 'missed').length
       });
+
+      // If no workout days were generated, log detailed debugging info
+      if (mapValues.filter(w => w.workout).length === 0) {
+        console.warn('No workout days generated. Debugging info:', {
+          workoutLookupSize: workoutLookup.size,
+          workoutLookupKeys: Array.from(workoutLookup.keys()),
+          sortedWorkoutsCount: sortedWorkouts.length,
+          firstFewWorkouts: sortedWorkouts.slice(0, 3).map(w => ({ week: w.week, day: w.day, name: w.name })),
+          daysSinceStart: calendarDays.length > 0 ? Math.floor((calendarDays[0].getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) : 'No days'
+        });
+      }
 
       return calendarMap;
     } catch (error) {
       console.error('Error generating calendar data:', error);
+      console.error('Error details:', {
+        userProgressExists: !!userProgress,
+        programWorkoutsLength: programWorkouts?.length || 0,
+        startDateValid: userProgress?.startDate ? 'Yes' : 'No',
+        errorMessage: error instanceof Error ? error.message : 'Unknown error'
+      });
       return new Map<string, WorkoutStatus>();
     }
   }, [calendarDays, userProgress, completions, programWorkouts]);
@@ -358,6 +378,31 @@ export default function Calendar() {
   };
 
   const [isNavigating, setIsNavigating] = useState(false);
+  const [isFixingCalendar, setIsFixingCalendar] = useState(false);
+
+  const fixCalendarData = async () => {
+    setIsFixingCalendar(true);
+    try {
+      const response = await fetch('/api/fix-calendar-data', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Calendar fix result:', result);
+        
+        // Refresh the page to reload data
+        window.location.reload();
+      } else {
+        console.error('Failed to fix calendar data');
+      }
+    } catch (error) {
+      console.error('Error fixing calendar data:', error);
+    } finally {
+      setIsFixingCalendar(false);
+    }
+  };
 
   const navigateMonth = (direction: 'prev' | 'next') => {
     setIsNavigating(true);
@@ -379,15 +424,36 @@ export default function Calendar() {
     };
   }, [calendarData]);
 
-  // Debug logging
+  // Enhanced debug logging
   console.log('Calendar render state:', {
     userProgress: !!userProgress,
+    userProgressDetails: userProgress ? {
+      programId: userProgress.programId,
+      startDate: userProgress.startDate,
+      currentWeek: userProgress.currentWeek,
+      currentDay: userProgress.currentDay
+    } : null,
     dashboardData: !!dashboardData,
     completions: completions?.length || 0,
     programWorkouts: programWorkouts?.length || 0,
+    programWorkoutsIsArray: Array.isArray(programWorkouts),
+    programWorkoutsSample: Array.isArray(programWorkouts) && programWorkouts.length > 0 
+      ? programWorkouts.slice(0, 3).map(w => ({ id: w.id, name: w.name, week: w.week, day: w.day }))
+      : 'No workouts',
     calendarDataSize: calendarData?.size || 0,
     currentMonth: currentMonth.toISOString()
   });
+
+  // Log early return conditions
+  if (!userProgress) {
+    console.warn('Calendar: Missing userProgress');
+  }
+  if (!Array.isArray(programWorkouts)) {
+    console.warn('Calendar: programWorkouts is not an array:', typeof programWorkouts);
+  }
+  if (Array.isArray(programWorkouts) && programWorkouts.length === 0) {
+    console.warn('Calendar: programWorkouts array is empty');
+  }
 
   if (!userProgress || !dashboardData) {
     return (
@@ -421,6 +487,16 @@ export default function Calendar() {
               <div>Completions: {completions?.length || 0}</div>
               <div>Calendar Data Size: {calendarData?.size || 0}</div>
               <div>Sample Workouts: {programWorkouts?.slice(0, 3).map(w => `${w.name} (W${w.week}D${w.day})`).join(', ') || 'None'}</div>
+              <div className="mt-3 pt-2 border-t border-yellow-300">
+                <Button 
+                  size="sm" 
+                  onClick={fixCalendarData}
+                  disabled={isFixingCalendar}
+                  className="bg-yellow-600 hover:bg-yellow-700"
+                >
+                  {isFixingCalendar ? 'Fixing...' : 'Fix Calendar Data'}
+                </Button>
+              </div>
             </CardContent>
           </Card>
         )}
@@ -760,6 +836,38 @@ export default function Calendar() {
               <Button onClick={() => window.location.href = '/programs'}>
                 Browse Programs
               </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Detailed Debug Info for Missing Data */}
+        {(!userProgress || !programWorkouts || programWorkouts.length === 0) && process.env.NODE_ENV === 'development' && (
+          <Card className="bg-red-50 border-red-200">
+            <CardHeader>
+              <CardTitle className="text-sm text-red-800">Calendar Debug - Missing Data</CardTitle>
+            </CardHeader>
+            <CardContent className="text-xs space-y-2 text-red-700">
+              <div>User Progress: {userProgress ? '✅ Found' : '❌ Missing'}</div>
+              {userProgress && (
+                <div className="ml-4 space-y-1">
+                  <div>Program ID: {userProgress.programId || 'None'}</div>
+                  <div>Start Date: {userProgress.startDate || 'None'}</div>
+                  <div>Current: Week {userProgress.currentWeek || 0}, Day {userProgress.currentDay || 0}</div>
+                </div>
+              )}
+              <div>Program Workouts: {Array.isArray(programWorkouts) ? `✅ Array with ${programWorkouts.length} items` : '❌ Not an array'}</div>
+              <div>Dashboard Data: {dashboardData ? '✅ Found' : '❌ Missing'}</div>
+              <div>Completions: {completions?.length || 0} records</div>
+              {!userProgress && (
+                <div className="mt-2 p-2 bg-red-100 rounded">
+                  <strong>Missing User Progress:</strong> User needs to complete assessment or have progress record created.
+                </div>
+              )}
+              {userProgress && (!programWorkouts || programWorkouts.length === 0) && (
+                <div className="mt-2 p-2 bg-red-100 rounded">
+                  <strong>No Program Workouts:</strong> Program {userProgress.programId} has no workouts, or user has no current program.
+                </div>
+              )}
             </CardContent>
           </Card>
         )}

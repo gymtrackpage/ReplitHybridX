@@ -871,6 +871,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
               if (startDate > today) {
 
 
+  // Calendar troubleshooting and fix endpoint
+  app.post('/api/fix-calendar-data', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const fixes = [];
+      
+      // Get current user state
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Check and fix missing current program
+      if (!user.currentProgramId && user.assessmentCompleted) {
+        console.log(`User ${userId} has completed assessment but no current program`);
+        
+        // Get available programs and assign first one as fallback
+        const programs = await storage.getPrograms();
+        if (programs.length > 0) {
+          const defaultProgram = programs.find(p => p.difficulty === 'Intermediate') || programs[0];
+          await storage.updateUserProgram(userId, defaultProgram.id);
+          fixes.push(`Assigned default program: ${defaultProgram.name}`);
+          console.log(`Assigned program ${defaultProgram.id} to user ${userId}`);
+        }
+      }
+
+      // Check and fix missing user progress
+      let progress = await storage.getUserProgress(userId);
+      if (!progress && user.currentProgramId) {
+        console.log(`Creating missing progress record for user ${userId}`);
+        
+        const program = await storage.getProgram(user.currentProgramId);
+        const totalWorkouts = program ? (program.duration || 12) * (program.frequency || 6) : 84;
+        
+        progress = await storage.createUserProgress({
+          userId,
+          programId: user.currentProgramId,
+          currentWeek: 1,
+          currentDay: 1,
+          startDate: new Date().toISOString(),
+          completedWorkouts: 0,
+          totalWorkouts
+        });
+        fixes.push('Created missing user progress record');
+      }
+
+      // Refresh user data after fixes
+      const updatedUser = await storage.getUser(userId);
+      const updatedProgress = await storage.getUserProgress(userId);
+      
+      let programWorkouts = [];
+      if (updatedUser?.currentProgramId) {
+        programWorkouts = await storage.getWorkoutsByProgram(updatedUser.currentProgramId);
+      }
+
+      res.json({
+        success: true,
+        fixes,
+        currentState: {
+          user: {
+            id: userId,
+            currentProgramId: updatedUser?.currentProgramId,
+            assessmentCompleted: updatedUser?.assessmentCompleted,
+            subscriptionStatus: updatedUser?.subscriptionStatus
+          },
+          progress: updatedProgress ? {
+            programId: updatedProgress.programId,
+            currentWeek: updatedProgress.currentWeek,
+            currentDay: updatedProgress.currentDay,
+            startDate: updatedProgress.startDate
+          } : null,
+          programWorkouts: {
+            count: programWorkouts.length,
+            sampleWorkouts: programWorkouts.slice(0, 3).map(w => ({
+              id: w.id,
+              name: w.name,
+              week: w.week,
+              day: w.day
+            }))
+          }
+        }
+      });
+    } catch (error) {
+      console.error("Error fixing calendar data:", error);
+      res.status(500).json({ 
+        message: "Failed to fix calendar data",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
   // Debug endpoint for calendar troubleshooting
   app.get('/api/debug/calendar-data', isAuthenticated, async (req: any, res) => {
     try {
