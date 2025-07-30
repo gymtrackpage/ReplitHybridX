@@ -125,23 +125,51 @@ export default function Calendar() {
   // Generate calendar data with proper workout scheduling
   const calendarData = useMemo(() => {
     try {
-      // Check if we have the required data
-      if (!userProgress || !Array.isArray(programWorkouts) || programWorkouts.length === 0) {
-        console.log('Calendar data: Missing required data', {
-          userProgress: !!userProgress,
-          programWorkouts: Array.isArray(programWorkouts) ? programWorkouts.length : 'not array'
-        });
+      console.log('Calendar data generation - checking inputs:', {
+        userProgress: userProgress,
+        programWorkouts: programWorkouts,
+        programWorkoutsLength: programWorkouts?.length,
+        programWorkoutsIsArray: Array.isArray(programWorkouts),
+        dashboardData: !!dashboardData,
+        completions: completions?.length,
+        calendarDaysCount: calendarDays.length
+      });
+
+      // More lenient check - allow empty program workouts for debugging
+      if (!userProgress) {
+        console.log('Calendar data: Missing user progress');
         return new Map<string, WorkoutStatus>();
+      }
+
+      if (!Array.isArray(programWorkouts)) {
+        console.log('Calendar data: Program workouts is not an array:', typeof programWorkouts);
+        return new Map<string, WorkoutStatus>();
+      }
+
+      // If no workouts but user has progress, create rest days
+      if (programWorkouts.length === 0) {
+        console.log('Calendar data: No program workouts found, creating rest days only');
+        const calendarMap = new Map<string, WorkoutStatus>();
+        calendarDays.forEach(date => {
+          const dateString = format(date, 'yyyy-MM-dd');
+          calendarMap.set(dateString, {
+            date: dateString,
+            status: 'rest'
+          });
+        });
+        return calendarMap;
       }
       
       const startDate = userProgress.startDate ? new Date(userProgress.startDate) : new Date();
       const today = new Date();
       
-      console.log('Calendar data generation:', {
+      console.log('Calendar data generation - processing:', {
         startDate: format(startDate, 'yyyy-MM-dd'),
         programWorkoutsCount: programWorkouts.length,
         completionsCount: completions.length,
-        calendarDaysCount: calendarDays.length
+        userProgressProgramId: userProgress.programId,
+        currentWeek: userProgress.currentWeek,
+        currentDay: userProgress.currentDay
       });
       
       // Create a map of completions by date for faster lookup
@@ -161,12 +189,22 @@ export default function Calendar() {
         return a.day - b.day;
       });
 
+      console.log('Sorted workouts:', sortedWorkouts.map(w => ({
+        id: w.id,
+        name: w.name,
+        week: w.week,
+        day: w.day
+      })));
+
       // Create workout lookup by week/day
       const workoutLookup = new Map<string, any>();
       sortedWorkouts.forEach(workout => {
         const key = `${workout.week}-${workout.day}`;
         workoutLookup.set(key, workout);
+        console.log(`Added workout to lookup: ${key} -> ${workout.name}`);
       });
+
+      console.log('Workout lookup keys:', Array.from(workoutLookup.keys()));
 
       const calendarMap = new Map<string, WorkoutStatus>();
 
@@ -174,6 +212,8 @@ export default function Calendar() {
         try {
           const dateString = format(date, 'yyyy-MM-dd');
           const daysSinceStart = Math.floor((date.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+          
+          console.log(`Processing date ${dateString}, daysSinceStart: ${daysSinceStart}`);
           
           // Handle dates before program start
           if (daysSinceStart < 0) {
@@ -192,6 +232,8 @@ export default function Calendar() {
           const scheduledWeek = weeksSinceStart + 1;
           const scheduledDay = dayOfWeek + 1;
 
+          console.log(`Date ${dateString}: scheduledWeek=${scheduledWeek}, scheduledDay=${scheduledDay}`);
+
           // Sunday (day 7) is typically rest
           if (scheduledDay > 6) {
             calendarMap.set(dateString, {
@@ -205,11 +247,14 @@ export default function Calendar() {
           const workoutKey = `${scheduledWeek}-${scheduledDay}`;
           let scheduledWorkout = workoutLookup.get(workoutKey);
 
+          console.log(`Looking for workout key ${workoutKey}, found: ${!!scheduledWorkout}`);
+
           // If no workout found for exact week/day, cycle through available workouts
           if (!scheduledWorkout && sortedWorkouts.length > 0) {
             const totalTrainingDays = weeksSinceStart * 6 + (scheduledDay - 1);
             const workoutIndex = totalTrainingDays % sortedWorkouts.length;
             scheduledWorkout = sortedWorkouts[workoutIndex];
+            console.log(`Using cycled workout at index ${workoutIndex}: ${scheduledWorkout?.name}`);
           }
 
           // Check if there's a completion for this date
@@ -361,6 +406,25 @@ export default function Calendar() {
   return (
     <MobileLayout>
       <div className="space-y-6">
+        {/* Debug Panel - Remove this once issue is fixed */}
+        {process.env.NODE_ENV === 'development' && (
+          <Card className="bg-yellow-50 border-yellow-200">
+            <CardHeader>
+              <CardTitle className="text-sm">Debug Info</CardTitle>
+            </CardHeader>
+            <CardContent className="text-xs space-y-2">
+              <div>User Progress: {userProgress ? 'Yes' : 'No'}</div>
+              <div>Program ID: {userProgress?.programId || 'None'}</div>
+              <div>Start Date: {userProgress?.startDate || 'None'}</div>
+              <div>Current Week/Day: {userProgress?.currentWeek || 'None'}/{userProgress?.currentDay || 'None'}</div>
+              <div>Program Workouts: {programWorkouts?.length || 0}</div>
+              <div>Completions: {completions?.length || 0}</div>
+              <div>Calendar Data Size: {calendarData?.size || 0}</div>
+              <div>Sample Workouts: {programWorkouts?.slice(0, 3).map(w => `${w.name} (W${w.week}D${w.day})`).join(', ') || 'None'}</div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Calendar Header */}
         <div className="flex justify-between items-center">
           <div>
