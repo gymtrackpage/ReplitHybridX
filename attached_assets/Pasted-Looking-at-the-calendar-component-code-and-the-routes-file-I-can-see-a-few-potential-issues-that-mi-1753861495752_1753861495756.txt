@@ -1,0 +1,163 @@
+Looking at the calendar component code and the routes file, I can see a few potential issues that might be causing the calendar to show "no workouts available to show":
+
+1. Let me trace through the calendar data generation logic in the `calendar.tsx` file.
+
+The calendar component:
+- Fetches `userProgress`, `completions`, `programWorkouts`, and `dashboardData` using React Query
+- The main issue seems to be in the `calendarData` useMemo that generates the calendar
+
+Looking at the `calendarData` useMemo:
+
+```javascript
+const calendarData = useMemo(() => {
+    try {
+      // Check if we have the required data
+      if (!userProgress || !Array.isArray(programWorkouts) || programWorkouts.length === 0) {
+        console.log('Calendar data: Missing required data', {
+          userProgress: !!userProgress,
+          programWorkouts: Array.isArray(programWorkouts) ? programWorkouts.length : 'not array'
+        });
+        return new Map<string, WorkoutStatus>();
+      }
+```
+
+This early return could be the issue. Let me check what the API endpoints return.
+
+Looking at the routes:
+
+1. `/api/user-progress` - This should return user progress
+2. `/api/workouts` - This should return workouts for the user's current program
+3. `/api/workout-completions` - This should return completions
+4. `/api/dashboard` - This should return dashboard data
+
+Looking at the `/api/workouts` endpoint:
+
+```javascript
+app.get('/api/workouts', isAuthenticated, async (req: any, res) => {
+  try {
+    const userId = req.user.claims.sub;
+    const user = await storage.getUser(userId);
+
+    if (!user?.currentProgramId) {
+      return res.json([]);
+    }
+
+    const workouts = await storage.getWorkoutsByProgram(user.currentProgramId);
+
+
+```
+
+I notice the endpoint returns an empty array if the user lacks a current program. This could explain why no workouts are displaying. The API checks for a valid `currentProgramId` before fetching workouts, which means users without an active program will see no workout data.
+
+The potential root causes appear to be:
+- Missing current program assignment
+- Incomplete user profile configuration
+- Potential data synchronization issue between user account and program selection
+
+The user progress endpoint retrieves multiple data points: user progress, streak, total workouts, and weekly completed workouts. Each of these components requires valid user data to populate correctly.
+
+The calendar logic specifically depends on two critical conditions: existing user progress with a start date and a non-empty array of program workouts. If either condition fails, the calendar will not render workout information.
+
+Potential failure scenarios include:
+- Missing current program
+- No user progress record
+- Empty program workout list
+
+The early return condition in the calendar generation checks these exact scenarios, logging diagnostic details when data is incomplete. This mechanism prevents rendering an empty or broken calendar interface by returning an empty map when required data is missing.
+
+Key validation points focus on verifying program assignment, tracking progress, and ensuring workout availability before generating calendar data.
+
+Looking at your calendar code, I can identify several potential issues that could cause the "no workouts available to show" message. Here are the main problems to check:
+
+## Primary Issues to Investigate:
+
+### 1. **Early Return in Calendar Data Generation**
+The calendar has an early return condition that's likely triggering:
+
+```javascript
+if (!userProgress || !Array.isArray(programWorkouts) || programWorkouts.length === 0) {
+  console.log('Calendar data: Missing required data', {
+    userProgress: !!userProgress,
+    programWorkouts: Array.isArray(programWorkouts) ? programWorkouts.length : 'not array'
+  });
+  return new Map<string, WorkoutStatus>();
+}
+```
+
+### 2. **User Missing Current Program ID**
+In `/api/workouts`, if the user doesn't have a `currentProgramId`, it returns an empty array:
+
+```javascript
+if (!user?.currentProgramId) {
+  return res.json([]);
+}
+```
+
+### 3. **Missing User Progress Record**
+The calendar needs a `userProgress` record with a valid `startDate` to calculate workout scheduling.
+
+## Debugging Steps to Perform:
+
+### 1. **Check the Debug Endpoint**
+You have a helpful debug endpoint already built in. Try calling:
+```
+GET /api/debug/calendar-data
+```
+
+This will show you exactly what data the calendar is receiving.
+
+### 2. **Check Browser Console**
+Look for the console.log message from the early return:
+```
+"Calendar data: Missing required data"
+```
+
+### 3. **Verify User Setup**
+Check if the user has:
+- Completed assessment (`assessmentCompleted: true`)
+- Has a current program assigned (`currentProgramId`)
+- Has user progress record with `startDate`
+
+### 4. **Check Database Records**
+Verify these database queries return data:
+```sql
+-- Check user has program assigned
+SELECT currentProgramId, assessmentCompleted FROM users WHERE id = ?;
+
+-- Check user progress exists
+SELECT * FROM user_progress WHERE userId = ?;
+
+-- Check program has workouts
+SELECT COUNT(*) FROM workouts WHERE programId = ?;
+```
+
+## Quick Fixes to Try:
+
+### 1. **Add More Detailed Logging**
+Add this logging to the calendar component to see what's missing:
+
+```javascript
+console.log('Calendar Debug Info:', {
+  userProgress: userProgress,
+  programWorkouts: programWorkouts,
+  programWorkoutsLength: programWorkouts?.length,
+  programWorkoutsIsArray: Array.isArray(programWorkouts),
+  dashboardData: dashboardData,
+  completions: completions?.length
+});
+```
+
+### 2. **Check API Response Format**
+Ensure the `/api/workouts` endpoint is returning the expected format. It should return an array of workout objects.
+
+### 3. **Verify User Onboarding**
+Check the `/api/user-onboarding-status` endpoint to ensure the user has completed the full setup process.
+
+## Most Likely Root Causes:
+
+1. **User hasn't completed assessment/onboarding properly**
+2. **User doesn't have a program assigned (`currentProgramId` is null)**
+3. **User progress record is missing or has no `startDate`**
+4. **The assigned program has no workout records in the database**
+
+Try the debug endpoint first - it will show you exactly which piece of data is missing and help you trace the issue back to its source.
